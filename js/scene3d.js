@@ -392,9 +392,11 @@ function createShop(canvas, opts) {
     g.fillStyle = '#c8261c'; g.fillRect(0, 0, 256, 256);
     g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 3;
     for (let y = 16; y < 256; y += 22) { g.beginPath(); g.moveTo(0, y); g.lineTo(256, y); g.stroke(); }
-    g.fillStyle = '#1a0a06'; g.font = 'bold 110px ' + FONT_JP; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText(Array.from(SHOP.NAME.replace(/^居酒屋\s*/, ''))[0] || '酒', 64, 130);
-    g.fillText(Array.from(SHOP.NAME.replace(/^居酒屋\s*/, ''))[0] || '酒', 192, 130);
+    g.fillStyle = '#1a0a06'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const chars = Array.from(SHOP.NAME.replace(/^居酒屋\s*/, '') || '酒').slice(0, 3);
+    const sz = chars.length === 1 ? 120 : chars.length === 2 ? 78 : 58;
+    g.font = 'bold ' + sz + 'px ' + FONT_JP;
+    [64, 192].forEach((cx) => chars.forEach((ch, k) => g.fillText(ch, cx, 128 + (k - (chars.length - 1) / 2) * sz * 1.02)));
   });
   const lanterns = [];
   const nl = Math.max(2, Math.round(L / 1.6));
@@ -449,7 +451,7 @@ function createShop(canvas, opts) {
   function target() {
     const x = view.seat >= 0 ? seatX(view.seat, N) : 0;
     switch (view.mode) {
-      case 'first': wantPos.set(x, 1.5, GUEST_Z + 0.22); wantLook.set(x + (ownerTargetX - x) * 0.55, 1.2, -0.95); break;
+      case 'first': wantPos.set(x, 1.5, GUEST_Z + 0.22); wantLook.set(x + (ownerTargetX - x) * 0.6, 1.08, -0.95); break;
       case 'back': wantPos.set(x * 0.85, 1.95, GUEST_Z + 1.55); wantLook.set(x * 0.7, 1.15, -0.4); break;
       case 'owner': wantPos.set(0, 2.25, -1.6); wantLook.set(0, 0.95, 1.3); break;
       default: wantPos.set(0, 2.75, 3.15); wantLook.set(0, 1.0, -0.9);
