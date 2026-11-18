@@ -92,6 +92,7 @@
       scene = make2D();
     }
     scene.onTap = function (seat) { if (seat >= 0) onSeatTap(seat); };
+    scene.onItemTap = function (seat, key) { if (inside && seat === mySeat && !OWNER_MODE) eat(key); };
     scene.onFrame = placeOverlays;
     sceneWait.forEach(function (fn) { fn(scene); }); sceneWait = [];
     applyTree();
@@ -713,9 +714,11 @@
     var it = menuItem(x.id), drink = it && it.kind === 'drink', b = x.bites + 1;
     var up = { bites: b }; if (b >= 2) up.emptyAt = TS;
     net.update('tables/' + mySeat + '/' + key, up);
+    withScene(function (sc) { if (sc.bump) sc.bump(key); if (drink) sc.cheer(mySeat); else sc.talk(mySeat); });
     floater(mySeat, b >= 2 ? (drink ? '😆' : '😋') : (drink ? '🍻' : '😊'));
     if (b >= 2) toast((it ? it.emoji + ' ' + it.name : '') + (drink ? ' を飲み干しました' : ' を食べ終わりました') + '。おかわりは「注文」から', 2200);
   }
+  var tipShown = !!lsGet('iz-tip-eat', 0);
   function renderMine() {
     var box = $('mine'); if (!box) return;
     var list = inside && mySeat >= 0 ? tableItems(mySeat).filter(function (x) { return !x.empty; }) : [];
@@ -724,6 +727,7 @@
       var verb = drink ? (x.half ? '飲み干す' : '飲む') : (x.half ? '食べ終わる' : '食べる');
       return '<button data-eat="' + x.key + '">' + it.emoji + ' <b>' + verb + '</b></button>';
     }).join('');
+    if (h && !tipShown) { tipShown = true; lsSet('iz-tip-eat', 1); setTimeout(function () { toast('料理や飲み物を そのまま押しても、食べたり飲んだりできます', 3500); }, 1500); }
     if (box._h !== h) { box._h = h; box.innerHTML = h; box.classList.toggle('hidden', !h);
       box.querySelectorAll('[data-eat]').forEach(function (b) { b.onclick = function () { eat(b.getAttribute('data-eat')); }; }); }
   }
@@ -1160,5 +1164,5 @@
 
   initEntrance();
   // 確認用(画面の自動テストから使う)
-  window.IZ = { get tree() { return tree; }, get inside() { return inside; }, get seat() { return mySeat; }, net: function () { return net; }, addBot: addBot, status: status, upcoming: upcoming };
+  window.IZ = { scene: function () { return scene; }, get tree() { return tree; }, get inside() { return inside; }, get seat() { return mySeat; }, net: function () { return net; }, addBot: addBot, status: status, upcoming: upcoming };
 })();

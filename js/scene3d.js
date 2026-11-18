@@ -760,6 +760,8 @@ function createShop(canvas, opts) {
   const tableGroups = [], tableKeys = new Array(N).fill('');
   for (let i = 0; i < N; i++) { const t = new THREE.Group(); t.position.set(seatX(i, N), COUNTER_Y, 0.08); scene.add(t); tableGroups.push(t); }
   let owner = null, ownerKey = '', ownerTargetX = 0;
+  let itemHitList = [], bumpKey = '', bumpAt = 0;
+  const HIT_MAT = new THREE.MeshBasicMaterial({ visible: false });
 
   // カメラ
   const view = { mode: 'overview', seat: -1, yaw: 0, pitch: 0 };
@@ -813,6 +815,9 @@ function createShop(canvas, opts) {
       const r = canvas.getBoundingClientRect();
       ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(ndc, camera);
+      // 先に料理・飲み物(押すと食べる・飲む)、なければ いす
+      const itemHits = ray.intersectObjects(itemHitList, false);
+      if (itemHits.length && api.onItemTap) { const u = itemHits[0].object.userData; api.onItemTap(u.seat, u.key); drag = null; return; }
       const hits = ray.intersectObjects(stools.map((s) => s.hit));
       api.onTap(hits.length ? hits[0].object.userData.seat : -1);
     }
@@ -841,6 +846,15 @@ function createShop(canvas, opts) {
     camera.position.copy(camPos); camera.lookAt(camLook);
     if (Math.abs(camera.fov - wantFov) > 0.05) { camera.fov += (wantFov - camera.fov) * k; camera.updateProjectionMatrix(); }
     seatAvatars.forEach((a) => a && animateAvatar(a, dt));
+    // 押した料理が「ぽよん」とはねる
+    const tnow = performance.now();
+    tableGroups.forEach((tg) => tg.children.forEach((m) => {
+      const b = m.userData.bump; if (!b) return;
+      const e = (tnow - b) / 450;
+      if (e >= 1) { m.scale.setScalar(1); m.position.y = 0; m.userData.bump = 0; return; }
+      const k2 = Math.sin(e * Math.PI);
+      m.scale.set(1 + k2 * 0.18, 1 - k2 * 0.12 + Math.sin(e * Math.PI * 2) * 0.05, 1 + k2 * 0.18); m.position.y = k2 * 0.03;
+    }));
     if (owner) { animateAvatar(owner, dt); owner.position.x += (ownerTargetX - owner.position.x) * Math.min(1, dt * 3); }
     lanterns.forEach((l, i) => { l.rotation.z = Math.sin(clock.elapsedTime * 0.8 + i) * 0.03; });
     renderer.render(scene, camera);
@@ -859,7 +873,11 @@ function createShop(canvas, opts) {
   }
 
   const api = {
-    onTap: null, onFrame: null,
+    onTap: null, onFrame: null, onItemTap: null,
+    /* 確認用: 料理の画面上の位置 */
+    itemPos(key) { const h = itemHitList.find((x) => x.userData.key === key); if (!h) return null; const v = new THREE.Vector3(); h.getWorldPosition(v); v.y += 0.02; v.project(camera); const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; },
+    /* 押した料理を はねさせる(作りなおしたあとでも はねるように 覚えておく) */
+    bump(key) { bumpKey = key; bumpAt = performance.now(); tableGroups.forEach((tg) => tg.children.forEach((m) => { if (m.userData.key === key) m.userData.bump = bumpAt; })); },
     /* seats: [{ key, avatar } | null, ...]  key が変わったときだけ作りなおす */
     setSeats(list) {
       for (let i = 0; i < N; i++) {
@@ -902,6 +920,7 @@ function createShop(canvas, opts) {
         tableKeys[i] = key;
         const g = tableGroups[i];
         while (g.children.length) g.remove(g.children[0]);
+        itemHitList = itemHitList.filter((h) => h.userData.seat !== i);
         let f = 0, d = 0;
         list.forEach((x, k) => {
           const it = SHOP.MENU.find((m) => m.id === x.id) || { id: x.id, emoji: '🍽️', model: 'plate', kind: 'food' };
@@ -910,6 +929,12 @@ function createShop(canvas, opts) {
           if (it.kind === 'drink') { pos = [DRINK_SLOT[0], DRINK_SLOT[1] - d * 0.12]; d++; }
           else { pos = FOOD_SLOTS[f % FOOD_SLOTS.length]; if (f >= FOOD_SLOTS.length) pos = [pos[0] + 0.03, pos[1] - 0.03]; f++; }
           m.position.set(pos[0], 0, pos[1]); m.rotation.y = it.kind === 'drink' ? 0 : ((k * 1.7) % 1 - 0.5) * 0.6;
+          m.userData.key = x.key;
+          if (x.key === bumpKey && performance.now() - bumpAt < 450) m.userData.bump = bumpAt;
+          if (!x.empty) {   // 指で押しやすいように、見えない大きめの当たりを付ける
+            const hit = mesh(new THREE.CylinderGeometry(it.kind === 'drink' ? 0.07 : 0.12, 0.12, 0.2, 10), HIT_MAT, 0, 0.08, 0);
+            hit.userData = { seat: i, key: x.key }; m.add(hit); itemHitList.push(hit);
+          }
           g.add(m);
         });
       }
