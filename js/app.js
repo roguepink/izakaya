@@ -878,7 +878,7 @@
       AVATAR.PRESETS.forEach(function (p, i) { h += '<button data-preset="' + i + '">' + esc(p.name) + '</button>'; });
       return h + '</div><div class="mk-sec">ほかのタブで、顔・髪・服を細かく直せます</div>';
     } },
-    { name: '顔', build: function () { return opts('目', 'eyes') + opts('まゆ', 'brows') + opts('口', 'mouth') + opts('ひげ', 'beard') + swatch('はだの色', 'skin', AVATAR.SKIN); } },
+    { name: '顔', build: function () { return opts('顔の形', 'face') + opts('目', 'eyes') + swatch('目の色', 'eyeColor', AVATAR.EYE_COLOR) + opts('まゆ', 'brows') + opts('鼻', 'nose') + opts('口', 'mouth') + opts('ひげ', 'beard') + swatch('はだの色', 'skin', AVATAR.SKIN); } },
     { name: '髪', build: function () { return opts('髪型', 'hair') + swatch('髪の色', 'hairColor', AVATAR.HAIR_COLOR); } },
     { name: '服', build: function () { return opts('服', 'top') + swatch('服の色', 'topColor', AVATAR.CLOTH_COLOR); } },
     { name: '小物', build: function () { return opts('小物', 'acc'); } },
@@ -898,6 +898,8 @@
   function swatch(label, key, colors) {
     var h = '<div class="mk-sec">' + label + '</div><div class="swatches">';
     colors.forEach(function (c, i) { h += '<button data-k="' + key + '" data-v="' + i + '" class="' + (draft[key] === i ? 'on' : '') + '" style="background:' + c + '"></button>'; });
+    var cur = AVATAR.color(colors, draft[key]);
+    h += '<label class="free-color' + (typeof draft[key] === 'string' ? ' on' : '') + '">🎨 自由な色<input type="color" data-free="' + key + '" value="' + cur + '"></label>';
     return h + '</div>';
   }
   function openMaker() {
@@ -934,6 +936,10 @@
     body.querySelectorAll('[data-preset]').forEach(function (b) {
       b.onclick = function () { var p = AVATAR.PRESETS[+b.getAttribute('data-preset')]; var v = draft.voice; draft = AVATAR.fix(p); draft.voice = v; updateDraft(); renderMaker(); };
     });
+    body.querySelectorAll('[data-free]').forEach(function (inp) {
+      inp.oninput = function () { draft[inp.getAttribute('data-free')] = inp.value; updateDraft(); };
+      inp.onchange = function () { renderMaker(); };
+    });
     var sz = $('mkSize'); if (sz) sz.oninput = function () { draft.size = +sz.value; updateDraft(); };
   }
   function updateDraft() { if (preview) preview.setAvatar(draft); }
@@ -959,9 +965,9 @@
   function drawFace2D(cv, a) {
     var g = cv.getContext('2d'), w = cv.width;
     g.clearRect(0, 0, w, w);
-    g.fillStyle = AVATAR.CLOTH_COLOR[a.topColor]; g.beginPath(); g.ellipse(w / 2, w * 1.02, w * 0.42, w * 0.3, 0, 0, Math.PI * 2); g.fill();
-    g.fillStyle = AVATAR.SKIN[a.skin]; g.beginPath(); g.arc(w / 2, w * 0.5, w * 0.3, 0, Math.PI * 2); g.fill();
-    if (a.hair !== 9) { g.fillStyle = AVATAR.HAIR_COLOR[a.hairColor]; g.beginPath(); g.arc(w / 2, w * 0.46, w * 0.32, Math.PI * 1.05, Math.PI * 1.95); g.fill(); }
+    g.fillStyle = AVATAR.color(AVATAR.CLOTH_COLOR, a.topColor); g.beginPath(); g.ellipse(w / 2, w * 1.02, w * 0.42, w * 0.3, 0, 0, Math.PI * 2); g.fill();
+    g.fillStyle = AVATAR.color(AVATAR.SKIN, a.skin); g.beginPath(); g.arc(w / 2, w * 0.5, w * 0.3, 0, Math.PI * 2); g.fill();
+    if (a.hair !== 9) { g.fillStyle = AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor); g.beginPath(); g.arc(w / 2, w * 0.46, w * 0.32, Math.PI * 1.05, Math.PI * 1.95); g.fill(); }
     g.fillStyle = '#241712';
     [0.4, 0.6].forEach(function (x) { g.beginPath(); g.arc(w * x, w * 0.52, w * 0.035, 0, Math.PI * 2); g.fill(); });
     g.strokeStyle = '#5a2a20'; g.lineWidth = w * 0.03; g.lineCap = 'round';

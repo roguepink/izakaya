@@ -52,7 +52,7 @@ function faceTexture(a) {
     g.lineCap = 'round'; g.lineJoin = 'round';
     const EY = 128, LX = 90, RX = 166;
     // 眉
-    g.strokeStyle = AVATAR.HAIR_COLOR[a.hairColor] === '#e8e0d0' ? '#9a9088' : ink;
+    g.strokeStyle = AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor) === '#e8e0d0' ? '#9a9088' : ink;
     const bw = [5, 9, 5, 6, 0][a.brows];
     if (bw) {
       g.lineWidth = bw;
@@ -65,7 +65,8 @@ function faceTexture(a) {
       });
     }
     // 目
-    g.fillStyle = ink; g.strokeStyle = ink;
+    const eyeC = AVATAR.color(AVATAR.EYE_COLOR, a.eyeColor);
+    g.fillStyle = eyeC; g.strokeStyle = ink;
     [LX, RX].forEach((x, idx) => {
       const s = idx ? 1 : -1;
       switch (a.eyes) {
@@ -79,15 +80,20 @@ function faceTexture(a) {
         case 5: g.lineWidth = 5; g.beginPath(); g.moveTo(x - 11, EY); g.lineTo(x + 11, EY); g.stroke(); break;
         default: g.beginPath(); g.arc(x, EY, 11, 0, Math.PI * 2); g.fill();
       }
-      if (a.eyes === 0 || a.eyes === 3 || a.eyes === 4) { g.fillStyle = '#fff'; g.beginPath(); g.arc(x + 4, EY - 4, 3.5, 0, Math.PI * 2); g.fill(); g.fillStyle = ink; }
+      if (a.eyes === 0 || a.eyes === 3 || a.eyes === 4) { g.fillStyle = '#fff'; g.beginPath(); g.arc(x + 4, EY - 4, 3.5, 0, Math.PI * 2); g.fill(); g.fillStyle = eyeC; }
     });
     // ほっぺ
     if (a.acc === 6) { g.fillStyle = 'rgba(240,110,110,0.45)'; [[64, 164], [192, 164]].forEach(([x, y]) => { g.beginPath(); g.ellipse(x, y, 17, 10, 0, 0, Math.PI * 2); g.fill(); }); }
     // ひげ(口より先にかく)
-    const hc = AVATAR.HAIR_COLOR[a.hairColor];
+    const hc = AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor);
     if (a.beard === 1) { g.fillStyle = hc; g.beginPath(); g.moveTo(92, 190); g.quadraticCurveTo(128, 260, 164, 190); g.quadraticCurveTo(128, 214, 92, 190); g.fill(); }
     if (a.beard === 2) { g.fillStyle = hc; g.beginPath(); g.moveTo(100, 180); g.quadraticCurveTo(128, 162, 156, 180); g.quadraticCurveTo(128, 174, 100, 180); g.fill(); }
     if (a.beard === 3) { g.fillStyle = 'rgba(40,30,30,0.35)'; for (let k = 0; k < 140; k++) { const t = Math.random() * Math.PI, r = 44 + Math.random() * 22; g.fillRect(128 + Math.cos(t) * r * 0.9, 160 + Math.sin(t) * r * 0.7, 2, 2); } }
+    // 鼻
+    g.fillStyle = 'rgba(120,60,40,0.45)'; g.strokeStyle = 'rgba(120,60,40,0.55)'; g.lineWidth = 3.5;
+    if (a.nose === 1) { g.beginPath(); g.arc(128, 160, 3.5, 0, Math.PI * 2); g.fill(); }
+    if (a.nose === 2) { g.beginPath(); g.arc(128, 156, 8, 0.2 * Math.PI, 0.8 * Math.PI); g.stroke(); }
+    if (a.nose === 3) { g.beginPath(); g.moveTo(130, 136); g.lineTo(124, 162); g.lineTo(134, 163); g.stroke(); }
     // 口
     g.strokeStyle = '#5a2a20'; g.fillStyle = '#7a2a24'; g.lineWidth = 5;
     const MY = 188;
@@ -104,9 +110,9 @@ function faceTexture(a) {
 
 function buildAvatar(raw, opt = {}) {
   const a = AVATAR.fix(raw);
-  const skin = mat(AVATAR.SKIN[a.skin]);
-  const hairM = mat(AVATAR.HAIR_COLOR[a.hairColor]);
-  const clothC = AVATAR.CLOTH_COLOR[a.topColor];
+  const skin = mat(AVATAR.color(AVATAR.SKIN, a.skin));
+  const hairM = mat(AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor));
+  const clothC = AVATAR.color(AVATAR.CLOTH_COLOR, a.topColor);
   const cloth = mat(clothC);
   const white = mat('#f3efe6');
   const dark = mat('#1d1a18');
@@ -172,7 +178,9 @@ function buildAvatar(raw, opt = {}) {
 
   // 頭
   const head = new THREE.Group(); head.position.set(0, 0.69, 0); body.add(head);
-  head.add(mesh(new THREE.SphereGeometry(R, 28, 20), skin));
+  const skull = mesh(new THREE.SphereGeometry(R, 28, 20), skin); head.add(skull);
+  const FACE = [[1, 1, 1], [0.95, 1.1, 0.97], [1.1, 0.93, 1.02], [0.9, 1.12, 0.95]][a.face] || [1, 1, 1];
+  head.scale.set(FACE[0], FACE[1], FACE[2]);
   [-1, 1].forEach((s) => head.add(mesh(new THREE.SphereGeometry(0.035, 10, 8), skin, R * 0.98 * s, -0.01, 0)));
   const face = new THREE.Mesh(
     new THREE.SphereGeometry(R * 1.006, 24, 18, Math.PI / 2 - 0.95, 1.9, Math.PI / 2 - 0.8, 1.6),
@@ -184,7 +192,7 @@ function buildAvatar(raw, opt = {}) {
   const backHalf = (r, thetaLen) => mesh(new THREE.SphereGeometry(r, 26, 16, Math.PI / 2 + 0.85, Math.PI * 2 - 1.7, 0, thetaLen), hairM);
   switch (a.hair) {
     case 0: head.add(cap(R * 1.06, 1.25)); break;
-    case 1: { const m = cap(R * 1.015, 1.55, -0.15); m.material = mat(AVATAR.HAIR_COLOR[a.hairColor], { transparent: true, opacity: 0.55 }); head.add(m); break; }
+    case 1: { const m = cap(R * 1.015, 1.55, -0.15); m.material = mat(AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor), { transparent: true, opacity: 0.55 }); head.add(m); break; }
     case 2: head.add(cap(R * 1.08, 1.45, -0.18)); head.add(backHalf(R * 1.07, 1.9)); break;
     case 3: head.add(cap(R * 1.05, 1.3)); for (let k = 0; k < 9; k++) { const c = mesh(new THREE.ConeGeometry(0.035, 0.11, 6), hairM); const t = (k / 9) * Math.PI * 2; c.position.set(Math.cos(t) * 0.09, 0.14, Math.sin(t) * 0.09 - 0.02); c.lookAt(Math.cos(t) * 0.4, 0.5, Math.sin(t) * 0.4); c.rotateX(Math.PI / 2); head.add(c); } break;
     case 4: head.add(cap(R * 1.1, 1.3, -0.1)); head.add(backHalf(R * 1.12, 2.15)); break;

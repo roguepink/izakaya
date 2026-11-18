@@ -68,6 +68,9 @@ button.chip { background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.2
 .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
 .swatches button { width: 38px; height: 38px; border-radius: 50%; border: 3px solid rgba(255,255,255,.2); }
 .swatches button.on { border-color: #fff; box-shadow: 0 0 0 3px var(--gold); }
+.free-color { position: relative; display: inline-flex; align-items: center; gap: 4px; height: 38px; padding: 0 12px; border-radius: 999px; background: rgba(255,255,255,.12); font-size: 13px; font-weight: 700; border: 2px solid transparent; }
+.free-color.on { border-color: var(--gold); }
+.free-color input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
 .presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .presets button { padding: 10px 4px; border-radius: 12px; background: rgba(255,255,255,.1); font-size: 13px; font-weight: 700; }
 .mk-body input[type=range] { width: 100%; }
