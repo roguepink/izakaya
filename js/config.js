@@ -20,7 +20,7 @@ var SHOP = {
   ],
   DOORS_OPEN_BEFORE: 10,      // 開店の何分前から入れるか
   LAST_CALL_BEFORE: 5,        // 閉店の何分前に「そろそろ閉店です」
-  RESERVE_WEEKS: 4,           // 何週先まで予約できるか
+  RESERVE_FROM_HOURS: 3,      // 開店の何時間前から予約できるか(金曜21時開店なら18時から)
   RESERVE_HOLD_MIN: 15,       // 予約の席を、開店から何分まで取っておくか
 
   /* 店の合言葉の「指紋」(SHA-256)。'' なら だれでも入れる。

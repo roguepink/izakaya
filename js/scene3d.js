@@ -913,6 +913,7 @@ function createShop(canvas, opts) {
     }
   }
   // 品書き(壁の木札) — MENU から自動で作る
+  const tagList = [];
   // 壁に入る数だけ(名物が先、つぎに料理、飲み物はあと)
   const tagFit = Math.floor((L - 0.4) / 0.2);
   const items = SHOP.MENU.filter((m) => m.pun).concat(SHOP.MENU.filter((m) => !m.pun && m.kind !== 'drink'), SHOP.MENU.filter((m) => m.kind === 'drink')).slice(0, tagFit);
@@ -928,6 +929,7 @@ function createShop(canvas, opts) {
       chars.forEach((ch, k) => { if (ch === 'ー') { g.save(); g.translate(32, 14 + k * (sz + 2) + sz / 2); g.rotate(Math.PI / 2); g.fillText(ch, 0, -sz / 2); g.restore(); } else g.fillText(ch, 32, 12 + k * (sz + 2)); });
     });
     const tag = mesh(new THREE.PlaneGeometry(tagW, tagH), new THREE.MeshLambertMaterial({ map: t }), tagsX0 + i * (tagW + 0.03), 2.45, -2.08);
+    tag.userData.menuId = it.id; tagList.push(tag);   // 押すと注文できる
     scene.add(tag);
   });
 
@@ -1043,6 +1045,8 @@ function createShop(canvas, opts) {
       ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(ndc, camera);
       // 先に料理・飲み物(押すと食べる・飲む)、なければ いす
+      const tagHits = ray.intersectObjects(tagList, false);
+      if (tagHits.length && api.onTagTap) { const tg = tagHits[0].object; tg.userData.flash = performance.now(); api.onTagTap(tg.userData.menuId); drag = null; return; }
       const itemHits = ray.intersectObjects(itemHitList, false);
       if (itemHits.length && api.onItemTap) { const u = itemHits[0].object.userData; api.onItemTap(u.seat, u.key); drag = null; return; }
       const hits = ray.intersectObjects(stools.map((s) => s.hit));
@@ -1073,6 +1077,7 @@ function createShop(canvas, opts) {
     camera.position.copy(camPos); camera.lookAt(camLook);
     if (Math.abs(camera.fov - wantFov) > 0.05) { camera.fov += (wantFov - camera.fov) * k; camera.updateProjectionMatrix(); }
     seatAvatars.forEach((a) => a && animateAvatar(a, dt));
+    tagList.forEach((tg) => { const f = tg.userData.flash; if (!f) return; const e = (performance.now() - f) / 500; if (e >= 1) { tg.rotation.z = 0; tg.userData.flash = 0; return; } tg.rotation.z = Math.sin(e * Math.PI * 4) * 0.12 * (1 - e); });
     // 押した料理が「ぽよん」とはねる
     const tnow = performance.now();
     tableGroups.forEach((tg) => tg.children.forEach((m) => {
@@ -1100,7 +1105,7 @@ function createShop(canvas, opts) {
   }
 
   const api = {
-    onTap: null, onFrame: null, onItemTap: null,
+    onTap: null, onFrame: null, onItemTap: null, onTagTap: null,
     /* 確認用: 料理の画面上の位置 */
     itemPos(key) { const h = itemHitList.find((x) => x.userData.key === key); if (!h) return null; const v = new THREE.Vector3(); h.getWorldPosition(v); v.y += 0.02; v.project(camera); const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; },
     /* 押した料理を はねさせる(作りなおしたあとでも はねるように 覚えておく) */

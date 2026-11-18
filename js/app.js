@@ -93,6 +93,11 @@
     }
     scene.onTap = function (seat) { if (seat >= 0) onSeatTap(seat); };
     scene.onItemTap = function (seat, key) { if (inside && seat === mySeat && !OWNER_MODE) eat(key); };
+    scene.onTagTap = function (id) {   // 壁の木札を押すと、その品を頼めるか聞く
+      if (!inside || OWNER_MODE) return;
+      if (mySeat < 0) { toast('先に席に座ってください'); return; }
+      openSheet('quick', id);
+    };
     scene.onFrame = placeOverlays;
     sceneWait.forEach(function (fn) { fn(scene); }); sceneWait = [];
     applyTree();
@@ -429,11 +434,15 @@
   };
 
   /* ---------------- 席 ---------------- */
+  /* 予約の回: 次の(または いまの)営業。予約は 開店の3時間前から、開店して15分まで 席を取っておく */
+  function reserveSession() {
+    var n = now(), list = upcoming(n - SHOP.RESERVE_HOLD_MIN * MIN, 8);
+    return list.filter(function (s) { return n < s.start + SHOP.RESERVE_HOLD_MIN * MIN; })[0] || null;
+  }
+  function reserveOpenAt(s) { return s.start - (SHOP.RESERVE_FROM_HOURS || 3) * 60 * MIN; }
   function reservationsNow() {
-    var s = status(now()); if (s.phase === 'closed') return {};
-    var r = (tree.reservations || {})[s.key] || {};
-    if (now() > s.start + SHOP.RESERVE_HOLD_MIN * MIN) return {};
-    return r;
+    var s = reserveSession(); if (!s) return {};
+    return (tree.reservations || {})[s.key] || {};
   }
   function myReservation() { var r = reservationsNow(); for (var i = 0; i < N; i++) if (r[i] && r[i].uid === ME.uid) return i; return -1; }
   function onSeatTap(i) {
@@ -552,13 +561,15 @@
     if (showTags) {
       var st = tree.state || {};
       put('owner', 'owner', (st.ownerName || SHOP.OWNER_NAME) + (ownerPresent() ? '' : '(おまかせ中)'), a.owner);
-      var resv = inside ? reservationsNow() : {};
+      var resv = reservationsNow();
       for (var i = 0; i < N; i++) {
         var uid = seatUid(i), m = uid && ms[uid];
-        if (m && fresh(m)) put('s' + i, uid === ME.uid ? 'me' : '', m.name + (uid === ME.uid ? '(あなた)' : ''), a.seats[i]);
-        else if (inside && !OWNER_MODE && mySeat < 0 && !document.body.classList.contains('no3d')) {
-          var r = resv[i];
-          (function (k) { put('e' + k, r && r.uid !== ME.uid ? 'reserved' : 'free', r ? (r.uid === ME.uid ? 'ご予約の席' : '予約席') : (k + 1) + '番 空席', a.empty[k], function () { onSeatTap(k); }); })(i);
+        if (m && fresh(m)) { put('s' + i, uid === ME.uid ? 'me' : '', m.name + (uid === ME.uid ? '(あなた)' : ''), a.seats[i]); continue; }
+        var r = resv[i];
+        if (r) {   // 予約済みの席は、だれにでも名前が見える
+          (function (k, rr) { put('e' + k, rr.uid === ME.uid ? 'free mine' : 'reserved', rr.uid === ME.uid ? 'ご予約の席(あなた)' : '予約済み ' + rr.name + 'さま', a.empty[k], function () { onSeatTap(k); }); })(i, r);
+        } else if (inside && !OWNER_MODE && mySeat < 0 && !document.body.classList.contains('no3d')) {
+          (function (k) { put('e' + k, 'free', (k + 1) + '番 空席', a.empty[k], function () { onSeatTap(k); }); })(i);
         }
       }
     }
@@ -871,6 +882,19 @@
   }
   function refreshSheet(force) {
     var body = $('shBody'), html = '', title = '';
+    if (sheetKind === 'quick') {
+      if (!force) return;
+      var it = menuItem(sheetArg); if (!it) { closeSheet(); return; }
+      var why = whyNot(mySeat, it.id);
+      $('shTitle').textContent = '木札から注文';
+      body.innerHTML = '<div class="quick"><span class="q-emoji">' + it.emoji + '</span><div class="q-name">' + esc(it.name) + (it.pun ? ' <i class="mn-badge" style="position:static">名物</i>' : '') + '</div>' +
+        '<div class="q-desc">' + esc(it.desc || '') + '</div>' + (why ? '<div class="q-why">いまは頼めません(' + esc(why) + ')</div>' : '') +
+        '<div class="btn-row" style="justify-content:center;margin-top:10px">' + (why ? '' : '<button id="qOrder" class="red">🙋 これを頼む</button>') + '<button id="qMenu">📜 お品書きを見る</button></div></div>';
+      body._h = '';
+      var qo = body.querySelector('#qOrder'); if (qo) qo.onclick = function () { order(it.id); };
+      body.querySelector('#qMenu').onclick = function () { menuCat = it.cat || menuCat; sheetKind = 'menu'; refreshSheet(true); };
+      return;
+    }
     if (sheetKind === 'menu' || sheetKind === 'seat') {
       var seatM = sheetKind === 'menu' ? mySeat : sheetArg;
       if (sheetKind === 'seat') { var u2 = seatUid(seatM), m2 = u2 && members()[u2]; if (!m2) { closeSheet(); return; } title = (seatM + 1) + '番 ' + m2.name + 'さんに出す'; }
@@ -1013,41 +1037,51 @@
     bots = {};
   }
 
-  /* ---------------- 予約 ---------------- */
+  /* ---------------- 予約 ----------------
+     開店の3時間前から予約できる。予約するときに 名前とアバターも登録(前に作ったものがあれば そのまま) */
+  var pendingReserve = false;
   $('reserveBtn').onclick = function () {
     var name = $('nameInput').value.trim().slice(0, 12);
     if (!name) { msg('先にお名前を入れてください'); return; }
     ME.name = name; saveMe();
+    if (!myAvatar()) { pendingReserve = true; toast('予約の前に、アバターを作ってください', 2200); openMaker(); return; }
     var go = function () { $('entrance').classList.add('hidden'); $('reserve').classList.remove('hidden'); renderReserve(); };
     if (SHOP.PASSCODE_HASH) roomFor($('passInput').value.trim()).then(function (r) { lsSet('iz-pass', $('passInput').value.trim()); connect(r); setTimeout(go, 400); }).catch(function () { msg('合言葉がちがいます'); });
     else go();
   };
   $('rsBack').onclick = function () { $('reserve').classList.add('hidden'); $('entrance').classList.remove('hidden'); };
   function renderReserve() {
-    var list = upcoming(now(), SHOP.RESERVE_WEEKS * 7).filter(function (s) { return s.start > now() - 30 * MIN; });
-    var rv = tree.reservations || {}, html = '';
-    if (!list.length) html = '<p class="rs-help">予約できる日がありません。</p>';
-    list.forEach(function (s) {
-      var r = rv[s.key] || {};
+    var s = reserveSession(), n = now(), html = '';
+    var me = myAvatar();
+    html += '<div class="rs-me"><canvas id="rsFace" width="96" height="96"></canvas><div><b>' + esc(ME.name || '') + 'さま</b><small>この名前とアバターで予約します</small></div><button id="rsAv">アバターを変える</button></div>';
+    if (!s) html += '<p class="rs-help">予約できる回がありません。</p>';
+    else if (!LOCAL && n < reserveOpenAt(s)) {
+      html += '<div class="rs-day"><div class="rs-date">' + fmtDay(s.start) + ' ' + fmtTime(s.start) + '〜' + fmtTime(s.end) + '</div>' +
+        '<p class="rs-help">予約は <b>' + fmtDay(reserveOpenAt(s)) + ' ' + fmtTime(reserveOpenAt(s)) + '</b> から受け付けます(開店の' + SHOP.RESERVE_FROM_HOURS + '時間前から)。</p></div>';
+    } else {
+      var r = (tree.reservations || {})[s.key] || {};
       html += '<div class="rs-day"><div class="rs-date">' + fmtDay(s.start) + ' ' + fmtTime(s.start) + '〜' + fmtTime(s.end) + '</div><div class="rs-seats">';
       for (var i = 0; i < N; i++) {
-        var x = r[i];
-        var cls = x ? (x.uid === ME.uid ? 'mine' : 'taken') : '';
-        html += '<button class="' + cls + '" data-k="' + s.key + '" data-i="' + i + '">' + (i + 1) + '番<br>' + (x ? (x.uid === ME.uid ? 'あなた' : esc(x.name) + 'さま') : '空き') + '</button>';
+        var x = r[i], seated = seatUid(i) && fresh(members()[seatUid(i)]);
+        var cls = x ? (x.uid === ME.uid ? 'mine' : 'taken') : (seated ? 'taken' : '');
+        html += '<button class="' + cls + '" data-k="' + s.key + '" data-i="' + i + '">' + (i + 1) + '番<br>' + (x ? (x.uid === ME.uid ? 'あなた' : esc(x.name) + 'さま') : (seated ? '来店中' : '空き')) + '</button>';
       }
-      html += '</div></div>';
-    });
+      html += '</div>' + (LOCAL ? '<p class="small-note" style="color:#c9b38a">おためしモードなので、時間に関係なく予約できます。</p>' : '') + '</div>';
+    }
     $('rsList').innerHTML = html;
-    $('rsList').querySelectorAll('button').forEach(function (b) {
+    drawFace2D($('rsFace'), me);
+    $('rsAv').onclick = function () { pendingReserve = true; $('reserve').classList.add('hidden'); openMaker(); };
+    $('rsList').querySelectorAll('.rs-seats button').forEach(function (b) {
       b.onclick = function () {
         var k = b.getAttribute('data-k'), i = +b.getAttribute('data-i');
         var cur = ((tree.reservations || {})[k] || {})[i];
         if (cur && cur.uid !== ME.uid) { toast('その席は予約ずみです'); return; }
         if (cur) { net.remove('reservations/' + k + '/' + i).then(renderReserve); toast('予約を取り消しました'); return; }
+        if (seatUid(i) && fresh(members()[seatUid(i)])) { toast('その席には、いまお客さんがいます'); return; }
         var mine = (tree.reservations || {})[k] || {};
         for (var j = 0; j < N; j++) if (mine[j] && mine[j].uid === ME.uid) { toast('1回に予約できるのは1席です'); return; }
-        net.set('reservations/' + k + '/' + i, { uid: ME.uid, name: ME.name, at: TS }).then(renderReserve);
-        toast(fmtDay(upcoming(now(), 60).filter(function (s) { return s.key === k; })[0].start) + ' ' + (i + 1) + '番の席を予約しました');
+        net.set('reservations/' + k + '/' + i, { uid: ME.uid, name: ME.name, avatar: myAvatar(), at: TS }).then(renderReserve);
+        toast((i + 1) + '番の席を予約しました。来店すると その席にご案内します', 2600);
       };
     });
   }
@@ -1198,6 +1232,7 @@
     if ($('maker').dataset.back !== 'shop') $('entrance').classList.remove('hidden');
     if (pendingEnter && myAvatar()) { pendingEnter = false; $('enterBtn').click(); }
     pendingEnter = false;
+    if (pendingReserve) { pendingReserve = false; if (myAvatar()) { $('entrance').classList.add('hidden'); $('reserve').classList.remove('hidden'); renderReserve(); } }
   }
   var pendingEnter = false;
   $('mkBack').onclick = function () { pendingEnter = false; closeMaker(); };
