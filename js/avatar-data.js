@@ -1,40 +1,55 @@
 'use strict';
 /* =====================================================================
-   アバターの部品の一覧 —— ここに1行足すと、着せかえの選択肢が1つ増える。
-   (形そのものは js/scene3d.js の「アバターを組み立てる」で作る。新しい形を足すときは両方を直す)
+   アバターの部品の一覧(2026-11-19 作りなおし・2代目)
+   ・最初に「女性/男性」を選ぶ。髪型・目・服・小物は、女性用と男性用で別
+   ・お客さん用と大将用で、服と小物が別(はちまき・前掛けなどは大将だけ。お客さんに制服はない)
+   ・ここに1行足すと、着せかえの選択肢が増える。形そのものは js/scene3d.js の buildAvatar で作る
+     (新しい id を足したら、scene3d.js にも その形を足す)
    ===================================================================== */
 var AVATAR = {
-  SKIN: ['#fbe3cf', '#f1c7a5', '#e0a982', '#c98a5e', '#9a6340', '#6b4128'],
-  HAIR_COLOR: ['#1b1310', '#3b2418', '#6b4024', '#a86b3c', '#d9b26a', '#e8e0d0', '#8a8a8a', '#b8325a', '#3c5bb8'],
-  CLOTH_COLOR: ['#2c3e66', '#8a1f24', '#2f5d3a', '#e8e3d8', '#1d1d1f', '#d9822b', '#6d3f8f', '#4fa0c8', '#c44d7a', '#7a6a52'],
-  EYE_COLOR: ['#241712', '#5a3416', '#2a4a7a', '#2f6a4a', '#7a2a4a', '#6a6a6a'],
-  PARTS: {
-    face:  ['まる', 'たまご', 'しかく', 'ほそ顔'],
-    nose:  ['なし', 'てん', 'ちょこん', 'しっかり'],
-    hair:  ['短め', 'ぼうず', 'ふつう', 'ツンツン', 'ボブ', 'ロング', 'おだんご', 'ポニーテール', 'オールバック', 'なし'],
-    eyes:  ['まる', 'にこにこ', 'きりっ', 'たれ目', 'ぱっちり', 'ほそ目'],
-    brows: ['ふつう', '太め', 'こまり', 'きりっ', 'なし'],
-    mouth: ['にっこり', 'ふつう', 'おおわらい', 'への字', 'ぽかん'],
-    beard: ['なし', 'あごひげ', '口ひげ', 'ぶしょうひげ'],
-    top:   ['Tシャツ', '法被(はっぴ)', '作務衣(さむえ)', 'ジャケット', 'パーカー', '着物', 'エプロン'],
-    acc:   ['なし', 'はちまき', 'メガネ', 'サングラス', '帽子', '手ぬぐい', 'ほっぺ赤']
+  V: 2,
+  SKIN: ['#fde7d6', '#f6d2b8', '#ecbf9c', '#d9a27a', '#b87c55', '#8a5638'],
+  HAIR_COLOR: ['#1c1714', '#3a2620', '#5c3a26', '#8a5a36', '#b88a5a', '#d9b98a', '#e8e2d8', '#8a8a92', '#9a3a4a', '#c46a8a', '#3a4a7a', '#4a6a5a'],
+  EYE_COLOR: ['#2a1a14', '#5a3a22', '#7a5a2a', '#2a4a7a', '#3a6a4a', '#6a3a6a', '#4a4a52'],
+  CLOTH_COLOR: ['#2c3550', '#1d1d22', '#f2efe8', '#8a1f2a', '#2f5a44', '#c87a3a', '#6a5a8a', '#5a8ab8', '#d98aa0', '#e8d8b8', '#7a6a52', '#3a6a8a', '#b8b8c0', '#e8c84a'],
+  LIP_COLOR: ['#d88080', '#e86a7a', '#c84a5a', '#e8968a', '#b85a6a'],
+
+  /* 男女で同じもの */
+  COMMON: {
+    face: [['round', 'まる'], ['egg', 'たまご'], ['sharp', 'シャープ'], ['square', 'エラはり']],
+    mouth: [['smile', 'にっこり'], ['soft', 'ほほえみ'], ['grin', 'にかっ'], ['flat', 'すまし'], ['open', 'ぽかん'], ['cat', 'ねこ口']]
   },
-  /* 体の大きさ(0.85〜1.15) */
-  SIZE_MIN: 0.85, SIZE_MAX: 1.15,
-
-  /* はじめから用意してあるアバター(「おまかせ」で選べる) */
-  PRESETS: [
-    { name: 'サラリーマン', skin: 1, hair: 2, hairColor: 0, eyes: 0, brows: 0, mouth: 1, beard: 0, top: 3, topColor: 0, acc: 2, size: 1 },
-    { name: 'OL',           skin: 0, hair: 5, hairColor: 2, eyes: 4, brows: 0, mouth: 0, beard: 0, top: 3, topColor: 3, acc: 6, size: 0.93 },
-    { name: '職人',         skin: 2, hair: 1, hairColor: 0, eyes: 2, brows: 1, mouth: 3, beard: 3, top: 2, topColor: 9, acc: 5, size: 1.05 },
-    { name: '学生',         skin: 1, hair: 3, hairColor: 1, eyes: 0, brows: 0, mouth: 2, beard: 0, top: 4, topColor: 7, acc: 0, size: 0.95 },
-    { name: 'おばちゃん',   skin: 1, hair: 6, hairColor: 6, eyes: 1, brows: 0, mouth: 2, beard: 0, top: 6, topColor: 8, acc: 6, size: 0.92 },
-    { name: 'ご隠居',       skin: 2, hair: 9, hairColor: 5, eyes: 5, brows: 1, mouth: 0, beard: 1, top: 5, topColor: 9, acc: 2, size: 0.97 }
-  ],
-
-  /* 大将(ノブさん)のアバター。あとで VRoid で作った本人そっくりのアバターに差しかえられるようにする */
-  OWNER: { skin: 2, hair: 0, hairColor: 0, eyes: 2, brows: 1, mouth: 0, beard: 3, top: 1, topColor: 0, acc: 1, size: 1.08 },
-
+  /* 性別ごと: [id, 名前] */
+  SEX: {
+    m: {
+      label: '男性',
+      hair: [['short', 'さわやかショート'], ['twoblock', 'ツーブロック'], ['center', 'センター分け'], ['mash', 'マッシュ'], ['side', '七三分け'],
+             ['perm', 'ゆるパーマ'], ['spiky', 'ツンツン'], ['back', 'オールバック'], ['long', '長め・ひとつ結び'], ['buzz', 'ぼうず']],
+      eyes:  [['clear', 'くっきり'], ['cool', '切れ長'], ['round', 'まる目'], ['droopy', 'たれ目'], ['sharp', 'つり目'], ['smile', 'にこにこ'], ['narrow', 'ほそ目']],
+      brows: [['thick', '太め'], ['natural', 'ふつう'], ['straight', 'まっすぐ'], ['up', 'きりっ'], ['worry', 'こまり']],
+      beard: [['none', 'なし'], ['stubble', 'ぶしょうひげ'], ['chin', 'あごひげ'], ['mustache', '口ひげ'], ['full', 'フルひげ']],
+      top:   [['suit', 'スーツ'], ['suitopen', 'スーツ(ノーネクタイ)'], ['shirt', 'シャツ'], ['polo', 'ポロシャツ'], ['knit', 'ニット'],
+              ['hoodie', 'パーカー'], ['jacket', 'ジャケット+Tシャツ'], ['denim', 'デニムジャケット'], ['work', '作業着'], ['tee', 'Tシャツ']],
+      acc:   [['none', 'なし'], ['glasses', '黒ぶちメガネ'], ['thin', 'ほそぶちメガネ'], ['sun', 'サングラス'], ['cap', 'キャップ'], ['beanie', 'ニット帽'], ['necklace', 'ネックレス']]
+    },
+    f: {
+      label: '女性',
+      hair: [['bob', 'ボブ'], ['shortbob', 'ショートボブ'], ['short', 'ショート'], ['long', 'ロング'], ['wave', 'ゆるふわロング'], ['ponytail', 'ポニーテール'],
+             ['bun', 'おだんご'], ['halfup', 'ハーフアップ'], ['hime', 'ぱっつんロング'], ['side', 'サイドまとめ']],
+      eyes:  [['big', 'ぱっちり'], ['droopy', 'たれ目'], ['cat', 'ねこ目'], ['cool', '切れ長'], ['smile', 'にこにこ'], ['round', 'まる目'], ['wink', 'ウインク']],
+      brows: [['soft', 'ふんわり'], ['thin', '細め'], ['straight', '平行'], ['up', 'きりっ'], ['worry', 'こまり']],
+      top:   [['blouse', 'ブラウス'], ['onepiece', 'ワンピース'], ['knit', 'ニット'], ['cardigan', 'カーディガン'], ['office', 'オフィスジャケット'],
+              ['pantsuit', 'パンツスーツ'], ['hoodie', 'パーカー'], ['tee', 'Tシャツ'], ['denim', 'デニムジャケット'], ['work', '作業着']],
+      acc:   [['none', 'なし'], ['earring', 'イヤリング'], ['necklace', 'ネックレス'], ['glasses', 'メガネ'], ['beret', 'ベレー帽'], ['band', 'カチューシャ'], ['ribbon', 'リボン'], ['sun', 'サングラス']]
+    }
+  },
+  /* 大将だけの服と小物(男女どちらでも) */
+  OWNER_PARTS: {
+    top:   [['happi', '法被(はっぴ)'], ['samue', '作務衣(さむえ)'], ['hakui', '板前の白衣'], ['jinbei', '甚平'], ['tee', 'Tシャツ']],
+    head:  [['none', 'なし'], ['hachimaki', 'はちまき'], ['nejiri', 'ねじりはちまき'], ['tenugui', '手ぬぐい'], ['itamae', '板前帽'], ['bandana', 'バンダナ']],
+    apron: [['none', 'なし'], ['navy', '紺の前掛け'], ['black', '黒の前掛け'], ['white', '白の前掛け'], ['brown', '茶の前掛け']]
+  },
+  SIZE_MIN: 0.88, SIZE_MAX: 1.12,
   VOICES: [
     { name: '男性・低め', pitch: 0.75, rate: 1.0 },
     { name: '男性・ふつう', pitch: 0.95, rate: 1.05 },
@@ -42,40 +57,68 @@ var AVATAR = {
     { name: '女性・高め', pitch: 1.5, rate: 1.1 }
   ],
 
-  /* 色は「一覧の番号」か、自由に選んだ色('#rrggbb') */
-  color: function (list, v) { return typeof v === 'string' ? v : (list[v] || list[0]); },
-
-  random: function () {
-    function r(n) { return Math.floor(Math.random() * n); }
-    var P = AVATAR.PARTS;
-    return {
-      skin: r(AVATAR.SKIN.length), face: r(4), nose: r(4), eyeColor: r(3), hair: r(P.hair.length - 1), hairColor: r(6), eyes: r(P.eyes.length),
-      brows: r(P.brows.length - 1), mouth: r(3), beard: Math.random() < 0.25 ? 1 + r(3) : 0,
-      top: r(P.top.length), topColor: r(AVATAR.CLOTH_COLOR.length), acc: Math.random() < 0.5 ? 0 : r(P.acc.length),
-      size: Math.round((0.9 + Math.random() * 0.2) * 100) / 100, voice: r(AVATAR.VOICES.length)
-    };
+  /* はじめから用意してあるアバター(「おまかせ」で選べる)。値は id で書く */
+  PRESETS: {
+    m: [
+      { name: 'サラリーマン', skin: 1, face: 'egg', hair: 'side', hairColor: 0, eyes: 'clear', brows: 'natural', mouth: 'soft', beard: 'none', top: 'suit', topColor: 0, acc: 'thin' },
+      { name: 'カフェ好き', skin: 1, face: 'sharp', hair: 'center', hairColor: 3, eyes: 'cool', brows: 'straight', mouth: 'flat', beard: 'none', top: 'knit', topColor: 9, acc: 'none' },
+      { name: '職人さん', skin: 3, face: 'square', hair: 'buzz', hairColor: 0, eyes: 'sharp', brows: 'thick', mouth: 'grin', beard: 'stubble', top: 'work', topColor: 10, acc: 'none' },
+      { name: 'ゆるパーマ', skin: 1, face: 'round', hair: 'perm', hairColor: 2, eyes: 'droopy', brows: 'natural', mouth: 'smile', beard: 'none', top: 'hoodie', topColor: 12, acc: 'cap' },
+      { name: 'ダンディ', skin: 2, face: 'square', hair: 'back', hairColor: 7, eyes: 'cool', brows: 'thick', mouth: 'soft', beard: 'chin', top: 'jacket', topColor: 1, acc: 'none' },
+      { name: 'デザイナー', skin: 0, face: 'egg', hair: 'mash', hairColor: 1, eyes: 'round', brows: 'straight', mouth: 'flat', beard: 'none', top: 'tee', topColor: 1, acc: 'glasses' }
+    ],
+    f: [
+      { name: 'オフィス', skin: 0, face: 'egg', hair: 'wave', hairColor: 3, eyes: 'big', brows: 'soft', mouth: 'smile', lip: 0, cheek: 1, top: 'office', topColor: 2, acc: 'earring' },
+      { name: 'カフェ店員', skin: 1, face: 'round', hair: 'bob', hairColor: 2, eyes: 'droopy', brows: 'soft', mouth: 'soft', lip: 3, cheek: 2, top: 'cardigan', topColor: 9, acc: 'none' },
+      { name: 'クール', skin: 0, face: 'sharp', hair: 'long', hairColor: 0, eyes: 'cool', brows: 'straight', mouth: 'flat', lip: 2, cheek: 0, top: 'pantsuit', topColor: 1, acc: 'necklace' },
+      { name: 'ふんわり', skin: 1, face: 'round', hair: 'halfup', hairColor: 4, eyes: 'smile', brows: 'soft', mouth: 'smile', lip: 1, cheek: 2, top: 'onepiece', topColor: 8, acc: 'ribbon' },
+      { name: 'アクティブ', skin: 2, face: 'egg', hair: 'ponytail', hairColor: 1, eyes: 'cat', brows: 'up', mouth: 'grin', lip: 3, cheek: 1, top: 'hoodie', topColor: 7, acc: 'band' },
+      { name: '職人さん', skin: 2, face: 'egg', hair: 'bun', hairColor: 0, eyes: 'round', brows: 'natural', mouth: 'soft', lip: 4, cheek: 1, top: 'work', topColor: 3, acc: 'none' }
+    ]
   },
-  /* 足りない所・おかしな値を直す(古い保存データや、ほかの人から届いたデータでも こわれないように) */
+  /* 大将(ノブさん)のはじめのアバター。あとで VRoid で作った本人そっくりのアバターに差しかえられるようにする */
+  OWNER: { owner: true, sex: 'm', skin: 3, face: 'square', hair: 'short', hairColor: 0, eyes: 'sharp', brows: 'thick', mouth: 'grin', beard: 'stubble',
+           top: 'happi', topColor: 0, head: 'hachimaki', apron: 'navy', size: 1.06, voice: 0 },
+
+  color: function (list, v) { return typeof v === 'string' && v[0] === '#' ? v : (list[v] || list[0]); },
+  /* その人が選べる部品の一覧 */
+  parts: function (a, key) {
+    var S = AVATAR.SEX[a.sex] || AVATAR.SEX.m;
+    if (a.owner && AVATAR.OWNER_PARTS[key]) return AVATAR.OWNER_PARTS[key];
+    return S[key] || AVATAR.COMMON[key] || [];
+  },
+  random: function (sex) {
+    function pick(list) { return list[Math.floor(Math.random() * list.length)]; }
+    sex = sex || (Math.random() < 0.5 ? 'm' : 'f');
+    var p = JSON.parse(JSON.stringify(pick(AVATAR.PRESETS[sex])));
+    var S = AVATAR.SEX[sex];
+    p.sex = sex; p.hair = pick(S.hair)[0]; p.hairColor = Math.floor(Math.random() * 6); p.eyes = pick(S.eyes)[0];
+    p.top = pick(S.top)[0]; p.topColor = Math.floor(Math.random() * AVATAR.CLOTH_COLOR.length);
+    p.acc = Math.random() < 0.5 ? 'none' : pick(S.acc)[0]; p.skin = Math.floor(Math.random() * 4);
+    p.voice = sex === 'f' ? 2 + Math.floor(Math.random() * 2) : Math.floor(Math.random() * 2);
+    p.size = Math.round((0.94 + Math.random() * 0.12) * 100) / 100;
+    return AVATAR.fix(p);
+  },
+  /* 足りない所・おかしな値を直す(古い保存データや、ほかの人から届いたデータでも こわれないように)。
+     古い形(1代目)のデータは null を返す(作りなおしてもらう) */
   fix: function (a) {
-    a = a || {};
-    var P = AVATAR.PARTS, o = {};
-    function n(v, max, d) { v = Math.floor(+v); return v >= 0 && v < max ? v : d; }
-    function c(v, max, d) { return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : n(v, max, d); }
-    o.skin = c(a.skin, AVATAR.SKIN.length, 1);
-    o.face = n(a.face, P.face.length, 0);
-    o.nose = n(a.nose, P.nose.length, 0);
-    o.eyeColor = c(a.eyeColor, AVATAR.EYE_COLOR.length, 0);
-    o.hair = n(a.hair, P.hair.length, 0);
-    o.hairColor = c(a.hairColor, AVATAR.HAIR_COLOR.length, 0);
-    o.eyes = n(a.eyes, P.eyes.length, 0);
-    o.brows = n(a.brows, P.brows.length, 0);
-    o.mouth = n(a.mouth, P.mouth.length, 0);
-    o.beard = n(a.beard, P.beard.length, 0);
-    o.top = n(a.top, P.top.length, 0);
-    o.topColor = c(a.topColor, AVATAR.CLOTH_COLOR.length, 0);
-    o.acc = n(a.acc, P.acc.length, 0);
-    o.voice = n(a.voice, AVATAR.VOICES.length, 1);
+    if (!a || (a.v !== 2 && !a.sex)) return null;
+    var o = { v: 2, sex: a.sex === 'f' ? 'f' : 'm', owner: !!a.owner };
+    function id(key, d) { var list = AVATAR.parts(o, key); var v = a[key]; for (var i = 0; i < list.length; i++) if (list[i][0] === v) return v; return d != null ? d : (list[0] ? list[0][0] : ''); }
+    function c(v, list, d) { return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : (v >= 0 && v < list.length ? Math.floor(v) : d); }
+    o.skin = c(a.skin, AVATAR.SKIN, 1);
+    o.face = id('face'); o.mouth = id('mouth'); o.eyes = id('eyes'); o.brows = id('brows'); o.hair = id('hair');
+    o.hairColor = c(a.hairColor, AVATAR.HAIR_COLOR, 0);
+    o.eyeColor = c(a.eyeColor, AVATAR.EYE_COLOR, 0);
+    if (o.sex === 'm') o.beard = id('beard', 'none');
+    else { o.lip = c(a.lip, AVATAR.LIP_COLOR, 0); o.cheek = a.cheek >= 0 && a.cheek <= 2 ? Math.floor(a.cheek) : 1; }
+    o.top = id('top'); o.topColor = c(a.topColor, AVATAR.CLOTH_COLOR, 0);
+    if (o.owner) { o.head = id('head', 'none'); o.apron = id('apron', 'none'); }
+    else o.acc = id('acc', 'none');
+    o.voice = a.voice >= 0 && a.voice < AVATAR.VOICES.length ? Math.floor(a.voice) : (o.sex === 'f' ? 2 : 1);
     var s = +a.size; o.size = s >= AVATAR.SIZE_MIN && s <= AVATAR.SIZE_MAX ? s : 1;
     return o;
-  }
+  },
+  /* 古いデータでも なにか表示するための 代わり(性別がまだ決まっていない人用) */
+  fallback: function (seed) { var r = AVATAR.random(seed % 2 ? 'f' : 'm'); return r; }
 };

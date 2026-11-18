@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>アバターの見本</title>
+<style>html,body{margin:0;background:#3a2414;color:#fff;font-family:sans-serif}canvas{display:block;width:100vw;height:100vh}
+.lb{position:fixed;transform:translate(-50%,0);font-size:12px;background:rgba(0,0,0,.6);padding:1px 6px;border-radius:6px;white-space:nowrap;pointer-events:none}</style></head>
+<body><canvas id="c"></canvas><div id="labels"></div>
+<script src="../js/config.js"></script><script src="../js/avatar-data.js"></script>
+<script type="module" src="../js/scene3d.js"></script>
+<script type="module">
+/* アバターを並べて見る(作る人の確認用)。?m=presets / hair-m / hair-f / top-m / top-f / acc-m / acc-f / owner / face-m / face-f */
+const wait = () => new Promise((r) => { if (window.IZ3D) r(); else addEventListener('iz3d-ready', r, { once: true }); });
+await wait();
+const { THREE, buildAvatar } = window.IZ3D;
+const mode = new URLSearchParams(location.search).get('m') || 'presets', zoom = new URLSearchParams(location.search).get('z') === '1';
+const list = [];
+const P = (sex, i) => Object.assign(JSON.parse(JSON.stringify(AVATAR.PRESETS[sex][i])), { sex });
+if (mode === 'presets') { ['m', 'f'].forEach((sx) => AVATAR.PRESETS[sx].forEach((p, i) => list.push([P(sx, i), p.name]))); list.push([AVATAR.OWNER, '大将']); }
+const vary = (sex, key, base) => AVATAR.parts({ sex }, key).forEach(([id, nm]) => { const a = P(sex, base); a[key] = id; if (key === 'acc') a.hair = sex === 'm' ? 'short' : 'bob'; list.push([a, nm]); });
+if (mode.startsWith('hair-')) vary(mode.slice(5), 'hair', 0);
+if (mode.startsWith('top-')) vary(mode.slice(4), 'top', 1);
+if (mode.startsWith('acc-')) vary(mode.slice(4), 'acc', 0);
+if (mode.startsWith('eyes-')) vary(mode.slice(5), 'eyes', 0);
+if (mode === 'owner') AVATAR.OWNER_PARTS.top.forEach(([id, nm], i) => { const a = JSON.parse(JSON.stringify(AVATAR.OWNER)); a.top = id; a.head = AVATAR.OWNER_PARTS.head[i + 1] ? AVATAR.OWNER_PARTS.head[i + 1][0] : 'none'; a.apron = AVATAR.OWNER_PARTS.apron[(i % 4) + 1][0]; list.push([a, nm + ' / ' + a.head]); });
+const cv = document.getElementById('c');
+const R = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); R.setPixelRatio(Math.min(devicePixelRatio, 2)); R.outputColorSpace = THREE.SRGBColorSpace;
+const S = new THREE.Scene(); S.background = new THREE.Color('#4a2e1a');
+S.add(new THREE.HemisphereLight('#fff1dc', '#5a3a22', 1.6)); const d = new THREE.DirectionalLight('#ffe0b0', 1.8); d.position.set(1, 2, 2.5); S.add(d);
+const cols = Math.min(list.length, Math.ceil(Math.sqrt(list.length * innerWidth / innerHeight * 1.1)));
+const gap = zoom ? 0.5 : 0.62, rows = Math.ceil(list.length / cols);
+list.forEach(([a, nm], i) => { const av = buildAvatar(a, zoom ? { standing: true } : {}); av.position.set((i % cols - (cols - 1) / 2) * gap, -Math.floor(i / cols) * (zoom ? 1.0 : 1.3), 0); av.rotation.y = -0.35; av.userData.nm = nm; S.add(av); list[i].push(av); });
+const cam = new THREE.PerspectiveCamera(zoom ? 22 : 30, innerWidth / innerHeight, 0.05, 40);
+const h = rows * (zoom ? 1.0 : 1.3), w = cols * gap;
+const dist = Math.max(h / (2 * Math.tan(cam.fov * Math.PI / 360)), w / (2 * Math.tan(cam.fov * Math.PI / 360)) / cam.aspect) * 1.05;
+const cy = zoom ? -(rows - 1) * 1.0 / 2 + 0.45 : -(rows - 1) * 1.3 / 2 + 0.35;
+cam.position.set(0, cy + dist * 0.35, dist); cam.lookAt(0, cy, 0);
+R.setSize(innerWidth, innerHeight, false);
+R.render(S, cam);
+let html = ''; const v = new THREE.Vector3();
+list.forEach(([a, nm, av]) => { v.set(av.position.x, av.position.y - (zoom ? 0.05 : 0.45), 0.3).project(cam); html += `<div class="lb" style="left:${(v.x + 1) / 2 * innerWidth}px;top:${(1 - v.y) / 2 * innerHeight}px">${nm}</div>`; });
+document.getElementById('labels').innerHTML = html;
+window.__ready = true;
+</script></body></html>

@@ -16,11 +16,11 @@
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   var ME = lsGet('iz-me', null);
   if (!ME || !ME.uid) {
-    ME = { uid: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), name: '', avatar: AVATAR.random() };
+    ME = { uid: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), name: '', avatar: null };
     lsSet('iz-me', ME);
   }
-  ME.avatar = AVATAR.fix(ME.avatar);
-  var ownerAvatar = AVATAR.fix(lsGet('iz-owner-avatar', AVATAR.OWNER));
+  ME.avatar = AVATAR.fix(ME.avatar);   // 古い形(1代目)なら null → 女性/男性 から作りなおしてもらう
+  var ownerAvatar = AVATAR.fix(lsGet('iz-owner-avatar', null)) || AVATAR.fix(AVATAR.OWNER);
   function myAvatar() { return OWNER_MODE ? ownerAvatar : ME.avatar; }
   function saveMe() { lsSet('iz-me', ME); }
 
@@ -289,7 +289,7 @@
     }
     scene.setSeats(seats);
     var st = tree.state || {};
-    scene.setOwner(st.ownerAvatar ? AVATAR.fix(st.ownerAvatar) : AVATAR.fix(AVATAR.OWNER));
+    scene.setOwner((st.ownerAvatar && AVATAR.fix(st.ownerAvatar)) || AVATAR.fix(AVATAR.OWNER));
     updateTables();
     if (!inside) return;
 
@@ -357,6 +357,7 @@
     unlockAudio();
     var name = $('nameInput').value.trim().slice(0, 12);
     if (!name) { msg('お名前を入れてください'); $('nameInput').focus(); return; }
+    if (!myAvatar()) { pendingEnter = true; if (OWNER_MODE) ME.ownerName = name; else ME.name = name; saveMe(); toast('はじめに アバターを作ってください', 2200); openMaker(); return; }
     if (OWNER_MODE) ME.ownerName = name; else ME.name = name;
     saveMe();
     var pass = $('passInput').value.trim();
@@ -1051,91 +1052,159 @@
     });
   }
 
-  /* ---------------- アバターを作る ---------------- */
+  /* ---------------- アバターを作る ----------------
+     お客さん: まず 女性/男性 を選ぶ → 顔・目・髪・服・小物。大将: 大将だけの服(法被・白衣…)・頭(はちまき…)・前掛け */
+  var OWNER_PRESETS = [
+    { name: '法被の大将', top: 'happi', topColor: 0, head: 'hachimaki', apron: 'navy' },
+    { name: '板前', top: 'hakui', topColor: 2, head: 'itamae', apron: 'white' },
+    { name: '作務衣', top: 'samue', topColor: 10, head: 'tenugui', apron: 'brown' },
+    { name: '甚平', top: 'jinbei', topColor: 4, head: 'nejiri', apron: 'none' },
+    { name: 'Tシャツと前掛け', top: 'tee', topColor: 1, head: 'bandana', apron: 'black' }
+  ];
   var preview = null, draft = null, mkTab = 0;
-  var TABS = [
+  function sexLabel(x) { return x === 'f' ? '女性' : '男性'; }
+  var GUEST_TABS = [
     { name: 'おまかせ', build: function () {
-      var h = '<div class="mk-sec">はじめから用意してあるアバター</div><div class="presets">';
-      AVATAR.PRESETS.forEach(function (p, i) { h += '<button data-preset="' + i + '">' + esc(p.name) + '</button>'; });
-      return h + '</div><div class="mk-sec">ほかのタブで、顔・髪・服を細かく直せます</div>';
+      var h = '<div class="mk-sex">' + sexLabel(draft.sex) + 'のアバター <button data-resex="1">女性/男性を選びなおす</button></div>';
+      h += '<div class="mk-sec">はじめから用意してあるアバター</div><div class="presets">';
+      AVATAR.PRESETS[draft.sex].forEach(function (p, i) { h += '<button data-preset="' + i + '">' + esc(p.name) + '</button>'; });
+      return h + '</div><div class="mk-sec">ほかのタブで、顔・目・髪・服・小物を細かく直せます</div>';
     } },
-    { name: '顔', build: function () { return opts('顔の形', 'face') + opts('目', 'eyes') + swatch('目の色', 'eyeColor', AVATAR.EYE_COLOR) + opts('まゆ', 'brows') + opts('鼻', 'nose') + opts('口', 'mouth') + opts('ひげ', 'beard') + swatch('はだの色', 'skin', AVATAR.SKIN); } },
+    { name: '顔', build: function () {
+      var h = opts('顔の形', 'face') + opts('まゆ', 'brows') + opts('口', 'mouth');
+      if (draft.sex === 'm') h += opts('ひげ', 'beard');
+      else h += swatch('くちびるの色', 'lip', AVATAR.LIP_COLOR, true) + numOpts('ほっぺ', 'cheek', ['なし', 'ほんのり', 'しっかり']);
+      return h + swatch('はだの色', 'skin', AVATAR.SKIN);
+    } },
+    { name: '目', build: function () { return opts('目', 'eyes') + swatch('目の色', 'eyeColor', AVATAR.EYE_COLOR); } },
     { name: '髪', build: function () { return opts('髪型', 'hair') + swatch('髪の色', 'hairColor', AVATAR.HAIR_COLOR); } },
     { name: '服', build: function () { return opts('服', 'top') + swatch('服の色', 'topColor', AVATAR.CLOTH_COLOR); } },
     { name: '小物', build: function () { return opts('小物', 'acc'); } },
-    { name: '体と声', build: function () {
-      var h = '<div class="mk-sec">体の大きさ</div><input type="range" id="mkSize" min="' + AVATAR.SIZE_MIN + '" max="' + AVATAR.SIZE_MAX + '" step="0.01" value="' + draft.size + '">';
-      h += '<div class="mk-sec">「乾杯」などの声</div><div class="opts">';
-      AVATAR.VOICES.forEach(function (v, i) { h += '<button data-k="voice" data-v="' + i + '" class="' + (draft.voice === i ? 'on' : '') + '">' + esc(v.name) + '</button>'; });
-      h += '</div><div class="mk-sec">いまは仮の読み上げの声です。あとで本物の声に差しかえられます。</div>';
-      return h;
-    } }
+    { name: '体と声', build: function () { return sizeVoice(); } }
   ];
-  function opts(label, key) {
+  var OWNER_TABS = [
+    { name: 'おまかせ', build: function () {
+      var h = '<div class="mk-sex">大将のアバター(' + sexLabel(draft.sex) + ') <button data-resex="1">女性/男性を選びなおす</button></div>';
+      h += '<div class="mk-sec">大将の着こなし</div><div class="presets">';
+      OWNER_PRESETS.forEach(function (p, i) { h += '<button data-opreset="' + i + '">' + esc(p.name) + '</button>'; });
+      return h + '</div><div class="mk-sec">はちまき・前掛けなど お店の人の服は、大将だけが着られます</div>';
+    } },
+    GUEST_TABS[1], GUEST_TABS[2], GUEST_TABS[3],
+    { name: '大将の服', build: function () { return opts('服', 'top') + swatch('服の色', 'topColor', AVATAR.CLOTH_COLOR); } },
+    { name: '頭と前掛け', build: function () { return opts('頭', 'head') + opts('前掛け', 'apron'); } },
+    GUEST_TABS[6]
+  ];
+  function tabs() { return OWNER_MODE ? OWNER_TABS : GUEST_TABS; }
+  function sizeVoice() {
+    var h = '<div class="mk-sec">体の大きさ</div><input type="range" id="mkSize" min="' + AVATAR.SIZE_MIN + '" max="' + AVATAR.SIZE_MAX + '" step="0.01" value="' + draft.size + '">';
+    h += '<div class="mk-sec">「乾杯」などの声</div><div class="opts">';
+    AVATAR.VOICES.forEach(function (v, i) { h += '<button data-n="voice" data-v="' + i + '" class="' + (draft.voice === i ? 'on' : '') + '">' + esc(v.name) + '</button>'; });
+    return h + '</div><div class="mk-sec">いまは仮の読み上げの声です。あとで本物の声に差しかえられます。</div>';
+  }
+  function opts(label, key) {   // 形を選ぶ(値は id)
     var h = '<div class="mk-sec">' + label + '</div><div class="opts">';
-    AVATAR.PARTS[key].forEach(function (n, i) { h += '<button data-k="' + key + '" data-v="' + i + '" class="' + (draft[key] === i ? 'on' : '') + '">' + esc(n) + '</button>'; });
+    AVATAR.parts(draft, key).forEach(function (it) { h += '<button data-k="' + key + '" data-v="' + it[0] + '" class="' + (draft[key] === it[0] ? 'on' : '') + '">' + esc(it[1]) + '</button>'; });
     return h + '</div>';
   }
-  function swatch(label, key, colors) {
+  function numOpts(label, key, names) {
+    var h = '<div class="mk-sec">' + label + '</div><div class="opts">';
+    names.forEach(function (n, i) { h += '<button data-n="' + key + '" data-v="' + i + '" class="' + (draft[key] === i ? 'on' : '') + '">' + esc(n) + '</button>'; });
+    return h + '</div>';
+  }
+  function swatch(label, key, colors, noFree) {
     var h = '<div class="mk-sec">' + label + '</div><div class="swatches">';
-    colors.forEach(function (c, i) { h += '<button data-k="' + key + '" data-v="' + i + '" class="' + (draft[key] === i ? 'on' : '') + '" style="background:' + c + '"></button>'; });
-    var cur = AVATAR.color(colors, draft[key]);
-    h += '<label class="free-color' + (typeof draft[key] === 'string' ? ' on' : '') + '">🎨 自由な色<input type="color" data-free="' + key + '" value="' + cur + '"></label>';
+    colors.forEach(function (c, i) { h += '<button data-n="' + key + '" data-v="' + i + '" class="' + (draft[key] === i ? 'on' : '') + '" style="background:' + c + '"></button>'; });
+    if (!noFree) { var cur = AVATAR.color(colors, draft[key]); h += '<label class="free-color' + (typeof draft[key] === 'string' ? ' on' : '') + '">🎨 自由な色<input type="color" data-free="' + key + '" value="' + cur + '"></label>'; }
     return h + '</div>';
   }
+  function chooseSex(sx) {
+    var keep = draft ? { voice: draft.voice, size: draft.size } : {};
+    if (OWNER_MODE) { var o = JSON.parse(JSON.stringify(AVATAR.OWNER)); o.sex = sx; if (sx === 'f') { o.hair = 'bun'; o.eyes = 'big'; o.brows = 'soft'; o.mouth = 'smile'; o.voice = 2; } draft = AVATAR.fix(o); }
+    else { var p = JSON.parse(JSON.stringify(AVATAR.PRESETS[sx][0])); p.sex = sx; p.voice = sx === 'f' ? 2 : 1; draft = AVATAR.fix(p); }
+    if (keep.size) draft.size = keep.size;
+    mkTab = 0; sexStep = false; updateDraft(); renderMaker();
+  }
+  var sexStep = false;
   function openMaker() {
-    draft = AVATAR.fix(JSON.parse(JSON.stringify(myAvatar())));
-    var back = inside ? 'shop' : 'entrance';
-    $('maker').dataset.back = back;
+    var cur = myAvatar();
+    draft = cur ? AVATAR.fix(JSON.parse(JSON.stringify(cur))) : null;
+    sexStep = !draft;
+    $('maker').dataset.back = inside ? 'shop' : 'entrance';
     $('entrance').classList.add('hidden');
     $('maker').classList.remove('hidden');
-    var tabs = $('mkTabs'); tabs.innerHTML = '';
-    TABS.forEach(function (t, i) {
-      var b = document.createElement('button'); b.textContent = t.name;
-      b.onclick = function () { mkTab = i; renderMaker(); };
-      tabs.appendChild(b);
-    });
+    document.querySelector('.mk-title').textContent = OWNER_MODE ? '大将のアバターを作る' : 'アバターを作る';
     var startPreview = function () {
       if (!window.IZ3D) return;
       if (!preview) preview = window.IZ3D.createPreview($('preview'));
-      preview.setAvatar(draft);
+      if (draft) preview.setAvatar(draft); else preview.setAvatar(null);
     };
     if (window.IZ3D) startPreview(); else window.addEventListener('iz3d-ready', startPreview, { once: true });
     renderMaker();
   }
   function renderMaker() {
-    Array.prototype.forEach.call($('mkTabs').children, function (b, i) { b.classList.toggle('on', i === mkTab); });
-    var body = $('mkBody');
-    body.innerHTML = TABS[mkTab].build();
-    body.querySelectorAll('[data-k]').forEach(function (b) {
+    var tbox = $('mkTabs'), body = $('mkBody');
+    $('mkSave').disabled = sexStep;
+    document.querySelector('.mk-tools').classList.toggle('hidden', sexStep);
+    if (sexStep) {   // さいしょに 女性/男性 を選ぶ
+      tbox.innerHTML = '';
+      body.innerHTML = '<div class="mk-sexpick"><p>' + (OWNER_MODE ? '大将の' : '') + 'アバターを作ります。<br>まず、どちらかを選んでください。</p>' +
+        '<button data-sex="f"><span>👩</span>女性</button><button data-sex="m"><span>👨</span>男性</button>' +
+        '<small>髪型・目・服・小物が、それぞれ女性用・男性用になります。</small></div>';
+      body.querySelectorAll('[data-sex]').forEach(function (b) { b.onclick = function () { chooseSex(b.getAttribute('data-sex')); }; });
+      return;
+    }
+    var T = tabs();
+    if (tbox.children.length !== T.length) {
+      tbox.innerHTML = '';
+      T.forEach(function (t, i) { var b = document.createElement('button'); b.textContent = t.name; b.onclick = function () { mkTab = i; renderMaker(); }; tbox.appendChild(b); });
+    }
+    Array.prototype.forEach.call(tbox.children, function (b, i) { b.classList.toggle('on', i === mkTab); });
+    var keep = body.scrollTop;
+    body.innerHTML = T[mkTab].build();
+    body.scrollTop = keep;
+    body.querySelectorAll('[data-k]').forEach(function (b) { b.onclick = function () { draft[b.getAttribute('data-k')] = b.getAttribute('data-v'); draft = AVATAR.fix(draft); updateDraft(); renderMaker(); }; });
+    body.querySelectorAll('[data-n]').forEach(function (b) {
       b.onclick = function () {
-        draft[b.getAttribute('data-k')] = +b.getAttribute('data-v');
-        if (b.getAttribute('data-k') === 'voice') speak('かんぱーい！', draft.voice);
+        var k = b.getAttribute('data-n'); draft[k] = +b.getAttribute('data-v'); draft = AVATAR.fix(draft);
+        if (k === 'voice') speak('かんぱーい！', draft.voice);
         updateDraft(); renderMaker();
       };
     });
     body.querySelectorAll('[data-preset]').forEach(function (b) {
-      b.onclick = function () { var p = AVATAR.PRESETS[+b.getAttribute('data-preset')]; var v = draft.voice; draft = AVATAR.fix(p); draft.voice = v; updateDraft(); renderMaker(); };
+      b.onclick = function () { var p = JSON.parse(JSON.stringify(AVATAR.PRESETS[draft.sex][+b.getAttribute('data-preset')])); p.sex = draft.sex; p.voice = draft.voice; p.size = draft.size; draft = AVATAR.fix(p); updateDraft(); renderMaker(); };
     });
+    body.querySelectorAll('[data-opreset]').forEach(function (b) {
+      b.onclick = function () { var p = OWNER_PRESETS[+b.getAttribute('data-opreset')]; ['top', 'topColor', 'head', 'apron'].forEach(function (k) { draft[k] = p[k]; }); draft = AVATAR.fix(draft); updateDraft(); renderMaker(); };
+    });
+    var rs = body.querySelector('[data-resex]'); if (rs) rs.onclick = function () { sexStep = true; renderMaker(); };
     body.querySelectorAll('[data-free]').forEach(function (inp) {
-      inp.oninput = function () { draft[inp.getAttribute('data-free')] = inp.value; updateDraft(); };
+      inp.oninput = function () { draft[inp.getAttribute('data-free')] = inp.value; draft = AVATAR.fix(draft); updateDraft(); };
       inp.onchange = function () { renderMaker(); };
     });
     var sz = $('mkSize'); if (sz) sz.oninput = function () { draft.size = +sz.value; updateDraft(); };
   }
-  function updateDraft() { if (preview) preview.setAvatar(draft); }
+  function updateDraft() { if (preview && draft) preview.setAvatar(draft); }
   $('makerBtn').onclick = function () { unlockAudio(); openMaker(); };
-  $('mkRandom').onclick = function () { var v = draft.voice; draft = AVATAR.fix(AVATAR.random()); draft.voice = v; updateDraft(); renderMaker(); };
+  $('mkRandom').onclick = function () {
+    if (!draft) return;
+    if (OWNER_MODE) { var p = OWNER_PRESETS[Math.floor(Math.random() * OWNER_PRESETS.length)]; ['top', 'topColor', 'head', 'apron'].forEach(function (k) { draft[k] = p[k]; }); var r = AVATAR.random(draft.sex); ['hair', 'hairColor', 'eyes', 'brows', 'mouth', 'face', 'skin'].forEach(function (k) { draft[k] = r[k]; }); draft = AVATAR.fix(draft); }
+    else { var v = draft.voice; draft = AVATAR.random(draft.sex); draft.voice = v; }
+    updateDraft(); renderMaker();
+  };
   $('mkZoom').onclick = function () { var z = this.classList.toggle('on'); if (preview) preview.setZoom(z); this.textContent = z ? '🔍 全身' : '🔍 顔を大きく'; };
   $('mkCheer').onclick = function () { if (preview) preview.cheer(); };
   function closeMaker() {
     $('maker').classList.add('hidden');
     if ($('maker').dataset.back !== 'shop') $('entrance').classList.remove('hidden');
+    if (pendingEnter && myAvatar()) { pendingEnter = false; $('enterBtn').click(); }
+    pendingEnter = false;
   }
-  $('mkBack').onclick = closeMaker;
+  var pendingEnter = false;
+  $('mkBack').onclick = function () { pendingEnter = false; closeMaker(); };
   $('mkSave').onclick = function () {
-    if (OWNER_MODE) { ownerAvatar = AVATAR.fix(draft); lsSet('iz-owner-avatar', ownerAvatar); if (inside) net.update('state', { ownerAvatar: ownerAvatar }); }
-    else { ME.avatar = AVATAR.fix(draft); saveMe(); }
+    if (!draft) return;
+    if (OWNER_MODE) { draft.owner = true; ownerAvatar = AVATAR.fix(draft); lsSet('iz-owner-avatar', ownerAvatar); if (inside) net.update('state', { ownerAvatar: ownerAvatar }); }
+    else { draft.owner = false; ME.avatar = AVATAR.fix(draft); saveMe(); }
     if (inside) net.update('members/' + ME.uid, { avatar: myAvatar(), voice: myAvatar().voice });
     drawFace2D($('meFace'), myAvatar());
     toast('アバターを決めました', 1400);
@@ -1146,11 +1215,14 @@
   function drawFace2D(cv, a) {
     var g = cv.getContext('2d'), w = cv.width;
     g.clearRect(0, 0, w, w);
+    if (!a) { g.fillStyle = '#b8a07a'; g.font = (w * 0.5) + 'px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('?', w / 2, w / 2); return; }
     g.fillStyle = AVATAR.color(AVATAR.CLOTH_COLOR, a.topColor); g.beginPath(); g.ellipse(w / 2, w * 1.02, w * 0.42, w * 0.3, 0, 0, Math.PI * 2); g.fill();
+    var hc = AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor);
+    if (a.sex === 'f' && a.hair !== 'short' && a.hair !== 'bun' && a.hair !== 'ponytail') { g.fillStyle = hc; g.beginPath(); g.ellipse(w / 2, w * 0.58, w * 0.36, w * 0.36, 0, 0, Math.PI * 2); g.fill(); }
     g.fillStyle = AVATAR.color(AVATAR.SKIN, a.skin); g.beginPath(); g.arc(w / 2, w * 0.5, w * 0.3, 0, Math.PI * 2); g.fill();
-    if (a.hair !== 9) { g.fillStyle = AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor); g.beginPath(); g.arc(w / 2, w * 0.46, w * 0.32, Math.PI * 1.05, Math.PI * 1.95); g.fill(); }
+    if (a.hair !== 'buzz') { g.fillStyle = hc; g.beginPath(); g.arc(w / 2, w * 0.46, w * 0.32, Math.PI * 1.02, Math.PI * 1.98); g.fill(); }
     g.fillStyle = '#241712';
-    [0.4, 0.6].forEach(function (x) { g.beginPath(); g.arc(w * x, w * 0.52, w * 0.035, 0, Math.PI * 2); g.fill(); });
+    [0.4, 0.6].forEach(function (x) { g.beginPath(); g.ellipse(w * x, w * 0.53, w * 0.035, w * (a.sex === 'f' ? 0.05 : 0.04), 0, 0, Math.PI * 2); g.fill(); });
     g.strokeStyle = '#5a2a20'; g.lineWidth = w * 0.03; g.lineCap = 'round';
     g.beginPath(); g.arc(w / 2, w * 0.6, w * 0.07, 0.2, Math.PI - 0.2); g.stroke();
   }
