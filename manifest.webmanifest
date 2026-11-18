@@ -7,7 +7,7 @@
   "scope": "./",
   "id": "./?app=izakaya-1",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#140c08",
   "theme_color": "#140c08",
   "icons": [

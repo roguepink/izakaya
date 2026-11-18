@@ -508,7 +508,7 @@
       if (seenChat[k]) return; seenChat[k] = 1;
       var m = c[k]; if (m.sys || (m.at || 0) < joinAt - 5000) return;
       bubble(m.seat, m.text, false);
-      withScene(function (s) { s.talk(m.seat); if (typeof m.seat === 'number' && !ownerPresent()) s.ownerGoTo(m.seat); });
+      withScene(function (s) { s.talk(m.seat); }); if (!ownerPresent()) ownerTo(m.seat, false);
     });
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]; }); }
@@ -596,8 +596,9 @@
       var T = p.y;                                   // 吹き出しの「しっぽの先」の位置
       b.bt.style.maxHeight = Math.max(MIN_TEXT, Math.min(T - TAIL - topLimit - 16, share - 16)) + 'px';
       var w = b.el.offsetWidth, h = b.el.offsetHeight;
+      var land = window.innerWidth > window.innerHeight && window.innerHeight < 520;   // 横向きはボタンが上に並ぶので右も使える
       var hw = Math.min(w, window.innerWidth - 100) / 2 + 6;
-      var cx = Math.max(hw, Math.min(window.innerWidth - 72 - hw, p.x));
+      var cx = Math.max(hw, Math.min(window.innerWidth - (land ? 10 : 72) - hw, p.x));
       var x0 = cx - w / 2, x1 = cx + w / 2;
       // ほかの吹き出しとぶつかる間は、上へずらす
       var moved = false, guard = 0, hit = true;
@@ -636,6 +637,15 @@
     });
   }
 
+  /* 大将を席の前へ。いらっしゃい・注文・料理・またお越しください のときは必ず行き、5秒は留まる(会話につられて動かない) */
+  var ownerHold = 0;
+  function ownerTo(seat, important) {
+    if (typeof seat !== 'number') return;
+    if (!important && Date.now() < ownerHold) return;
+    if (important) ownerHold = Date.now() + 5000;
+    withScene(function (s) { s.ownerGoTo(seat); });
+  }
+
   /* ---------------- 決まり文句・乾杯などの合図 ---------------- */
   function event(e) { e.at = TS; e.by = ME.uid; e.voice = myAvatar().voice || 0; net.push('events', e); }
   function buildPhrases() {
@@ -660,16 +670,18 @@
         var ph = SHOP.PHRASES.filter(function (p) { return p.id === e.id; })[0]; if (!ph) return;
         var who = ph.who === 'owner' ? 'owner' : e.seat;
         bubble(who, (ph.emoji ? ph.emoji + ' ' : '') + ph.say, true);
-        withScene(function (s) {
-          if (ph.id === 'kanpai') { s.cheerAll(); } else s.talk(who);
-          if (ph.who === 'owner' && typeof e.seat === 'number') s.ownerGoTo(e.seat);
-        });
+        withScene(function (s) { if (ph.id === 'kanpai') { s.cheerAll(); } else s.talk(who); });
+        if (ph.who === 'owner') ownerTo(e.seat, true);
         if (ph.id === 'kanpai') { for (var i = 0; i < N; i++) if (seatUid(i)) floater(i, '🍻'); floater('owner', '🍻'); }
         else if (ph.emoji) floater(who, ph.emoji);
         playPhrase(ph, e.voice);
+      } else if (e.type === 'order') {
+        ownerTo(e.seat, true);
+        var it0 = menuItem(e.item), ph3 = SHOP.PHRASES.filter(function (p) { return p.id === 'haiyo'; })[0];
+        if (ph3) { bubble('owner', ph3.say + (it0 ? ' ' + it0.emoji + ' ' + it0.name + 'ね' : ''), true); playPhrase(ph3, 0); }
       } else if (e.type === 'serve') {
         var it = menuItem(e.item);
-        withScene(function (s) { s.ownerGoTo(e.seat); });
+        ownerTo(e.seat, true);
         var ph2 = SHOP.PHRASES.filter(function (p) { return p.id === 'omachi'; })[0];
         if (ph2) { bubble('owner', ph2.say + ' ' + (it ? it.emoji + ' ' + it.name : ''), true); playPhrase(ph2, 0); }
       }
@@ -681,6 +693,7 @@
   function order(id) {
     if (mySeat < 0) { toast('先に席に座ってください'); return; }
     net.push('orders', { uid: ME.uid, name: currentName(), seat: mySeat, item: id, at: TS });
+    event({ type: 'order', seat: mySeat, item: id });
     var it = menuItem(id);
     toast((it ? it.emoji + ' ' + it.name : '') + ' を注文しました', 1600);
     closeSheet();
@@ -908,7 +921,7 @@
       b.next = t + 7000 + Math.random() * 9000;
       var r = Math.random();
       if (r < 0.62) net.push('chat', { uid: uid, name: b.name, seat: b.seat, text: BOT_LINES[Math.floor(Math.random() * BOT_LINES.length)], at: TS });
-      else if (r < 0.82) { var it = SHOP.MENU[Math.floor(Math.random() * SHOP.MENU.length)]; net.push('orders', { uid: uid, name: b.name, seat: b.seat, item: it.id, at: TS }); }
+      else if (r < 0.82) { var it = SHOP.MENU[Math.floor(Math.random() * SHOP.MENU.length)]; net.push('orders', { uid: uid, name: b.name, seat: b.seat, item: it.id, at: TS }); net.push('events', { type: 'order', seat: b.seat, item: it.id, at: TS, by: uid }); }
       else net.push('events', { type: 'phrase', id: Math.random() < 0.6 ? 'kanpai' : 'umai', seat: b.seat, at: TS, by: uid, voice: 2 });
     });
   }, 1000);

@@ -90,6 +90,7 @@ var SHOP = {
     { id: 'oyasumi', who: 'owner', say: 'おやすみなさい！',        voice: 'voice/oyasumi.mp3' },
     { id: 'lastcall', who: 'owner', say: 'そろそろ閉店です。ラストオーダー、どうぞ！', voice: 'voice/lastcall.mp3' },
     { id: 'omachi', who: 'owner', say: 'はい、お待ち！',           voice: 'voice/omachi.mp3' },
+    { id: 'haiyo', who: 'owner', say: 'はいよ！',                 voice: 'voice/haiyo.mp3' },
     { id: 'kanpai', who: 'all', say: 'かんぱーい！',  voice: 'voice/kanpai.mp3', btn: true, emoji: '🍻' },
     { id: 'okawari', who: 'all', say: 'おかわり！',   voice: 'voice/okawari.mp3', btn: true, emoji: '🙋' },
     { id: 'umai', who: 'all', say: 'うまい！',        voice: 'voice/umai.mp3', btn: true, emoji: '😋' },

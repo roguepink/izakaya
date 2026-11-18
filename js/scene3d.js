@@ -456,13 +456,28 @@ function createShop(canvas, opts) {
   const view = { mode: 'overview', seat: -1, yaw: 0, pitch: 0 };
   const camPos = new THREE.Vector3(0, 2.4, 4.4), camLook = new THREE.Vector3(0, 1.1, -0.5);
   const wantPos = new THREE.Vector3(), wantLook = new THREE.Vector3();
+  /* カメラの置き場所。縦向き(スマホを立てて持つ)は横に7人が入らないので、カウンターの端から斜めに見る。
+     横向きは正面から、7人全員が入る広さに自動で合わせる */
+  let wantFov = 60;
+  function fitFov(dist) {   // カウンターの端から端までが横に入る広さ
+    const half = L / 2 - 0.15;
+    const h = 2 * Math.atan(half / dist);
+    return THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(h / 2) / camera.aspect)), 42, 78);
+  }
   function target() {
     const x = view.seat >= 0 ? seatX(view.seat, N) : 0;
+    const portrait = camera.aspect < 1;
+    wantFov = portrait ? 70 : 55;
     switch (view.mode) {
-      case 'first': wantPos.set(x, 1.5, GUEST_Z + 0.22); wantLook.set(x + (ownerTargetX - x) * 0.6, 1.08, -0.95); break;
+      case 'first': wantPos.set(x, 1.5, GUEST_Z + 0.22); wantLook.set(x + THREE.MathUtils.clamp((ownerTargetX - x) * 0.6, -1.0, 1.0), 1.08, -0.95); break;   // 向きすぎると となりの頭でふさがる
       case 'back': wantPos.set(x * 0.85, 1.95, GUEST_Z + 1.55); wantLook.set(x * 0.7, 1.15, -0.4); break;
-      case 'owner': wantPos.set(0, 2.25, -1.6); wantLook.set(0, 0.95, 1.3); break;
-      default: wantPos.set(0, 2.75, 3.15); wantLook.set(0, 1.0, -0.9);
+      case 'owner':
+        if (portrait) { wantPos.set(-L / 2 - 0.1, 2.1, -1.25); wantLook.set(L * 0.12, 0.95, 1.45); wantFov = 64; }
+        else { wantPos.set(0, 2.3, -1.85); wantLook.set(0, 1.2, 1.0); wantFov = fitFov(GUEST_Z + 1.85); }
+        break;
+      default:
+        if (portrait) { wantPos.set(L / 2 + 0.75, 2.55, 2.75); wantLook.set(-L * 0.12, 1.0, -0.35); wantFov = 64; }
+        else { wantPos.set(0, 2.6, 3.25); wantLook.set(0, 1.0, -0.8); wantFov = fitFov(3.25); }
     }
     // 指でぐるっと見回す分
     const dir = wantLook.clone().sub(wantPos);
@@ -499,7 +514,6 @@ function createShop(canvas, opts) {
     const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    camera.fov = w / h < 0.8 ? 72 : 55;   // 縦長のスマホは少し広く見せる
     camera.updateProjectionMatrix();
   }
   window.addEventListener('resize', resize); resize();
@@ -516,6 +530,7 @@ function createShop(canvas, opts) {
     const k = 1 - Math.pow(0.002, dt);
     camPos.lerp(wantPos, k); camLook.lerp(wantLook, k);
     camera.position.copy(camPos); camera.lookAt(camLook);
+    if (Math.abs(camera.fov - wantFov) > 0.05) { camera.fov += (wantFov - camera.fov) * k; camera.updateProjectionMatrix(); }
     seatAvatars.forEach((a) => a && animateAvatar(a, dt));
     if (owner) { animateAvatar(owner, dt); owner.position.x += (ownerTargetX - owner.position.x) * Math.min(1, dt * 3); }
     lanterns.forEach((l, i) => { l.rotation.z = Math.sin(clock.elapsedTime * 0.8 + i) * 0.03; });
