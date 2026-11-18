@@ -686,7 +686,9 @@ function createShop(canvas, opts) {
     }
   }
   // 品書き(壁の木札) — MENU から自動で作る
-  const items = SHOP.MENU;
+  // 壁に入る数だけ(名物が先、つぎに料理、飲み物はあと)
+  const tagFit = Math.floor((L - 0.4) / 0.2);
+  const items = SHOP.MENU.filter((m) => m.pun).concat(SHOP.MENU.filter((m) => !m.pun && m.kind !== 'drink'), SHOP.MENU.filter((m) => m.kind === 'drink')).slice(0, tagFit);
   const tagW = 0.17, tagH = 0.5;
   const tagsX0 = -((items.length - 1) * (tagW + 0.03)) / 2;
   items.forEach((it, i) => {
@@ -777,7 +779,7 @@ function createShop(canvas, opts) {
     wantFov = portrait ? 70 : 55;
     switch (view.mode) {
       case 'first': wantPos.set(x, 1.5, GUEST_Z + 0.22); wantLook.set(x + THREE.MathUtils.clamp((ownerTargetX - x) * 0.6, -1.0, 1.0), 1.08, -0.95); break;   // 向きすぎると となりの頭でふさがる
-      case 'back': wantPos.set(x * 0.85, 1.95, GUEST_Z + 1.55); wantLook.set(x * 0.7, 1.15, -0.4); break;
+      case 'back': wantPos.set(x * 0.85, 2.3, GUEST_Z + 1.35); wantLook.set(x * 0.75, 1.0, -0.45); break;   // 頭ごしに 自分の料理が見える高さ
       case 'owner':
         if (portrait) { wantPos.set(-L / 2 - 0.1, 2.1, -1.25); wantLook.set(L * 0.12, 0.95, 1.45); wantFov = 64; }
         else { wantPos.set(0, 2.3, -1.85); wantLook.set(0, 1.2, 1.0); wantFov = fitFov(GUEST_Z + 1.85); }

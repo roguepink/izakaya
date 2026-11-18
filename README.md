@@ -9,7 +9,10 @@
 | 店の名前・大将の名前 | `SHOP.NAME` / `SHOP.OWNER_NAME` |
 | 席の数 | `SHOP.SEATS`(カウンターも自動で長くなる) |
 | 営業日・時間 | `SHOP.SCHEDULE`(いくつでも足せる) |
-| メニュー | `SHOP.MENU`(1行で1品。model で 3D の形、知らない形はお皿に絵文字) |
+| メニュー | `SHOP.MENU`(1行で1品。cat で分類、model で 3D の形、知らない形はお皿に絵文字。pun: true でダジャレの名物、real に中身) |
+| 分類の見出し | `SHOP.CATS` |
+| 置ける数・食べ終わる時間 | `SHOP.FOOD_LIMIT`(料理3)/ `DRINK_LIMIT`(飲み物1)/ `EAT_MINUTES`(押し忘れで空になるまで5分)/ `CLEAR_SECONDS`(空から下げるまで5秒) |
+| 料理の見た目を全部見る | `tools/menu-gallery.html`(ふつう・半分・食べ終わり) |
 | 曲 | `SHOP.SONGS`(1行で1曲。music/ に置いたら 'music/名前.mp3') |
 | 決まり文句の声 | `SHOP.PHRASES`。`voice/irasshai.mp3` などを置けばその声で鳴る。なければ仮の読み上げ |
 | 合言葉 | `tools/hash.html` で指紋を作って `PASSCODE_HASH`(お店)/ `OWNER_HASH`(大将) |
