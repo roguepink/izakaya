@@ -113,16 +113,26 @@ body:not(.is-owner) .owner-only { display: none; }
 .phrases { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .phrases::-webkit-scrollbar { display: none; }
 .phrases button { flex: none; background: rgba(243,230,204,.92); color: var(--ink); border-radius: 999px; padding: 7px 12px; font-weight: 800; font-size: 14px; }
+.log-wrap { position: relative; }
 .log { max-height: 16vh; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; line-height: 1.45;
   mask-image: linear-gradient(180deg, transparent, #000 30%); -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%); padding-top: 14px; }
-.log .ln { background: rgba(0,0,0,.35); align-self: flex-start; border-radius: 10px; padding: 3px 9px; max-width: 92%; word-break: break-word; }
+.log .ln { background: rgba(0,0,0,.35); align-self: flex-start; border-radius: 10px; padding: 3px 9px; max-width: 92%; word-break: break-word; white-space: pre-wrap; }
 .log .ln b { color: var(--gold); margin-right: 5px; }
 .log .ln.owner b { color: #ff8a6a; }
 .log .ln.sys { color: var(--paper2); font-size: 12px; background: transparent; }
-.chat { display: flex; gap: 6px; }
-.chat input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 999px; border: 0; background: rgba(255,250,240,.96); color: var(--ink); }
-.chat button { background: var(--red); color: #fff; font-weight: 800; border-radius: 999px; padding: 0 18px; font-size: 15px; }
-.chat input:disabled, .chat button:disabled { opacity: .5; }
+.log-btn { position: absolute; right: 2px; top: -6px; background: rgba(20,12,8,.8); border: 1px solid rgba(232,163,61,.6); color: var(--paper2);
+  border-radius: 999px; padding: 4px 10px; font-size: 11.5px; font-weight: 700; }
+/* 会話の記録を 画面いっぱいに広げたとき */
+.log-wrap.big { position: fixed; left: 8px; right: 8px; top: calc(var(--sat) + 52px); bottom: calc(var(--sab) + 70px); z-index: 12;
+  background: rgba(20,12,8,.985); border-radius: 16px; border: 1px solid rgba(232,163,61,.4); padding: 34px 10px 10px; }
+.log-wrap.big .log > :first-child { margin-top: auto; }
+.log-wrap.big .log { max-height: 100%; height: 100%; mask-image: none; -webkit-mask-image: none; padding-top: 0; font-size: 15px; gap: 6px; }
+.log-wrap.big .log-btn { top: 8px; right: 10px; }
+.chat { display: flex; gap: 6px; align-items: flex-end; }
+.chat textarea { flex: 1; min-width: 0; padding: 11px 14px; border-radius: 22px; border: 0; background: rgba(255,250,240,.96); color: var(--ink);
+  font: inherit; font-size: 16px; line-height: 1.4; resize: none; max-height: 140px; overflow-y: auto; display: block; }
+.chat button { background: var(--red); color: #fff; font-weight: 800; border-radius: 999px; padding: 0 18px; font-size: 15px; height: 44px; flex: none; }
+.chat textarea:disabled, .chat button:disabled { opacity: .5; }
 
 /* 頭の上の札と吹き出し */
 #tags, #bubbles, #floaters { position: fixed; inset: 0; pointer-events: none; z-index: 9; overflow: hidden; }
@@ -132,12 +142,16 @@ body:not(.is-owner) .owner-only { display: none; }
 .tag.me { background: rgba(232,163,61,.9); color: var(--ink); }
 .tag.free { pointer-events: auto; background: rgba(243,230,204,.95); color: var(--ink); font-size: 13px; padding: 7px 12px; border: 2px solid var(--wood); cursor: pointer; }
 .tag.reserved { background: rgba(80,60,40,.9); color: #e8d3a6; }
-.bubble { position: absolute; transform: translate(-50%, calc(-100% - 22px)); max-width: min(62vw, 260px); background: #fffaf0; color: var(--ink);
+.bubble { position: absolute; transform: translate(-50%, calc(-100% - 22px)); max-width: min(62vw, 260px); white-space: pre-wrap; background: #fffaf0; color: var(--ink);
   border-radius: 14px; padding: 7px 11px; font-size: 14px; line-height: 1.4; box-shadow: 0 3px 10px rgba(0,0,0,.4); word-break: break-word; transition: opacity .4s; }
 .bubble::after { content: ''; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #fffaf0; border-bottom: 0; }
 .bubble.phrase { background: var(--gold); font-weight: 800; font-size: 16px; }
 .bubble.phrase::after { border-top-color: var(--gold); }
 .bubble.fade { opacity: 0; }
+.bubble.long { max-width: min(74vw, 320px); font-size: 13.5px; }
+.bubble .bt { overflow: hidden; }
+.bubble.scroll .bt { mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); }
 .floater { position: absolute; font-size: 34px; animation: floatUp 1.8s ease-out forwards; }
 @keyframes floatUp { from { transform: translate(-50%, 0) scale(.6); opacity: 0; } 15% { opacity: 1; transform: translate(-50%, -10px) scale(1.1); } to { transform: translate(-50%, -90px) scale(1); opacity: 0; } }
 

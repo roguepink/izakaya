@@ -413,7 +413,7 @@
     inside = false; mySeat = -1; clearInterval(hbTimer);
     audio.pause(); hideYT(); curKey = '';
     closeSheet();
-    $('bubbles').innerHTML = ''; $('log').innerHTML = '';
+    $('bubbles').innerHTML = ''; bubbles = {}; $('log').innerHTML = ''; $('log')._h = ''; toggleLog(false);
     $('shop').classList.add('hidden'); $('entrance').classList.remove('hidden');
     setView('overview');
   }
@@ -466,17 +466,34 @@
 
   /* ---------------- 会話 ---------------- */
   function sys(text) { net.push('chat', { sys: true, text: text, at: TS }); }
+  /* 書く欄: 長く書くと下に広がる(5行くらいまで。それ以上は欄の中で動かす) */
+  var chatIn = $('chatInput');
+  function growInput() { chatIn.style.height = 'auto'; chatIn.style.height = Math.min(chatIn.scrollHeight, 140) + 'px'; }
+  chatIn.addEventListener('input', growInput);
+  chatIn.addEventListener('keydown', function (e) {   // パソコンは Enter で送る(Shift+Enter で改行)。スマホの改行キーは改行
+    var touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (e.key === 'Enter' && !e.shiftKey && !touch && !e.isComposing) { e.preventDefault(); $('chatForm').requestSubmit ? $('chatForm').requestSubmit() : $('sendBtn').click(); }
+  });
+  /* 会話の記録: 押すと画面いっぱいに広がる */
+  function toggleLog(open) {
+    var w = document.querySelector('.log-wrap'), big = open == null ? !w.classList.contains('big') : open;
+    w.classList.toggle('big', big);
+    $('logBtn').textContent = big ? '閉じる ✕' : '全部見る ▲';
+    var log = $('log'); log.scrollTop = log.scrollHeight;
+  }
+  $('logBtn').onclick = function () { toggleLog(); };
+  $('log').addEventListener('click', function () { if (!document.querySelector('.log-wrap').classList.contains('big')) toggleLog(true); });
   $('chatForm').addEventListener('submit', function (e) {
     e.preventDefault();
-    var t = $('chatInput').value.trim().slice(0, 200);
+    var t = $('chatInput').value.trim().slice(0, 500);
     if (!t) return;
     if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return; }
     net.push('chat', { uid: ME.uid, name: currentName(), seat: OWNER_MODE ? 'owner' : mySeat, owner: OWNER_MODE, text: t, at: TS });
-    $('chatInput').value = '';
+    $('chatInput').value = ''; growInput();
   });
   function renderLog() {
     var c = tree.chat || {}, keys = Object.keys(c).sort();
-    var shown = keys.filter(function (k) { return (c[k].at || 0) >= joinAt - 10 * MIN; }).slice(-40);
+    var shown = keys.filter(function (k) { return (c[k].at || 0) >= joinAt - 10 * MIN; }).slice(-120);
     var log = $('log'), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
     var html = shown.map(function (k) {
       var m = c[k];
@@ -499,10 +516,12 @@
     if (seat == null) return;
     var key = String(seat);
     var b = bubbles[key];
-    if (!b) { b = bubbles[key] = { el: document.createElement('div') }; $('bubbles').appendChild(b.el); }
-    b.el.className = 'bubble' + (phrase ? ' phrase' : '');
-    b.el.textContent = text;
-    b.until = Date.now() + Math.min(9000, 3500 + text.length * 120);
+    if (!b) { b = bubbles[key] = { el: document.createElement('div'), bt: document.createElement('div') }; b.el.appendChild(b.bt); }
+    $('bubbles').appendChild(b.el);   // いちばん新しい吹き出しを、いちばん手前に
+    b.el.className = 'bubble' + (phrase ? ' phrase' : '') + (text.length > 50 ? ' long' : '');
+    b.bt.textContent = text; b.bt.scrollTop = 0;
+    b.start = Date.now();
+    b.until = b.start + Math.min(20000, 3500 + text.length * 90);
   }
   function floater(seat, emoji) {
     var a = scene && scene.anchors(); if (!a) return;
@@ -544,6 +563,17 @@
     Object.keys(bubbles).forEach(function (k) {
       var b = bubbles[k], p = k === 'owner' ? a.owner : a.seats[+k];
       if (!p || t > b.until + 500) { b.el.remove(); delete bubbles[k]; return; }
+      // 上の端(上の帯の下)まで伸ばす。それでも入りきらないときは、中で文字をゆっくり上に流す
+      var top = (document.querySelector('.topbar') || { getBoundingClientRect: function () { return { bottom: 50 }; } }).getBoundingClientRect().bottom + 6;
+      var room = Math.max(60, p.y - 22 - top - 16);
+      b.bt.style.maxHeight = room + 'px';
+      var over = b.bt.scrollHeight - b.bt.clientHeight;
+      if (over > 2) {
+        b.el.classList.add('scroll');
+        var SPEED = 24, WAIT = 1800;   // 1秒に24ほど流す。はじめは少し待つ
+        b.bt.scrollTop = Math.max(0, Math.min(over, (t - b.start - WAIT) / 1000 * SPEED));
+        b.until = Math.max(b.until, b.start + WAIT + over / SPEED * 1000 + 3500);
+      } else b.el.classList.remove('scroll');
       b.el.classList.toggle('fade', t > b.until);
       var hw = Math.min(b.el.offsetWidth, window.innerWidth - 100) / 2 + 6; b.el.style.left = Math.max(hw, Math.min(window.innerWidth - 72 - hw, p.x)) + 'px';
       b.el.style.top = p.y + 'px';
