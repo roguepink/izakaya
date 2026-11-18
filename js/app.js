@@ -289,9 +289,7 @@
     scene.setSeats(seats);
     var st = tree.state || {};
     scene.setOwner(st.ownerAvatar ? AVATAR.fix(st.ownerAvatar) : AVATAR.fix(AVATAR.OWNER));
-    var tb = tree.tables || {}, tables = [];
-    for (var j = 0; j < N; j++) { var o = tb[j] || {}; tables.push(Object.keys(o).sort().map(function (k) { return o[k]; })); }
-    scene.setTables(tables);
+    updateTables();
     if (!inside) return;
 
     // 自分が店から出された(大将に帰ってもらった・閉店で片づけられた)
@@ -675,6 +673,8 @@
         if (ph.id === 'kanpai') { for (var i = 0; i < N; i++) if (seatUid(i)) floater(i, '🍻'); floater('owner', '🍻'); }
         else if (ph.emoji) floater(who, ph.emoji);
         playPhrase(ph, e.voice);
+      } else if (e.type === 'clear') {
+        ownerTo(e.seat, false);   // 下げに行く
       } else if (e.type === 'order') {
         ownerTo(e.seat, true);
         var it0 = menuItem(e.item), ph3 = SHOP.PHRASES.filter(function (p) { return p.id === 'haiyo'; })[0];
@@ -683,15 +683,70 @@
         var it = menuItem(e.item);
         ownerTo(e.seat, true);
         var ph2 = SHOP.PHRASES.filter(function (p) { return p.id === 'omachi'; })[0];
-        if (ph2) { bubble('owner', ph2.say + ' ' + (it ? it.emoji + ' ' + it.name : ''), true); playPhrase(ph2, 0); }
+        if (ph2) { bubble('owner', ph2.say + ' ' + (it ? it.emoji + ' ' + it.name + (it.pun && it.real ? '(中身は' + it.real + 'です)' : '') : ''), true); playPhrase(ph2, 0); }
       }
     });
   }
 
   /* ---------------- 注文と料理 ---------------- */
   function menuItem(id) { return SHOP.MENU.filter(function (m) { return m.id === id; })[0]; }
+  var EAT_MS = (SHOP.EAT_MINUTES || 3) * MIN, CLEAR_MS = (SHOP.CLEAR_SECONDS || 5) * 1000;
+  function tableItems(seat) {   // その席に出ている物 [{key, id, at, empty}]
+    var o = (tree.tables || {})[seat] || {}, n = now();
+    return Object.keys(o).sort().map(function (k) {
+      var v = o[k]; if (typeof v === 'string') v = { id: v, at: n };   // 古い形のデータ
+      var at = v.at || n, bites = v.bites || 0;
+      var emptyAt = bites >= 2 ? (v.emptyAt || n) : at + EAT_MS;   // 自分で食べ終わった時か、押し忘れの5分後
+      return { key: k, id: v.id, at: at, bites: bites, half: bites === 1, emptyAt: emptyAt, empty: n >= emptyAt };
+    });
+  }
+  function updateTables() {
+    if (!scene) return;
+    var tables = []; for (var j = 0; j < N; j++) tables.push(tableItems(j));
+    scene.setTables(tables);
+    renderMine();
+  }
+  /* 自分の前の料理・飲み物: 1回押すと半分、2回で 食べ終わる・飲み干す */
+  function eat(key) {
+    var x = tableItems(mySeat).filter(function (y) { return y.key === key; })[0];
+    if (!x || x.empty) return;
+    var it = menuItem(x.id), drink = it && it.kind === 'drink', b = x.bites + 1;
+    var up = { bites: b }; if (b >= 2) up.emptyAt = TS;
+    net.update('tables/' + mySeat + '/' + key, up);
+    floater(mySeat, b >= 2 ? (drink ? '😆' : '😋') : (drink ? '🍻' : '😊'));
+    if (b >= 2) toast((it ? it.emoji + ' ' + it.name : '') + (drink ? ' を飲み干しました' : ' を食べ終わりました') + '。おかわりは「注文」から', 2200);
+  }
+  function renderMine() {
+    var box = $('mine'); if (!box) return;
+    var list = inside && mySeat >= 0 ? tableItems(mySeat).filter(function (x) { return !x.empty; }) : [];
+    var h = list.map(function (x) {
+      var it = menuItem(x.id) || { emoji: '🍽️', name: x.id }, drink = it.kind === 'drink';
+      var verb = drink ? (x.half ? '飲み干す' : '飲む') : (x.half ? '食べ終わる' : '食べる');
+      return '<button data-eat="' + x.key + '">' + it.emoji + ' <b>' + verb + '</b></button>';
+    }).join('');
+    if (box._h !== h) { box._h = h; box.innerHTML = h; box.classList.toggle('hidden', !h);
+      box.querySelectorAll('[data-eat]').forEach(function (b) { b.onclick = function () { eat(b.getAttribute('data-eat')); }; }); }
+  }
+  setInterval(function () { updateTables(); if (sheetKind === 'menu' || sheetKind === 'seat') refreshSheet(false); }, 1000);   // 時間がたつと空になるので、1秒ごとに見なおす
+  /* 置ける数: テーブルの上(空のお皿も、下げるまでは場所をとる)+ まだ出ていない注文 */
+  function seatCounts(seat) {
+    var c = { food: 0, drink: 0 };
+    tableItems(seat).forEach(function (x) { var it = menuItem(x.id); c[it && it.kind === 'drink' ? 'drink' : 'food']++; });
+    var o = tree.orders || {};
+    Object.keys(o).forEach(function (k) { if (o[k].seat === seat) { var it = menuItem(o[k].item); c[it && it.kind === 'drink' ? 'drink' : 'food']++; } });
+    return c;
+  }
+  function whyNot(seat, id) {
+    var it = menuItem(id); if (!it) return 'ありません';
+    var c = seatCounts(seat);
+    if (it.kind === 'drink' && c.drink >= (SHOP.DRINK_LIMIT || 1)) return '飲み物は1杯ずつ';
+    if (it.kind !== 'drink' && c.food >= (SHOP.FOOD_LIMIT || 3)) return 'テーブルがいっぱい';
+    return '';
+  }
   function order(id) {
     if (mySeat < 0) { toast('先に席に座ってください'); return; }
+    var why = whyNot(mySeat, id);
+    if (why) { toast(why === '飲み物は1杯ずつ' ? '飲み物は1杯ずつです。飲み終わったら頼めます' : 'テーブルがいっぱいです。食べ終わったら頼めます', 2400); return; }
     net.push('orders', { uid: ME.uid, name: currentName(), seat: mySeat, item: id, at: TS });
     event({ type: 'order', seat: mySeat, item: id });
     var it = menuItem(id);
@@ -699,8 +754,15 @@
     closeSheet();
   }
   function serve(seat, id, orderKey) {
+    var o = tree.orders || {};
+    if (!orderKey && whyNot(seat, id)) { toast('その席は いまは置けません(' + whyNot(seat, id) + ')'); return; }
+    if (orderKey) {   // 注文の分は、自分の注文を数えないで見る
+      var c = seatCounts(seat), it = menuItem(id), lim = it && it.kind === 'drink' ? (SHOP.DRINK_LIMIT || 1) : (SHOP.FOOD_LIMIT || 3);
+      var onTable = tableItems(seat).filter(function (x) { var m = menuItem(x.id); return (m && m.kind === 'drink') === (it && it.kind === 'drink'); }).length;
+      if (onTable >= lim) { net.remove('orders/' + orderKey); return; }
+    }
     var k = net.newKey();
-    net.set('tables/' + seat + '/' + k, id);
+    net.set('tables/' + seat + '/' + k, { id: id, at: TS });
     if (orderKey) net.remove('orders/' + orderKey);
     event({ type: 'serve', seat: seat, item: id });
   }
@@ -727,6 +789,12 @@
     if (!ownerPresent()) {
       var o = tree.orders || {};
       Object.keys(o).forEach(function (k) { if (n - (o[k].at || n) > 2500) serve(o[k].seat, o[k].item, k); });
+    }
+    // 食べ終わって(空になって)5秒たった物を下げる
+    for (var t2 = 0; t2 < N; t2++) {
+      var cleared = false;
+      tableItems(t2).forEach(function (x) { if (n - x.emptyAt >= CLEAR_MS) { net.remove('tables/' + t2 + '/' + x.key); cleared = true; } });
+      if (cleared) event({ type: 'clear', seat: t2 });
     }
     // 古い合図・会話を整理
     var ev = tree.events || {};
@@ -772,25 +840,50 @@
   function openSheet(kind, arg) { sheetKind = kind; sheetArg = arg; $('sheet').classList.remove('hidden'); $('sheetBack').classList.remove('hidden'); refreshSheet(true); }
   function closeSheet() { sheetKind = ''; $('sheet').classList.add('hidden'); $('sheetBack').classList.add('hidden'); }
   $('shClose').onclick = closeSheet; $('sheetBack').onclick = closeSheet;
-  function menuGrid(onPick) {
-    var html = '';
-    [['drink', '🍺 飲み物'], ['food', '🍢 料理']].forEach(function (g) {
-      html += '<div class="sh-sec">' + g[1] + '</div><div class="menu-grid">';
-      SHOP.MENU.filter(function (m) { return m.kind === g[0]; }).forEach(function (m) {
-        html += '<button data-id="' + esc(m.id) + '"><span>' + m.emoji + '</span>' + esc(m.name) + '</button>';
-      });
-      html += '</div>';
+  /* お品書き: 分類の見出しで切りかえ。置けない物は うすく、理由を出す */
+  var menuCat = (SHOP.CATS && SHOP.CATS[0] && SHOP.CATS[0].id) || 'drink';
+  function menuHTML(seat) {
+    var c = seatCounts(seat), cats = SHOP.CATS || [{ id: 'drink', name: '飲み物', emoji: '🍺' }];
+    var h = '<div class="mn-count">' + (seat === mySeat && !OWNER_MODE ? 'あなたの前' : (seat + 1) + '番の席') +
+      ' <b class="' + (c.food >= SHOP.FOOD_LIMIT ? 'full' : '') + '">料理 ' + c.food + '/' + SHOP.FOOD_LIMIT + '</b>' +
+      ' <b class="' + (c.drink >= SHOP.DRINK_LIMIT ? 'full' : '') + '">飲み物 ' + c.drink + '/' + SHOP.DRINK_LIMIT + '</b>' +
+      '<small>「食べる」「飲む」を2回押すと空になり、大将が下げます(押さなくても ' + SHOP.EAT_MINUTES + '分で空になります)</small></div>';
+    h += '<div class="mn-tabs">';
+    cats.forEach(function (ct) { h += '<button data-cat="' + ct.id + '" class="' + (ct.id === menuCat ? 'on' : '') + '">' + ct.emoji + ' ' + esc(ct.name) + '</button>'; });
+    h += '</div><div class="mn-list">';
+    SHOP.MENU.filter(function (m) { return (m.cat || (m.kind === 'drink' ? 'drink' : 'otsumami')) === menuCat; }).forEach(function (m) {
+      var why = whyNot(seat, m.id);
+      h += '<button class="mn-card' + (m.pun ? ' pun' : '') + (why ? ' off' : '') + '" data-id="' + esc(m.id) + '">' +
+        (m.pun ? '<i class="mn-badge">名物</i>' : '') +
+        '<span class="mn-emoji">' + m.emoji + '</span><span class="mn-name">' + esc(m.name) + '</span>' +
+        '<span class="mn-desc">' + esc(why || m.desc || '') + '</span></button>';
     });
-    return html;
+    return h + '</div>';
+  }
+  function wireMenu(body, onPick) {
+    body.querySelectorAll('[data-cat]').forEach(function (b) { b.onclick = function () { menuCat = b.getAttribute('data-cat'); refreshSheet(true); }; });
+    body.querySelectorAll('.mn-card').forEach(function (b) { b.onclick = function () { onPick(b.getAttribute('data-id')); }; });
   }
   function refreshSheet(force) {
     var body = $('shBody'), html = '', title = '';
-    if (sheetKind === 'menu') {
-      if (!force) return;
-      title = 'お品書き';
-      html = menuGrid() + '<p class="small-note">' + (ownerPresent() ? '大将に注文が届きます。' : 'いまは大将がおまかせ中なので、すぐに出てきます。') + '</p>';
-      body.innerHTML = html; $('shTitle').textContent = title;
-      body.querySelectorAll('.menu-grid button').forEach(function (b) { b.onclick = function () { order(b.getAttribute('data-id')); }; });
+    if (sheetKind === 'menu' || sheetKind === 'seat') {
+      var seatM = sheetKind === 'menu' ? mySeat : sheetArg;
+      if (sheetKind === 'seat') { var u2 = seatUid(seatM), m2 = u2 && members()[u2]; if (!m2) { closeSheet(); return; } title = (seatM + 1) + '番 ' + m2.name + 'さんに出す'; }
+      else title = 'お品書き';
+      html = menuHTML(seatM) + (sheetKind === 'menu' ? '<p class="small-note">' + (ownerPresent() ? '大将に注文が届きます。' : 'いまは大将がおまかせ中なので、すぐに出てきます。') + '</p>'
+        : '<div class="sh-sec">そのほか</div><div class="btn-row"><button id="kickBtn" class="red">帰ってもらう</button></div>');
+      if (!force && body._h === html) return;
+      var list0 = body.querySelector('.mn-list'), keep = list0 ? list0.scrollTop : 0, keepB = body.scrollTop;
+      body._h = html; body.innerHTML = html; $('shTitle').textContent = title;
+      var list1 = body.querySelector('.mn-list'); if (list1 && !force) list1.scrollTop = keep; if (!force) body.scrollTop = keepB;
+      wireMenu(body, sheetKind === 'menu' ? function (id) { order(id); } : function (id) { serve(seatM, id); closeSheet(); });
+      var kb = body.querySelector('#kickBtn');
+      if (kb) kb.onclick = function () {
+        var uid = seatUid(seatM), m = uid && members()[uid];
+        if (!m || !confirm(m.name + 'さんに帰ってもらいますか?')) return;
+        net.remove('seats/' + seatM); net.remove('tables/' + seatM); net.remove('members/' + uid);
+        sys(m.name + 'さんがお店を出ました'); closeSheet();
+      };
       return;
     }
     if (sheetKind === 'music') {
@@ -816,12 +909,6 @@
       ok.forEach(function (k) { var it = menuItem(o[k].item) || { emoji: '🍽️', name: o[k].item }; html += '<div class="li"><div class="t">' + it.emoji + ' ' + esc(it.name) + '<small>' + (o[k].seat + 1) + '番 ' + esc(o[k].name) + 'さん</small></div><button data-serve="' + k + '">出す</button></div>'; });
       html += '</div><p class="small-note">お客さんの席を押すと、注文がなくても好きな物を出せます。</p>';
       if (!force && body._h === html) return;
-    } else if (sheetKind === 'seat') {
-      var uid = seatUid(sheetArg), mm = uid && members()[uid];
-      if (!mm) { closeSheet(); return; }
-      if (!force) return;
-      title = (sheetArg + 1) + '番 ' + mm.name + 'さん';
-      html = '<div class="sh-sec">この人に出す</div>' + menuGrid() + '<div class="sh-sec">そのほか</div><div class="btn-row"><button id="kickBtn" class="red">帰ってもらう</button></div>';
     } else if (sheetKind === 'owner') {
       if (!force) return;
       title = '店主の操作';
@@ -855,15 +942,6 @@
       };
     } else if (sheetKind === 'orders') {
       body.querySelectorAll('[data-serve]').forEach(function (b) { b.onclick = function () { var k = b.getAttribute('data-serve'), o = (tree.orders || {})[k]; if (o) serve(o.seat, o.item, k); }; });
-    } else if (sheetKind === 'seat') {
-      var seat = sheetArg;
-      body.querySelectorAll('.menu-grid button').forEach(function (b) { b.onclick = function () { serve(seat, b.getAttribute('data-id')); closeSheet(); }; });
-      q('#kickBtn').onclick = function () {
-        var uid = seatUid(seat), m = uid && members()[uid];
-        if (!m || !confirm(m.name + 'さんに帰ってもらいますか?')) return;
-        net.remove('seats/' + seat); net.remove('tables/' + seat); net.remove('members/' + uid);
-        sys(m.name + 'さんがお店を出ました'); closeSheet();
-      };
     } else if (sheetKind === 'owner') {
       q('#openBtn').onclick = function () { net.update('state', { forceFrom: now(), forceUntil: now() + 60 * MIN, closedAt: null, closedFor: null }); sys('🏮 臨時で開店しました(1時間)'); closeSheet(); };
       q('#closeBtn').onclick = function () { if (confirm('閉店しますか?(会話と料理は片づけられます)')) { closeSheet(); closeShop(); } };
@@ -921,7 +999,7 @@
       b.next = t + 7000 + Math.random() * 9000;
       var r = Math.random();
       if (r < 0.62) net.push('chat', { uid: uid, name: b.name, seat: b.seat, text: BOT_LINES[Math.floor(Math.random() * BOT_LINES.length)], at: TS });
-      else if (r < 0.82) { var it = SHOP.MENU[Math.floor(Math.random() * SHOP.MENU.length)]; net.push('orders', { uid: uid, name: b.name, seat: b.seat, item: it.id, at: TS }); net.push('events', { type: 'order', seat: b.seat, item: it.id, at: TS, by: uid }); }
+      else if (r < 0.82) { var it = SHOP.MENU[Math.floor(Math.random() * SHOP.MENU.length)]; if (whyNot(b.seat, it.id)) return; net.push('orders', { uid: uid, name: b.name, seat: b.seat, item: it.id, at: TS }); net.push('events', { type: 'order', seat: b.seat, item: it.id, at: TS, by: uid }); }
       else net.push('events', { type: 'phrase', id: Math.random() < 0.6 ? 'kanpai' : 'umai', seat: b.seat, at: TS, by: uid, voice: 2 });
     });
   }, 1000);

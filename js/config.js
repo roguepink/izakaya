@@ -38,24 +38,78 @@ var SHOP = {
   },
 
   /* ---------------- メニュー ----------------
-     kind: 'food'(料理)か 'drink'(飲み物)
-     model: 3D の形。'mug'(ジョッキ)'glass'(グラス)'tokkuri'(とっくり)'cup'(湯のみ)
-            'yakitori' 'sashimi' 'oden' 'edamame' 'karaage' 'plate'(お皿に絵文字)
-            知らない形を書いても、お皿に絵文字がのって出る
-     color: 飲み物の色など(なくてもいい) */
+     cat: 分類(下の CATS の id)/ kind: 'food'(料理)か 'drink'(飲み物)
+     model: 3D の形(js/scene3d.js の「料理とお酒」)。知らない形を書いても、お皿に絵文字がのって出る
+     pun: true … ダジャレの名物。real に中身の名前を書くと、出すときに大将が「(中身は◯◯です)」とそえる
+     desc: メニュー表に出るひとこと */
+  CATS: [
+    { id: 'drink',    name: '飲み物',   emoji: '🍺' },
+    { id: 'meibutsu', name: '名物',     emoji: '⭐' },
+    { id: 'otsumami', name: 'おつまみ', emoji: '🫛' },
+    { id: 'age',      name: '揚げ物',   emoji: '🍗' },
+    { id: 'sakana',   name: '魚',       emoji: '🐟' },
+    { id: 'niku',     name: '肉',       emoji: '🥩' },
+    { id: 'nabe',     name: '鍋・煮物', emoji: '🍲' },
+    { id: 'salad',    name: 'サラダ',   emoji: '🥗' },
+    { id: 'gohan',    name: 'ご飯・麺', emoji: '🍚' }
+  ],
+  FOOD_LIMIT: 3,       // 1人の前に置ける料理の数(カウンター1人分 幅60cm・奥行き45cm に 皿3枚)
+  DRINK_LIMIT: 1,      // 飲み物は1杯まで
+  EAT_MINUTES: 5,      // 押し忘れても、出してから何分で 自動で空になるか(自分で「食べる」「飲む」を押せば もっと早く空になる)
+  CLEAR_SECONDS: 5,    // 空になってから 何秒で下げるか
   MENU: [
-    { id: 'beer',     kind: 'drink', name: '生ビール',     emoji: '🍺', model: 'mug',     color: '#f2b51c' },
-    { id: 'highball', kind: 'drink', name: 'ハイボール',   emoji: '🥃', model: 'glass',   color: '#e6b45a' },
-    { id: 'lemon',    kind: 'drink', name: 'レモンサワー', emoji: '🍋', model: 'glass',   color: '#f3ec9a' },
-    { id: 'sake',     kind: 'drink', name: '熱燗',         emoji: '🍶', model: 'tokkuri', color: '#f4f0e6' },
-    { id: 'oolong',   kind: 'drink', name: 'ウーロン茶',   emoji: '🍵', model: 'glass',   color: '#8a4b1c' },
-    { id: 'cola',     kind: 'drink', name: 'コーラ',       emoji: '🥤', model: 'glass',   color: '#3a1a0c' },
-    { id: 'yakitori', kind: 'food',  name: '焼き鳥',       emoji: '🍢', model: 'yakitori' },
-    { id: 'sashimi',  kind: 'food',  name: 'お刺身',       emoji: '🐟', model: 'sashimi' },
-    { id: 'oden',     kind: 'food',  name: 'おでん',       emoji: '🍢', model: 'oden' },
-    { id: 'edamame',  kind: 'food',  name: '枝豆',         emoji: '🫛', model: 'edamame' },
-    { id: 'karaage',  kind: 'food',  name: '唐揚げ',       emoji: '🍗', model: 'karaage' },
-    { id: 'onigiri',  kind: 'food',  name: 'おにぎり',     emoji: '🍙', model: 'plate' }
+    /* 飲み物 */
+    { id: 'beer',     cat: 'drink', kind: 'drink', name: '生ビール',       emoji: '🍺', model: 'mug',     color: '#f2b51c', desc: 'キンキンの中ジョッキ' },
+    { id: 'nonal',    cat: 'drink', kind: 'drink', name: 'ノンアルビール', emoji: '🍺', model: 'mug',     color: '#e8c25a', desc: 'アルコール0.00%' },
+    { id: 'highball', cat: 'drink', kind: 'drink', name: 'ハイボール',     emoji: '🥃', model: 'glass',   color: '#e6b45a', desc: 'すっきり濃いめ' },
+    { id: 'lemon',    cat: 'drink', kind: 'drink', name: 'レモンサワー',   emoji: '🍋', model: 'glass',   color: '#f3ec9a', desc: '生レモンしぼり' },
+    { id: 'umeshu',   cat: 'drink', kind: 'drink', name: '梅酒ロック',     emoji: '🍑', model: 'rock',    color: '#c9852e', desc: '梅の実入り' },
+    { id: 'shochu',   cat: 'drink', kind: 'drink', name: '焼酎ロック',     emoji: '🥃', model: 'rock',    color: '#f4f0e6', desc: '芋・麦どちらでも' },
+    { id: 'sake',     cat: 'drink', kind: 'drink', name: '熱燗',           emoji: '🍶', model: 'tokkuri', color: '#f4f0e6', desc: 'とっくり一合' },
+    { id: 'reishu',   cat: 'drink', kind: 'drink', name: '冷酒',           emoji: '🍶', model: 'masu',    color: '#f4f6f0', desc: '升にこぼれる一杯' },
+    { id: 'oolong',   cat: 'drink', kind: 'drink', name: 'ウーロン茶',     emoji: '🍵', model: 'glass',   color: '#8a4b1c', desc: '' },
+    { id: 'cola',     cat: 'drink', kind: 'drink', name: 'コーラ',         emoji: '🥤', model: 'glass',   color: '#3a1a0c', desc: '' },
+    { id: 'orange',   cat: 'drink', kind: 'drink', name: 'オレンジジュース', emoji: '🍊', model: 'glass', color: '#f39a1c', desc: '' },
+    /* 名物(ダジャレ。中身はふつうの料理) */
+    { id: 'mansion',  cat: 'meibutsu', kind: 'food', name: 'マンション系ラーメン', emoji: '🍜', model: 'ramen',    pun: true, real: '家系ラーメン', desc: '家系より、ちょっと上の階' },
+    { id: 'indozou',  cat: 'meibutsu', kind: 'food', name: 'インド像カレー',       emoji: '🍛', model: 'curry',    pun: true, real: 'カレーライス', desc: 'ゾウさんも びっくり' },
+    { id: 'nobuya',   cat: 'meibutsu', kind: 'food', name: 'のぶ屋の牛丼',         emoji: '🍚', model: 'gyudon',   pun: true, real: '牛丼', desc: 'はやい・うまい・ノブ' },
+    { id: 'shinseki', cat: 'meibutsu', kind: 'food', name: '親戚丼',               emoji: '🍳', model: 'oyakodon', pun: true, real: '親子丼', desc: '親子より ちょっと遠い' },
+    { id: 'tororo',   cat: 'meibutsu', kind: 'food', name: 'とろ〜ろそば',         emoji: '🥢', model: 'tororosoba', pun: true, real: 'とろろそば', desc: 'のばすと おいしくなる' },
+    { id: 'curryoton',cat: 'meibutsu', kind: 'food', name: 'カレーおとん',         emoji: '🍜', model: 'curryudon', pun: true, real: 'カレーうどん', desc: 'おかんには ないしょ' },
+    { id: 'pizzakozo',cat: 'meibutsu', kind: 'food', name: 'ピザこぞう',           emoji: '🍕', model: 'pizza',    pun: true, real: 'ピザ', desc: '一人前の 小さいピザ' },
+    /* おつまみ */
+    { id: 'edamame',  cat: 'otsumami', kind: 'food', name: '枝豆',       emoji: '🫛', model: 'edamame',  desc: '塩ゆで' },
+    { id: 'hiyayakko',cat: 'otsumami', kind: 'food', name: '冷奴',       emoji: '🧊', model: 'hiyayakko', desc: 'ねぎと かつおぶし' },
+    { id: 'dashimaki',cat: 'otsumami', kind: 'food', name: 'だし巻き卵', emoji: '🍳', model: 'dashimaki', desc: '大根おろし添え' },
+    { id: 'takowasa', cat: 'otsumami', kind: 'food', name: 'たこわさ',   emoji: '🐙', model: 'takowasa', desc: 'ツンとくる' },
+    { id: 'motsuni',  cat: 'otsumami', kind: 'food', name: 'もつ煮込み', emoji: '🍲', model: 'motsuni',  desc: '味噌でじっくり' },
+    { id: 'tsukemono',cat: 'otsumami', kind: 'food', name: 'お新香盛り', emoji: '🥒', model: 'tsukemono', desc: 'たくあん・きゅうり・しば漬け' },
+    /* 揚げ物 */
+    { id: 'karaage',  cat: 'age', kind: 'food', name: '唐揚げ',           emoji: '🍗', model: 'karaage', desc: 'レモン添え' },
+    { id: 'fries',    cat: 'age', kind: 'food', name: 'ポテトフライ',     emoji: '🍟', model: 'fries',   desc: '一人前' },
+    { id: 'friesbig', cat: 'age', kind: 'food', name: '山盛りポテトフライ', emoji: '🍟', model: 'friesbig', desc: '一人前を、上にこんもり' },
+    { id: 'agedashi', cat: 'age', kind: 'food', name: '揚げ出し豆腐',     emoji: '🍢', model: 'agedashi', desc: 'あったか おだし' },
+    /* 魚 */
+    { id: 'sashimi',  cat: 'sakana', kind: 'food', name: 'お刺身',         emoji: '🐟', model: 'sashimi', desc: 'まぐろ・サーモン' },
+    { id: 'sanma',    cat: 'sakana', kind: 'food', name: 'さんまの塩焼き', emoji: '🐟', model: 'sanma',   desc: '大根おろし・すだち' },
+    { id: 'kinmedai', cat: 'sakana', kind: 'food', name: '金目鯛の煮付け', emoji: '🐠', model: 'kinmedai', desc: '甘辛く ことこと' },
+    { id: 'ajifry',   cat: 'sakana', kind: 'food', name: 'アジフライ',     emoji: '🐟', model: 'ajifry',  desc: 'サクッと二枚' },
+    /* 肉 */
+    { id: 'yakitori', cat: 'niku', kind: 'food', name: '焼き鳥',               emoji: '🍢', model: 'yakitori', desc: 'もも・ねぎま' },
+    { id: 'steak',    cat: 'niku', kind: 'food', name: 'ステーキ',             emoji: '🥩', model: 'steak',    desc: '鉄板でジュウ' },
+    { id: 'yakiniku', cat: 'niku', kind: 'food', name: '高級焼肉 三種盛り',    emoji: '🥩', model: 'yakiniku', desc: 'カルビ・ロース・タン' },
+    { id: 'rafute',   cat: 'niku', kind: 'food', name: 'ラフテー',             emoji: '🍖', model: 'rafute',   desc: '沖縄の豚の角煮' },
+    /* 鍋・煮物 */
+    { id: 'oden',     cat: 'nabe', kind: 'food', name: 'おでん',       emoji: '🍢', model: 'oden',      desc: '大根・たまご・こんにゃく' },
+    { id: 'motsunabe',cat: 'nabe', kind: 'food', name: '一人もつ鍋',   emoji: '🍲', model: 'motsunabe', desc: 'キャベツ・にら たっぷり' },
+    /* サラダ */
+    { id: 'potesara', cat: 'salad', kind: 'food', name: 'ポテトサラダ',   emoji: '🥔', model: 'potesara', desc: '' },
+    { id: 'caesar',   cat: 'salad', kind: 'food', name: 'シーザーサラダ', emoji: '🥗', model: 'caesar',   desc: 'クルトンとチーズ' },
+    { id: 'daikonsalad', cat: 'salad', kind: 'food', name: '大根サラダ', emoji: '🥗', model: 'daikonsalad', desc: 'のり と ごまだれ' },
+    /* ご飯・麺 */
+    { id: 'onigiri',  cat: 'gohan', kind: 'food', name: 'おにぎり',   emoji: '🍙', model: 'onigiri',  desc: '鮭・梅' },
+    { id: 'ochazuke', cat: 'gohan', kind: 'food', name: 'お茶漬け',   emoji: '🍵', model: 'ochazuke', desc: 'しめに' }
   ],
 
   /* ---------------- 曲 ----------------
