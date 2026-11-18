@@ -142,7 +142,7 @@ body:not(.is-owner) .owner-only { display: none; }
 .tag.me { background: rgba(232,163,61,.9); color: var(--ink); }
 .tag.free { pointer-events: auto; background: rgba(243,230,204,.95); color: var(--ink); font-size: 13px; padding: 7px 12px; border: 2px solid var(--wood); cursor: pointer; }
 .tag.reserved { background: rgba(80,60,40,.9); color: #e8d3a6; }
-.bubble { position: absolute; transform: translate(-50%, calc(-100% - 22px)); max-width: min(62vw, 260px); white-space: pre-wrap; background: #fffaf0; color: var(--ink);
+.bubble { position: absolute; transform: translate(-50%, calc(-100% - 22px)); width: max-content; max-width: min(62vw, 260px); white-space: pre-wrap; box-sizing: border-box; background: #fffaf0; color: var(--ink);
   border-radius: 14px; padding: 7px 11px; font-size: 14px; line-height: 1.4; box-shadow: 0 3px 10px rgba(0,0,0,.4); word-break: break-word; transition: opacity .4s; }
 .bubble::after { content: ''; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #fffaf0; border-bottom: 0; }
 .bubble.phrase { background: var(--gold); font-weight: 800; font-size: 16px; }
@@ -150,6 +150,10 @@ body:not(.is-owner) .owner-only { display: none; }
 .bubble.fade { opacity: 0; }
 .bubble.long { max-width: min(74vw, 320px); font-size: 13.5px; }
 .bubble .bt { overflow: hidden; }
+.bubble .bn { display: none; font-size: 11px; font-weight: 800; color: #9a5a1a; margin-bottom: 1px; }
+.bubble.moved .bn { display: block; }
+.bubble.moved::after { display: none; }
+.bubble.moved { box-shadow: 0 3px 10px rgba(0,0,0,.4), 0 0 0 2px rgba(232,163,61,.7); }
 .bubble.scroll .bt { mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%);
   -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 14px, #000 calc(100% - 14px), transparent 100%); }
 .floater { position: absolute; font-size: 34px; animation: floatUp 1.8s ease-out forwards; }

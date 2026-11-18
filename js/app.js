@@ -466,6 +466,7 @@
 
   /* ---------------- 会話 ---------------- */
   function sys(text) { net.push('chat', { sys: true, text: text, at: TS }); }
+  var lastSent = 0;
   /* 書く欄: 長く書くと下に広がる(5行くらいまで。それ以上は欄の中で動かす) */
   var chatIn = $('chatInput');
   function growInput() { chatIn.style.height = 'auto'; chatIn.style.height = Math.min(chatIn.scrollHeight, 140) + 'px'; }
@@ -488,6 +489,8 @@
     var t = $('chatInput').value.trim().slice(0, 500);
     if (!t) return;
     if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return; }
+    if (Date.now() - lastSent < 1500) { toast('少し間をあけて送ってください', 1500); return; }
+    lastSent = Date.now();
     net.push('chat', { uid: ME.uid, name: currentName(), seat: OWNER_MODE ? 'owner' : mySeat, owner: OWNER_MODE, text: t, at: TS });
     $('chatInput').value = ''; growInput();
   });
@@ -516,7 +519,8 @@
     if (seat == null) return;
     var key = String(seat);
     var b = bubbles[key];
-    if (!b) { b = bubbles[key] = { el: document.createElement('div'), bt: document.createElement('div') }; b.el.appendChild(b.bt); }
+    if (!b) { b = bubbles[key] = { el: document.createElement('div'), bn: document.createElement('div'), bt: document.createElement('div') }; b.bn.className = 'bn'; b.bt.className = 'bt'; b.el.appendChild(b.bn); b.el.appendChild(b.bt); }
+    if (!b.el.parentNode) b.el.style.display = 'none';   // 置き場所が決まるまでは隠す
     $('bubbles').appendChild(b.el);   // いちばん新しい吹き出しを、いちばん手前に
     b.el.className = 'bubble' + (phrase ? ' phrase' : '') + (text.length > 50 ? ' long' : '');
     b.bt.textContent = text; b.bt.scrollTop = 0;
@@ -559,24 +563,76 @@
       }
     }
     Object.keys(tagEls).forEach(function (k) { if (!used[k]) tagEls[k].style.display = 'none'; });
+    placeBubbles(a, ms);
+  }
+
+  /* 吹き出しを置く —— ぜったいに重ならないように。
+     新しい吹き出しほど先に、頭のすぐ上に置く。ぶつかる古い吹き出しは、その上へずらす(ずらしたものには名前を出す)。
+     上の端まで入りきらないときは、古いほうを低くして中で文字を流す。それでも入らなければ消す(会話の記録には残る) */
+  var GAP = 8, TAIL = 22, MIN_H = 46, MIN_TEXT = 46, SPEED = 24, WAIT = 1800;   // MIN_TEXT: 文字は最低2行ぶん見せる
+  function placeBubbles(a, ms) {
     var t = Date.now();
+    var topEl = document.querySelector('.topbar');
+    var topLimit = (topEl && topEl.offsetParent ? topEl.getBoundingClientRect().bottom : 50) + 6;
+    var list = [];
     Object.keys(bubbles).forEach(function (k) {
       var b = bubbles[k], p = k === 'owner' ? a.owner : a.seats[+k];
       if (!p || t > b.until + 500) { b.el.remove(); delete bubbles[k]; return; }
-      // 上の端(上の帯の下)まで伸ばす。それでも入りきらないときは、中で文字をゆっくり上に流す
-      var top = (document.querySelector('.topbar') || { getBoundingClientRect: function () { return { bottom: 50 }; } }).getBoundingClientRect().bottom + 6;
-      var room = Math.max(60, p.y - 22 - top - 16);
-      b.bt.style.maxHeight = room + 'px';
+      list.push({ k: k, b: b, p: p });
+    });
+    list.sort(function (x, y) { return y.b.start - x.b.start; });   // 新しい順
+    var placed = [];
+    // ひとりじめさせない: 話している人数で、使える高さを等分する(1人なら上まで、4人なら4分の1ずつ)
+    var lowest = 0; list.forEach(function (it) { lowest = Math.max(lowest, it.p.y); });
+    var share = (Math.min(lowest, window.innerHeight) - TAIL - topLimit) / Math.max(1, list.length) - GAP;
+    list.forEach(function (it) {
+      var b = it.b, p = it.p;
+      // 名前(ずらしたときだけ見える)
+      var nm = it.k === 'owner' ? ((tree.state && tree.state.ownerName) || SHOP.OWNER_NAME) : (function () { var u = seatUid(+it.k), m = u && ms[u]; return m ? m.name : ''; })();
+      if (b.bn.textContent !== nm) b.bn.textContent = nm;
+      b.el.style.display = '';
+      b.el.classList.remove('moved');   // 測る前に、名前の行を消しておく(ずらすときに付けて、測りなおす)
+      // まず、頭の上から上の端までを使える高さにして、自然な大きさを測る
+      var T = p.y;                                   // 吹き出しの「しっぽの先」の位置
+      b.bt.style.maxHeight = Math.max(MIN_TEXT, Math.min(T - TAIL - topLimit - 16, share - 16)) + 'px';
+      var w = b.el.offsetWidth, h = b.el.offsetHeight;
+      var hw = Math.min(w, window.innerWidth - 100) / 2 + 6;
+      var cx = Math.max(hw, Math.min(window.innerWidth - 72 - hw, p.x));
+      var x0 = cx - w / 2, x1 = cx + w / 2;
+      // ほかの吹き出しとぶつかる間は、上へずらす
+      var moved = false, guard = 0, hit = true;
+      while (hit && guard++ < 20) {
+        hit = false;
+        for (var i = 0; i < placed.length; i++) {
+          var q = placed[i];
+          var top = T - TAIL - h, bottom = T - TAIL + (moved ? 0 : 10);
+          if (x0 < q.x1 + GAP && x1 > q.x0 - GAP && top < q.bottom + GAP && bottom > q.top - GAP) {
+            T = q.top - GAP + TAIL;   // q の上へ
+            if (!moved) { moved = true; b.el.classList.add('moved'); h = b.el.offsetHeight; }   // 名前の行の分 高くなる
+            hit = true;
+          }
+        }
+      }
+      // 上の端に入りきらないときは、低くする。低くしても入らなければ消す
+      var bottom2 = T - TAIL, space = bottom2 - topLimit;
+      if (space < MIN_H + 20) { b.el.style.display = 'none'; return; }
+      if (h > space) {
+        b.bt.style.maxHeight = Math.max(MIN_TEXT, b.bt.clientHeight - (h - space)) + 'px';
+        h = b.el.offsetHeight;
+        if (h > space) { b.el.style.display = 'none'; return; }
+      }
+      // 入りきらない文字は、中でゆっくり上に流す
       var over = b.bt.scrollHeight - b.bt.clientHeight;
       if (over > 2) {
         b.el.classList.add('scroll');
-        var SPEED = 24, WAIT = 1800;   // 1秒に24ほど流す。はじめは少し待つ
         b.bt.scrollTop = Math.max(0, Math.min(over, (t - b.start - WAIT) / 1000 * SPEED));
         b.until = Math.max(b.until, b.start + WAIT + over / SPEED * 1000 + 3500);
       } else b.el.classList.remove('scroll');
+      b.el.classList.toggle('moved', moved);
       b.el.classList.toggle('fade', t > b.until);
-      var hw = Math.min(b.el.offsetWidth, window.innerWidth - 100) / 2 + 6; b.el.style.left = Math.max(hw, Math.min(window.innerWidth - 72 - hw, p.x)) + 'px';
-      b.el.style.top = p.y + 'px';
+      b.el.style.left = cx + 'px';
+      b.el.style.top = T + 'px';
+      placed.push({ x0: x0, x1: x1, top: T - TAIL - h, bottom: T - TAIL + (moved ? 0 : 10) });
     });
   }
 
