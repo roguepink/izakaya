@@ -160,6 +160,7 @@
     scene.onFrame = function () { placeOverlays(); placeTV(); };
     scene.onMonitorTap = function () { if ($('tv').classList.contains('hidden')) { if (inside) openSheet('music'); } else tvBig(true); };   // 何も流れていない時は、動画を選ぶ画面
     sceneWait.forEach(function (fn) { fn(scene); }); sceneWait = [];
+    if (typeof PERF !== 'undefined' && PERF && scene.setPerf) scene.setPerf({ fps: PERF[perfMode].fps, ratio: PERF[perfMode].ratio });
     applyTree();
   }
   if (window.IZ3D) setTimeout(start3D, 0);
@@ -317,11 +318,11 @@
   function tvShow(on) { $('tv').classList.toggle('hidden', !on); if (!on) tvBig(false); }
   function showYT(m) {
     var id = ytId(m.src); if (!id) return;
-    ytOn = true; ytState = -1; ytLoadedAt = Date.now(); ytMuted = false;
+    ytOn = true; ytState = -1; ytLoadedAt = Date.now(); ytMuted = false; ytReady = false;
     var f = document.createElement('iframe');
     f.allow = 'autoplay; encrypted-media; fullscreen'; f.allowFullscreen = true;
-    f.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&playsinline=1&enablejsapi=1&controls=1&rel=0&iv_load_policy=3&fs=1&start=' + Math.floor(elapsed(m)) + '&origin=' + encodeURIComponent(location.origin);
-    f.onload = function () { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*'); } catch (e) {} setVol(); };
+    f.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&playsinline=1&enablejsapi=1&controls=1&rel=0&iv_load_policy=3&fs=1&cc_load_policy=0&start=' + Math.floor(elapsed(m)) + '&origin=' + encodeURIComponent(location.origin);
+    f.onload = function () { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*'); } catch (e) {} setVol(); [800, 2500, 6000].forEach(function (t) { setTimeout(ytNoCaptions, t); }); };
     $('tvHolder').innerHTML = ''; $('tvHolder').appendChild(f);
     tvShow(true);
     // 音つきで始まらないスマホでは、音を消して絵だけ先に動かす(モニターを押すと音が出る)
@@ -358,6 +359,7 @@
     $('tv').classList.add('anim'); setTimeout(function () { $('tv').classList.remove('anim'); }, 380);
     $('tv').classList.toggle('big', on); $('tvBack').classList.toggle('hidden', !on); $('tvClose').classList.toggle('hidden', !on);
     if (on) tvUnmute(); else document.body.classList.remove('tv-land');
+    withScene(function (sc) { if (sc.setPerf) sc.setPerf({ rest: on }); });
     tvBadge(); tvCss = ''; placeTV();
   }
   /* 640×360 の箱を、画面の上の4つの点にぴったり合わせる(遠近もつける) */
@@ -383,7 +385,7 @@
     } else {
       var q = scene && scene.monitorQuad ? scene.monitorQuad() : null;
       var wpx = q ? Math.hypot(q[1].x - q[0].x, q[1].y - q[0].y) : 0;
-      var headHull = q && scene.ownerHeadHull ? scene.ownerHeadHull() : null;
+      var headHull = q && q.main && scene.ownerHeadHull ? scene.ownerHeadHull() : null;
       var seen = q ? shownPart(q) : 0;
       if (q && wpx > 56 && seen > 0.72 && seen * (1 - hiddenByHead(q, headHull)) > 0.6) { css = quadMatrix(q); mode = 'monitor'; }   // 帯や大将の頭で半分近く隠れるなら小窓
       else {   // モニターが見えない向きは左上の小窓
@@ -439,6 +441,9 @@
   $('tvCatch').onclick = function () { tvBig(true); };
   $('tvClose').onclick = function () { tvBig(false); };
   $('tvBack').onclick = function () { if (Date.now() - tvBigAt > 450) tvBig(false); };
+  /* YouTube の字幕(CC)はいつも消す。見る人の YouTube の設定で勝手に出ることがあるので、始まり・切りかえのたびに消す合図を送る */
+  var ytReady = false;
+  function ytNoCaptions() { if (!ytReady) return; ytCmd('unloadModule', ['captions']); ytCmd('unloadModule', ['cc']); ytCmd('setOption', ['captions', 'track', {}]); }
   function ytCmd(func, args) {
     var f = $('tvHolder').firstChild; if (!f || !f.contentWindow || f.tagName !== 'IFRAME') return;
     try { f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: args || [] }), '*'); } catch (e) {}
@@ -447,7 +452,9 @@
     if (!/youtube/.test(e.origin)) return;
     var d; try { d = JSON.parse(e.data); } catch (x) { return; }
     if (!d || !d.info) return;
+    if (!ytReady) { ytReady = true; ytNoCaptions(); }
     if (typeof d.info.playerState === 'number') {
+      if (d.info.playerState !== ytState) ytNoCaptions();
       ytState = d.info.playerState;
       if (ytState === 0 && amLeader()) advance(curKey);
     }
@@ -1155,8 +1162,10 @@
     if (sheetKind === 'music') {
       title = '曲・動画';
       var st = tree.state || {}, m = st.music, q = tree.queue || {}, qk = Object.keys(q).sort();
-      html += '<div class="sh-sec">いま流れている曲</div><div class="li now"><div class="t">🎵 ' + (m ? esc(m.title) + (m.byName ? '<small>' + esc(m.byName) + 'さんのリクエスト</small>' : '') : '—') + '</div>' + (OWNER_MODE ? '<button id="skipBtn" class="gray">次へ</button>' : '') + '</div>';
+      html += '<div class="sh-sec">いま流れている曲</div><div class="li now"><div class="t">🎵 ' + (m ? esc(m.title) + (m.byName ? '<small>' + esc(m.byName) + 'さんのリクエスト</small>' : '') : '—') + '</div>' + (OWNER_MODE && m ? '<button id="skipBtn" class="red">⏭ 次の曲へ</button>' : '') + '</div>';
+      if (OWNER_MODE) html += '<p class="small-note">大将だけ: 「次の曲へ」で今の曲・動画を取り消して、次へ進めます。順番待ちも全部取り消せます。</p>';
       html += '<div class="vol" style="margin-top:10px">🔈<input id="volIn" type="range" min="0" max="1" step="0.05" value="' + vol + '">🔊</div>';
+      html += '<div class="sh-sec">🔋 画面の動き(熱くなる・電池が気になるとき)</div><div class="btn-row perf-row">' + ['eco', 'normal', 'smooth'].map(function (k) { return '<button data-perf="' + k + '" class="' + (k === perfMode ? 'red' : 'gray') + '">' + PERF[k].name + '</button>'; }).join('') + '</div><p class="small-note">省エネにすると、動きが少しカクッとしますが、熱と電池の減りがおさえられます。動画を大きく見ている間は、うしろのお店の絵を自動で止めて休ませます。</p>';
       html += '<p class="small-note">音の大きさは自分のスマホだけ。曲はお店にいる全員で同じものを聞きます。</p>';
       html += '<div class="sh-sec">リクエストの順番待ち(' + qk.length + ')</div><div class="list">';
       if (!qk.length) html += '<div class="li"><div class="t"><small>まだありません。下の一覧からリクエストできます。</small></div></div>';
@@ -1216,7 +1225,8 @@
     var q = function (sel) { return body.querySelector(sel); };
     if (sheetKind === 'music') {
       var vi = q('#volIn'); if (vi) vi.oninput = function () { vol = +vi.value; lsSet('iz-vol', vol); setVol(); };
-      var sk = q('#skipBtn'); if (sk) sk.onclick = function () { advance(curKey); };
+      var sk = q('#skipBtn'); if (sk) sk.onclick = ownerSkip;
+      body.querySelectorAll('[data-perf]').forEach(function (b) { b.onclick = function () { perfMode = b.getAttribute('data-perf'); lsSet('iz-perf', perfMode); applyPerf(); toast('画面の動き: ' + PERF[perfMode].name, 1500); refreshSheet(true); }; });
       body.querySelectorAll('[data-req]').forEach(function (b) { b.onclick = function () { requestSong(b.getAttribute('data-req')); }; });
       body.querySelectorAll('[data-vreq]').forEach(function (b) { b.onclick = function () {
         var v = SHOP.VIDEOS.filter(function (x) { return x.id === b.getAttribute('data-vreq'); })[0]; if (!v) return;
@@ -1363,6 +1373,19 @@
   $('bMenu').onclick = function () { if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return; } openSheet('menu'); };
   $('bMusic').onclick = function () { openSheet('music'); };
   $('nowPlaying').onclick = function () { openSheet('music'); };
+  /* 大将だけ: 今の曲・動画を取り消して次へ */
+  function ownerSkip() {
+    if (!OWNER_MODE) return;
+    var m = tree.state && tree.state.music; if (!m) return;
+    advance(musicKey(m));
+    toast('⏭ 「' + m.title + '」を取り消して、次へ進めました', 2200);
+  }
+  $('npSkip').onclick = ownerSkip;
+  /* 画面の動き(電池・熱): 自分のスマホだけ。なめらか=60回/秒・細かい、ふつう=30回、省エネ=20回・あらめ */
+  var PERF = { smooth: { fps: 60, ratio: 2, name: 'なめらか' }, normal: { fps: 30, ratio: 1.5, name: 'ふつう' }, eco: { fps: 20, ratio: 1, name: '省エネ' } };
+  var perfMode = lsGet('iz-perf', 'normal'); if (!PERF[perfMode]) perfMode = 'normal';
+  function applyPerf() { withScene(function (sc) { if (sc.setPerf) sc.setPerf({ fps: PERF[perfMode].fps, ratio: PERF[perfMode].ratio }); }); }
+  applyPerf();
   $('bOrders').onclick = function () { openSheet('orders'); };
   $('bOwner').onclick = function () { openSheet('owner'); };
   $('bBot').onclick = function () { openSheet('bot'); };

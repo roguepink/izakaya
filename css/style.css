@@ -106,7 +106,9 @@ button.ok:disabled { opacity: .4; }
   background: var(--glass); border-radius: 999px; padding: 7px 14px; font-size: 14px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .tb-left b { font-family: var(--mincho); margin-right: 8px; }
 #tbState { color: var(--gold); font-weight: 700; }
-.np { position: absolute; top: calc(var(--sat) + 52px); left: 10px; max-width: calc(100% - 90px); background: var(--glass); border-radius: 999px;
+.np-row { position: absolute; top: calc(var(--sat) + 52px); left: 10px; max-width: calc(100% - 90px); display: flex; gap: 6px; align-items: center; }
+.np-skip { flex: none; background: var(--red); color: #fff; font-weight: 800; border-radius: 999px; padding: 6px 12px; font-size: 13px; }
+.np { min-width: 0; background: var(--glass); border-radius: 999px;
   padding: 6px 14px; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: left; }
 /* 大将のうしろのモニター。640×360 の箱を 3D の画面の位置に重ねる */
 #tv { position: fixed; left: 0; top: 0; width: 640px; height: 360px; transform-origin: 0 0; z-index: 8; background: #000; pointer-events: none; overflow: hidden; }
@@ -282,7 +284,9 @@ button.mini { background: rgba(0,0,0,.1); border-radius: 999px; width: 30px; hei
 /* ---------- 横向き(スマホを横にしたとき) ---------- */
 @media (orientation: landscape) and (max-height: 520px) {
   .topbar { right: auto; width: min(46vw, 420px); padding: 5px 12px; font-size: 13px; }
-  .np { top: calc(var(--sat) + 44px); font-size: 12px; padding: 5px 12px; max-width: 40vw; }
+  .np-row { top: calc(var(--sat) + 44px); max-width: 48vw; }
+  .np { font-size: 12px; padding: 5px 12px; }
+  .np-skip { font-size: 12px; padding: 5px 10px; }
   .side { top: calc(var(--sat) + 6px); right: calc(env(safe-area-inset-right, 0px) + 8px); flex-direction: row; gap: 5px; }
   .sbtn { width: 50px; padding: 5px 0 3px; border-radius: 12px; }
   .sbtn span { font-size: 19px; }
