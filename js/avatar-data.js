@@ -23,8 +23,10 @@ var AVATAR = {
   SEX: {
     m: {
       label: '男性',
-      hair: [['short', 'さわやかショート'], ['twoblock', 'ツーブロック'], ['center', 'センター分け'], ['mash', 'マッシュ'], ['side', '七三分け'],
+      hair: [['short', 'さわやかショート'], ['twoblock', 'ツーブロック'], ['mash', 'マッシュ'], ['medium', 'ミディアム'], ['wolf', 'ウルフ'],
              ['perm', 'ゆるパーマ'], ['spiky', 'ツンツン'], ['back', 'オールバック'], ['long', '長め・ひとつ結び'], ['buzz', 'ぼうず']],
+      bangs: [['down', '下ろす'], ['sideswept', '流す'], ['center', 'センター分け'], ['up', 'かき上げ(アップバング)'], ['short', '短め'], ['long', '長め(目にかかる)']],
+      ahoge: [['off', 'なし'], ['on', 'あり']],
       eyes:  [['clear', 'くっきり'], ['cool', '切れ長'], ['round', 'まる目'], ['droopy', 'たれ目'], ['sharp', 'つり目'], ['smile', 'にこにこ'], ['narrow', 'ほそ目']],
       brows: [['thick', '太め'], ['natural', 'ふつう'], ['straight', 'まっすぐ'], ['up', 'きりっ'], ['worry', 'こまり']],
       beard: [['none', 'なし'], ['stubble', 'ぶしょうひげ'], ['chin', 'あごひげ'], ['mustache', '口ひげ'], ['full', 'フルひげ']],
@@ -35,7 +37,9 @@ var AVATAR = {
     f: {
       label: '女性',
       hair: [['bob', 'ボブ'], ['shortbob', 'ショートボブ'], ['short', 'ショート'], ['long', 'ロング'], ['wave', 'ゆるふわロング'], ['ponytail', 'ポニーテール'],
-             ['bun', 'おだんご'], ['halfup', 'ハーフアップ'], ['hime', 'ぱっつんロング'], ['side', 'サイドまとめ']],
+             ['twin', 'ツインテール'], ['bun', 'おだんご'], ['halfup', 'ハーフアップ'], ['side', 'サイドまとめ']],
+      bangs: [['seethrough', 'シースルー'], ['patsun', 'ぱっつん'], ['nagashi', '流す'], ['center', 'センター分け'], ['long', '長め(大人っぽく)']],
+      ahoge: [['off', 'なし'], ['on', 'あり']],
       eyes:  [['big', 'ぱっちり'], ['droopy', 'たれ目'], ['cat', 'ねこ目'], ['cool', '切れ長'], ['smile', 'にこにこ'], ['round', 'まる目'], ['wink', 'ウインク']],
       brows: [['soft', 'ふんわり'], ['thin', '細め'], ['straight', '平行'], ['up', 'きりっ'], ['worry', 'こまり']],
       top:   [['blouse', 'ブラウス'], ['onepiece', 'ワンピース'], ['knit', 'ニット'], ['cardigan', 'カーディガン'], ['office', 'オフィスジャケット'],
@@ -60,24 +64,24 @@ var AVATAR = {
   /* はじめから用意してあるアバター(「おまかせ」で選べる)。値は id で書く */
   PRESETS: {
     m: [
-      { name: 'サラリーマン', skin: 1, face: 'egg', hair: 'side', hairColor: 0, eyes: 'clear', brows: 'natural', mouth: 'soft', beard: 'none', top: 'suit', topColor: 0, acc: 'thin' },
-      { name: 'カフェ好き', skin: 1, face: 'sharp', hair: 'center', hairColor: 3, eyes: 'cool', brows: 'straight', mouth: 'flat', beard: 'none', top: 'knit', topColor: 9, acc: 'none' },
-      { name: '職人さん', skin: 3, face: 'square', hair: 'buzz', hairColor: 0, eyes: 'sharp', brows: 'thick', mouth: 'grin', beard: 'stubble', top: 'work', topColor: 10, acc: 'none' },
-      { name: 'ゆるパーマ', skin: 1, face: 'round', hair: 'perm', hairColor: 2, eyes: 'droopy', brows: 'natural', mouth: 'smile', beard: 'none', top: 'hoodie', topColor: 12, acc: 'cap' },
+      { name: 'サラリーマン', skin: 1, face: 'egg', hair: 'short', bangs: 'sideswept', hairColor: 0, eyes: 'clear', brows: 'natural', mouth: 'soft', beard: 'none', top: 'suit', topColor: 0, acc: 'thin' },
+      { name: 'カフェ好き', skin: 1, face: 'sharp', hair: 'medium', bangs: 'center', hairColor: 3, eyes: 'cool', brows: 'straight', mouth: 'flat', beard: 'none', top: 'knit', topColor: 9, acc: 'none' },
+      { name: '職人さん', skin: 3, face: 'square', hair: 'twoblock', bangs: 'up', hairColor: 0, eyes: 'sharp', brows: 'thick', mouth: 'grin', beard: 'stubble', top: 'work', topColor: 10, acc: 'none' },
+      { name: 'ゆるパーマ', skin: 1, face: 'round', hair: 'perm', bangs: 'down', hairColor: 2, eyes: 'droopy', brows: 'natural', mouth: 'smile', beard: 'none', top: 'hoodie', topColor: 12, acc: 'cap' },
       { name: 'ダンディ', skin: 2, face: 'square', hair: 'back', hairColor: 7, eyes: 'cool', brows: 'thick', mouth: 'soft', beard: 'chin', top: 'jacket', topColor: 1, acc: 'none' },
-      { name: 'デザイナー', skin: 0, face: 'egg', hair: 'mash', hairColor: 1, eyes: 'round', brows: 'straight', mouth: 'flat', beard: 'none', top: 'tee', topColor: 1, acc: 'glasses' }
+      { name: 'デザイナー', skin: 0, face: 'egg', hair: 'mash', bangs: 'long', hairColor: 1, eyes: 'round', brows: 'straight', mouth: 'flat', beard: 'none', top: 'tee', topColor: 1, acc: 'glasses' }
     ],
     f: [
-      { name: 'オフィス', skin: 0, face: 'egg', hair: 'wave', hairColor: 3, eyes: 'big', brows: 'soft', mouth: 'smile', lip: 0, cheek: 1, top: 'office', topColor: 2, acc: 'earring' },
-      { name: 'カフェ店員', skin: 1, face: 'round', hair: 'bob', hairColor: 2, eyes: 'droopy', brows: 'soft', mouth: 'soft', lip: 3, cheek: 2, top: 'cardigan', topColor: 9, acc: 'none' },
-      { name: 'クール', skin: 0, face: 'sharp', hair: 'long', hairColor: 0, eyes: 'cool', brows: 'straight', mouth: 'flat', lip: 2, cheek: 0, top: 'pantsuit', topColor: 1, acc: 'necklace' },
-      { name: 'ふんわり', skin: 1, face: 'round', hair: 'halfup', hairColor: 4, eyes: 'smile', brows: 'soft', mouth: 'smile', lip: 1, cheek: 2, top: 'onepiece', topColor: 8, acc: 'ribbon' },
-      { name: 'アクティブ', skin: 2, face: 'egg', hair: 'ponytail', hairColor: 1, eyes: 'cat', brows: 'up', mouth: 'grin', lip: 3, cheek: 1, top: 'hoodie', topColor: 7, acc: 'band' },
-      { name: '職人さん', skin: 2, face: 'egg', hair: 'bun', hairColor: 0, eyes: 'round', brows: 'natural', mouth: 'soft', lip: 4, cheek: 1, top: 'work', topColor: 3, acc: 'none' }
+      { name: 'オフィス', skin: 0, face: 'egg', hair: 'wave', bangs: 'seethrough', hairColor: 3, eyes: 'big', brows: 'soft', mouth: 'smile', lip: 0, cheek: 1, top: 'office', topColor: 2, acc: 'earring' },
+      { name: 'カフェ店員', skin: 1, face: 'round', hair: 'bob', bangs: 'patsun', hairColor: 2, eyes: 'droopy', brows: 'soft', mouth: 'soft', lip: 3, cheek: 2, top: 'cardigan', topColor: 9, acc: 'none' },
+      { name: 'クール', skin: 0, face: 'sharp', hair: 'long', bangs: 'center', hairColor: 0, eyes: 'cool', brows: 'straight', mouth: 'flat', lip: 2, cheek: 0, top: 'pantsuit', topColor: 1, acc: 'necklace' },
+      { name: 'ふんわり', skin: 1, face: 'round', hair: 'twin', bangs: 'seethrough', ahoge: 'on', hairColor: 4, eyes: 'smile', brows: 'soft', mouth: 'smile', lip: 1, cheek: 2, top: 'onepiece', topColor: 8, acc: 'ribbon' },
+      { name: 'アクティブ', skin: 2, face: 'egg', hair: 'ponytail', bangs: 'nagashi', hairColor: 1, eyes: 'cat', brows: 'up', mouth: 'grin', lip: 3, cheek: 1, top: 'hoodie', topColor: 7, acc: 'band' },
+      { name: '職人さん', skin: 2, face: 'egg', hair: 'bun', bangs: 'seethrough', hairColor: 0, eyes: 'round', brows: 'natural', mouth: 'soft', lip: 4, cheek: 1, top: 'work', topColor: 3, acc: 'none' }
     ]
   },
   /* 大将(ノブさん)のはじめのアバター。あとで VRoid で作った本人そっくりのアバターに差しかえられるようにする */
-  OWNER: { owner: true, sex: 'm', skin: 3, face: 'square', hair: 'short', hairColor: 0, eyes: 'sharp', brows: 'thick', mouth: 'grin', beard: 'stubble',
+  OWNER: { owner: true, sex: 'm', skin: 3, face: 'square', hair: 'short', bangs: 'short', hairColor: 0, eyes: 'sharp', brows: 'thick', mouth: 'grin', beard: 'stubble',
            top: 'happi', topColor: 0, head: 'hachimaki', apron: 'navy', size: 1.06, voice: 0 },
 
   color: function (list, v) { return typeof v === 'string' && v[0] === '#' ? v : (list[v] || list[0]); },
@@ -92,7 +96,7 @@ var AVATAR = {
     sex = sex || (Math.random() < 0.5 ? 'm' : 'f');
     var p = JSON.parse(JSON.stringify(pick(AVATAR.PRESETS[sex])));
     var S = AVATAR.SEX[sex];
-    p.sex = sex; p.hair = pick(S.hair)[0]; p.hairColor = Math.floor(Math.random() * 6); p.eyes = pick(S.eyes)[0];
+    p.sex = sex; p.hair = pick(S.hair)[0]; p.bangs = pick(S.bangs)[0]; p.ahoge = sex === 'f' && Math.random() < 0.3 ? 'on' : 'off'; p.hairColor = Math.floor(Math.random() * 6); p.eyes = pick(S.eyes)[0];
     p.top = pick(S.top)[0]; p.topColor = Math.floor(Math.random() * AVATAR.CLOTH_COLOR.length);
     p.acc = Math.random() < 0.5 ? 'none' : pick(S.acc)[0]; p.skin = Math.floor(Math.random() * 4);
     p.voice = sex === 'f' ? 2 + Math.floor(Math.random() * 2) : Math.floor(Math.random() * 2);
@@ -107,7 +111,7 @@ var AVATAR = {
     function id(key, d) { var list = AVATAR.parts(o, key); var v = a[key]; for (var i = 0; i < list.length; i++) if (list[i][0] === v) return v; return d != null ? d : (list[0] ? list[0][0] : ''); }
     function c(v, list, d) { return typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : (v >= 0 && v < list.length ? Math.floor(v) : d); }
     o.skin = c(a.skin, AVATAR.SKIN, 1);
-    o.face = id('face'); o.mouth = id('mouth'); o.eyes = id('eyes'); o.brows = id('brows'); o.hair = id('hair');
+    o.face = id('face'); o.mouth = id('mouth'); o.eyes = id('eyes'); o.brows = id('brows'); o.hair = id('hair'); o.bangs = id('bangs'); o.ahoge = id('ahoge', 'off');
     o.hairColor = c(a.hairColor, AVATAR.HAIR_COLOR, 0);
     o.eyeColor = c(a.eyeColor, AVATAR.EYE_COLOR, 0);
     if (o.sex === 'm') o.beard = id('beard', 'none');

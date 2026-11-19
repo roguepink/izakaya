@@ -20,6 +20,7 @@ if (mode.startsWith('hair-')) vary(mode.slice(5), 'hair', 0);
 if (mode.startsWith('top-')) vary(mode.slice(4), 'top', 1);
 if (mode.startsWith('acc-')) vary(mode.slice(4), 'acc', 0);
 if (mode.startsWith('eyes-')) vary(mode.slice(5), 'eyes', 0);
+if (mode.startsWith('bangs-')) vary(mode.slice(6), 'bangs', 0);
 if (mode === 'owner') AVATAR.OWNER_PARTS.top.forEach(([id, nm], i) => { const a = JSON.parse(JSON.stringify(AVATAR.OWNER)); a.top = id; a.head = AVATAR.OWNER_PARTS.head[i + 1] ? AVATAR.OWNER_PARTS.head[i + 1][0] : 'none'; a.apron = AVATAR.OWNER_PARTS.apron[(i % 4) + 1][0]; list.push([a, nm + ' / ' + a.head]); });
 const cv = document.getElementById('c');
 const R = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); R.setPixelRatio(Math.min(devicePixelRatio, 2)); R.outputColorSpace = THREE.SRGBColorSpace;

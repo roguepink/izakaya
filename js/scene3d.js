@@ -44,7 +44,7 @@ function woodTex(base, line, w = 512, h = 128, rep = 1) {
 }
 
 /* =====================================================================
-   アバターを組み立てる(2代目・アニメ風)
+   アバターを組み立てる(3代目・アニメ風。頭の形・髪の土台+毛の束・体を作りこみ)
    ・塗りは「トゥーン」(影を3段で塗る)+ ふちに細い線
    ・顔はキャンバスに描いて、頭の前に貼る。髪は毛の束を1本ずつ形にして並べる
    ===================================================================== */
@@ -52,9 +52,19 @@ const GRAD = (() => { const t = new THREE.DataTexture(new Uint8Array([90, 90, 90
 const TOONS = {};
 function toon(color, o) { const k = color + JSON.stringify(o || {}); return TOONS[k] || (TOONS[k] = new THREE.MeshToonMaterial(Object.assign({ color, gradientMap: GRAD }, o))); }
 const LINE_M = new THREE.MeshBasicMaterial({ color: '#2a1810', side: THREE.BackSide });
-function tm(geo, color, x = 0, y = 0, z = 0, line = 0) {   // トゥーンの部品。line に太さ(0.03 なら 3% 大きい黒で ふちどり)
+/* ふち線: 形を 面の向きに少し ふくらませた黒い殻(内がわだけ描く)。細かい部品でも きれいに出る */
+function outlineOf(geo, th) {
+  const g = geo.index ? geo.clone() : geo.clone();
+  if (!g.attributes.normal) g.computeVertexNormals();
+  // 角のある形(箱など)は 頂点が分かれているので、同じ場所の頂点の向きを まとめてから ふくらませる
+  const p = g.attributes.position, n = g.attributes.normal, acc = new Map();
+  for (let i = 0; i < p.count; i++) { const k = p.getX(i).toFixed(4) + ',' + p.getY(i).toFixed(4) + ',' + p.getZ(i).toFixed(4); const v = acc.get(k) || [0, 0, 0]; v[0] += n.getX(i); v[1] += n.getY(i); v[2] += n.getZ(i); acc.set(k, v); }
+  for (let i = 0; i < p.count; i++) { const k = p.getX(i).toFixed(4) + ',' + p.getY(i).toFixed(4) + ',' + p.getZ(i).toFixed(4); const v = acc.get(k); const l = Math.hypot(v[0], v[1], v[2]) || 1; p.setXYZ(i, p.getX(i) + v[0] / l * th, p.getY(i) + v[1] / l * th, p.getZ(i) + v[2] / l * th); }
+  return new THREE.Mesh(g, LINE_M);
+}
+function tm(geo, color, x = 0, y = 0, z = 0, line = 0) {   // トゥーンの部品。line = ふち線の太さ(メートル。0 で なし)
   const m = new THREE.Mesh(geo, toon(color)); m.position.set(x, y, z);
-  if (line) { const o = new THREE.Mesh(geo, LINE_M); o.scale.setScalar(1 + line); m.add(o); }
+  if (line) m.add(outlineOf(geo, line));
   return m;
 }
 function shade(hex, f) { const c = new THREE.Color(hex); c.multiplyScalar(f); return '#' + c.getHexString(); }
@@ -179,157 +189,313 @@ function drawEye(g, cx, cy, s, a, eyeC, ink) {
   g.restore();
 }
 
-/* ---------- 髪の毛の束 ---------- */
-const LOCK_CACHE = {};
-/* 根元が上(y=0)、毛先が下(y=-len)。bz: 毛先が前(+z)へ曲がる量 / bx: 横へ / wave: 波打ち / flat: 平たさ */
-function lockGeo(len, r0, r1, bz = 0, bx = 0, wave = 0, flat = 0.55) {
-  const k = [len, r0, r1, bz, bx, wave, flat].map((v) => v.toFixed(3)).join(',');
-  if (LOCK_CACHE[k]) return LOCK_CACHE[k];
-  const geo = new THREE.CylinderGeometry(r0, r1, len, 8, 8);
-  geo.translate(0, -len / 2, 0);
+/* ---------- 頭の形(ただの丸ではなく、上が広く あごに向かって細いアニメの頭) ---------- */
+function headDeform(face) {
+  const a = { round: 0.12, egg: 0.21, sharp: 0.29, square: 0.08 }[face] ?? 0.18;
+  const sq = face === 'square';
+  return (x, y, z, R) => {
+    const ny = y / R;
+    if (ny < 0) {
+      const t = Math.min(1, -ny);
+      x *= (1 - a * Math.pow(t, 1.5)) * (sq ? 1 + 0.05 * t : 1);
+      z *= z > 0 ? 1 - 0.06 * t : 1 - 0.22 * t;
+      y *= 1 + (sq ? 0.02 : 0.1) * t;
+    } else { x *= 1 + 0.035 * ny; y *= 1.02; z *= 1 + 0.02 * ny; }
+    return [x, y, z];
+  };
+}
+function deformGeo(geo, D, R) {
   const p = geo.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const y = p.getY(i), t = -y / len;
-    let x = p.getX(i), z = p.getZ(i) * flat;
-    x += bx * t * t + wave * Math.sin(t * Math.PI * 3) * t;
-    z += bz * t * t;
-    p.setXYZ(i, x, y, z);
+  for (let i = 0; i < p.count; i++) { const v = D(p.getX(i), p.getY(i), p.getZ(i), R); p.setXYZ(i, v[0], v[1], v[2]); }
+  geo.computeVertexNormals(); return geo;
+}
+/* 頭の表面の点(θ: 真上0、φ: 正面0・右が+) */
+function sp(D, R, th, ph, r) { return new THREE.Vector3(...D(r * Math.sin(th) * Math.sin(ph), r * Math.cos(th), r * Math.sin(th) * Math.cos(ph), R)); }
+
+/* ---------- 髪の土台(頭にかぶせる かたまり)。生えぎわは 前・横・後ろで高さがちがう ---------- */
+function hairShell(D, R, o) {
+  const SP = 56, ST = 20, pos = [], idx = [];
+  for (let j = 0; j <= ST; j++) for (let i = 0; i <= SP; i++) {
+    const ph = (i / SP) * Math.PI * 2 - Math.PI, a = Math.cos(ph);
+    let hl = a >= 0 ? o.s + (o.f - o.s) * Math.pow(a, 1.4) : o.s + (o.b - o.s) * Math.pow(-a, 1.1);
+    if (o.part != null) hl -= 0.12 * Math.exp(-Math.pow((ph - o.part) * 4, 2));   // 分け目のところは 少し上がる
+    const th = (j / ST) * hl;
+    const top = Math.max(0, Math.cos(th));
+    let r = R * (1.04 + o.vol * Math.pow(top, 1.4) + (a < 0 ? o.crown * Math.pow(Math.sin(th * 1.6), 2) * (-a) : 0));
+    const v = sp(D, R, th, ph, r); pos.push(v.x, v.y, v.z);
   }
-  geo.computeVertexNormals();
-  return (LOCK_CACHE[k] = geo);
+  for (let j = 0; j < ST; j++) for (let i = 0; i < SP; i++) { const a = j * (SP + 1) + i, b = a + SP + 1; idx.push(a, b, a + 1, b, b + 1, a + 1); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  return g;
 }
-/* 頭のまわりに 束を置く。ang: 正面0・右(+x)が+、tilt: 外へ開く角度、y: 根元の高さ */
-function addLock(parent, color, R, ang, y, geoArgs, tilt = 0.25, out = 1.0, roll = 0) {
-  const pivot = new THREE.Group(); pivot.rotation.y = ang;
-  const m = tm(lockGeo(...geoArgs), color, 0, y, R * out, 0.05);
-  m.rotation.x = -tilt; m.rotation.z = roll;
-  pivot.add(m); parent.add(pivot); return m;
+/* ---------- 毛の束: 根もとが太く、先が とがった 平たい束 ---------- */
+function strandGeo(pts, w0, flat = 0.4, blunt = 0, wave = 0) {
+  const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.35);
+  const S = 22, A = 7, pos = [], idx = [];
+  const P = new THREE.Vector3(), T = new THREE.Vector3(), N = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
+  for (let i = 0; i <= S; i++) {
+    const t = i / S;
+    curve.getPointAt(t, P); curve.getTangentAt(t, T);
+    C.set(0, Math.min(P.y, 0), 0); N.copy(P).sub(C).normalize(); N.addScaledVector(T, -N.dot(T)).normalize();
+    B.crossVectors(T, N).normalize();
+    let w = w0 * (t < 0.12 ? 0.8 + t / 0.12 * 0.2 : 1 - Math.pow((t - 0.12) / 0.88, 1.7) * (1 - blunt));
+    w = Math.max(w, w0 * 0.03);
+    const wv = wave ? Math.sin(t * Math.PI * 3) * wave : 0;
+    for (let k = 0; k < A; k++) {
+      const an = (k / A) * Math.PI * 2;
+      pos.push(P.x + B.x * (Math.cos(an) * w + wv) + N.x * Math.sin(an) * w * flat,
+               P.y + B.y * (Math.cos(an) * w + wv) + N.y * Math.sin(an) * w * flat,
+               P.z + B.z * (Math.cos(an) * w + wv) + N.z * Math.sin(an) * w * flat);
+    }
+  }
+  for (let i = 0; i < S; i++) for (let k = 0; k < A; k++) { const a = i * A + k, b = i * A + (k + 1) % A, c = a + A, d = b + A; idx.push(a, c, b, b, c, d); }
+  const tip = pos.length / 3; const L = curve.getPointAt(1); pos.push(L.x, L.y, L.z);
+  for (let k = 0; k < A; k++) idx.push(S * A + k, tip, S * A + (k + 1) % A);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  return g;
+}
+/* 束の道すじ。頭に そって進み(hug)、頭の いちばん広い所を こえたら 下へ たれる */
+function strandPath(D, R, s) {
+  const pts = [], N = 12;
+  const rs = (th) => R * (1.045 + (s.vol || 0) * Math.pow(Math.max(0, Math.cos(th)), 1.4) + 0.022 + (s.lift || 0));   // 土台の表面より 少し外
+  const r0 = rs(s.th);
+  let th = s.th, ph = s.ph, pos = null, onHead = true;
+  const total = s.len, ds = total / N, leave = s.leave ?? 1.55;
+  for (let k = 0; k <= N; k++) {
+    const t = k / N;
+    if (onHead) {
+      const r = s.up ? rs(th) * (1 + (s.rise || 0.3) * t) : rs(th) * (1 + (s.puff || 0) * Math.sin(t * Math.PI));
+      pos = sp(D, R, th, ph, r);
+      th += (s.up ? -1 : 1) * ds / r0; ph += (s.sweep || 0) * ds / R;
+      if (!s.up && th > leave) onHead = false;
+    } else {
+      const out = new THREE.Vector3(pos.x, 0, pos.z).normalize();
+      pos = pos.clone(); pos.y -= ds; pos.addScaledVector(out, (s.flare ?? 0.12) * ds);
+      if (s.fwd) pos.z += s.fwd * ds;
+    }
+    pts.push(pos.clone());
+  }
+  if (s.curl) {   // 毛先を 内(−)か 外(+)へ はねる
+    const n = pts.length;
+    for (let k = Math.floor(n * 0.65); k < n; k++) { const e = (k - n * 0.65) / (n * 0.35); const out = new THREE.Vector3(pts[k].x, 0, pts[k].z).normalize(); pts[k].addScaledVector(out, s.curl * e * e * R * 0.5); pts[k].y += Math.abs(s.curl) * e * e * R * 0.25; }
+  }
+  return pts;
 }
 
-function buildHair(head, a, R) {
+function buildHair(head, a, R, D) {
   const hc = AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor);
-  const dark = shade(hc, 0.82);
-  let capMesh = null, capS = 1.07;
-  const cap = (thetaLen = 1.45, tilt = -0.22, s = 1.07, sy = 1) => { const m = tm(new THREE.SphereGeometry(R * s, 32, 18, 0, Math.PI * 2, 0, thetaLen), hc, 0, 0, 0, 0.035); m.rotation.x = tilt; m.scale.y = sy; head.add(m); capMesh = m; capS = s; return m; };
-  const back = (thetaLen = 2.1, s = 1.07) => { const m = tm(new THREE.SphereGeometry(R * s, 32, 18, Math.PI / 2 + 1.25, Math.PI * 2 - 2.5, 0, thetaLen), hc, 0, 0, 0, 0.03); head.add(m); return m; };
-  const fringe = (n, from, to, len, curve = 0.02, side = 0, y = R * 0.62, thick = 0.032) => {
-    for (let k = 0; k < n; k++) { const t = n === 1 ? 0.5 : k / (n - 1); const ang = from + (to - from) * t; addLock(head, hc, R * 1.0, ang, y, [len * (0.88 + 0.24 * Math.sin(k * 2.1 + 1)), thick * 1.45, 0.006, curve, side * (0.6 + t * 0.6), 0, 0.45], 0.42, 0.97); }
+  const dark = shade(hc, 0.78);
+  const F = a.sex === 'f';
+  const add = (geo, color = hc, line = 0.0035) => { const m = tm(geo, color, 0, 0, 0, line); head.add(m); return m; };
+  let VOL = 0.07;
+  const shell = (o) => { VOL = o.vol ?? 0.07; const m = add(hairShell(D, R, Object.assign({ f: 0.95, s: 1.65, b: 2.0, vol: 0.07, crown: 0.03 }, o)), o.color || hc, 0); m.material = toon(o.color || hc, { side: THREE.DoubleSide }); return m; };
+  const st = (s, w = 0.03, flat = 0.4, blunt = 0, color) => { if (s.vol == null) s.vol = VOL; return add(strandGeo(strandPath(D, R, s), w, flat, blunt, s.wave || 0), color); };
+  const spike = (th, ph, len, w = 0.05, back = 0.35) => {   // ツンツン: 根もとから 外へ、少し上・後ろへ
+    const r = R * (1.06 + VOL * Math.pow(Math.max(0, Math.cos(th)), 1.4)); const p0 = sp(D, R, th, ph, r * 0.97);
+    const n = p0.clone().normalize(); const up = new THREE.Vector3(0, 1, -back).normalize();
+    const pts = [p0, p0.clone().addScaledVector(n, len * 0.45).addScaledVector(up, len * 0.15), p0.clone().addScaledVector(n, len * 0.8).addScaledVector(up, len * 0.35), p0.clone().addScaledVector(n, len).addScaledVector(up, len * 0.55)];
+    add(strandGeo(pts, w, 0.55));
   };
-  const sideLocks = (len, curve = 0.015, n = 2, ang = 1.25, thick = 0.035) => { [-1, 1].forEach((s) => { for (let k = 0; k < n; k++) addLock(head, hc, R * 1.02, s * (ang + k * 0.22), R * 0.3, [len * (1 - k * 0.12), thick, 0.006, curve, 0], 0.12, 1.0); }); };
-  const backLocks = (len, n = 9, curl = -0.03, wave = 0, y = R * 0.4, spread = 2.4) => {
-    for (let k = 0; k < n; k++) { const t = n === 1 ? 0.5 : k / (n - 1); const ang = Math.PI + (t - 0.5) * spread; addLock(head, hc, R * 1.02, ang, y, [len * (0.93 + 0.12 * Math.sin(k * 1.7)), 0.05, 0.008, curl, 0, wave], 0.06, 1.0); }
-  };
-  const ring = () => {   // つやの光の輪: 髪(かぶせた丸)の表面に そって 前半分だけ
-    return;   // 2026-11-19 帯のように見えたので やめた
-    if (!capMesh) return;
-    const hh = R * capS * 0.62, rr = Math.sqrt((R * capS) ** 2 - hh * hh) * 1.01;
-    const r = new THREE.Mesh(new THREE.TorusGeometry(rr, 0.006, 6, 30, Math.PI * 0.8), new THREE.MeshBasicMaterial({ color: lighten(hc, 0.6), transparent: true, opacity: 0.6 }));
-    r.rotation.set(Math.PI / 2, 0, Math.PI * 0.1); r.position.y = hh; capMesh.add(r);
-  };
+  const row = (n, from, to, f) => { for (let k = 0; k < n; k++) { const t = n === 1 ? 0.5 : k / (n - 1); f(from + (to - from) * t, t, k); } };
+  const jit = (k, amt) => (Math.sin(k * 12.9898) * 43758.5453 % 1) * amt;
+  const endLen = (th0, thEnd, lift = 0) => (thEnd - th0) * R * (1.065 + lift);
 
-  if (a.sex === 'f') switch (a.hair) {
-    case 'bob': cap(1.5, -0.2, 1.1); back(2.45, 1.13); fringe(7, -0.8, 0.8, R * 0.62); sideLocks(R * 1.25, 0.03, 3, 1.15); backLocks(R * 1.25, 9, 0.05); ring(); break;
-    case 'shortbob': cap(1.5); back(2.15, 1.08); fringe(6, -0.75, 0.85, R * 0.5, 0.02, 0.01); sideLocks(R * 0.95, 0.03, 2, 1.2); backLocks(R * 0.95, 8, 0.04); ring(); break;
-    case 'short': cap(1.5, -0.25); back(2.0); fringe(6, -0.9, 0.7, R * 0.5, 0.015, 0.03); sideLocks(R * 0.7, 0.02, 2, 1.3, 0.03); backLocks(R * 0.75, 7, 0.02); ring(); break;
-    case 'long': cap(1.5); back(2.3, 1.08); fringe(7, -0.8, 0.8, R * 0.6); sideLocks(R * 2.2, 0.03, 3, 1.15); backLocks(R * 2.6, 11, -0.04); ring(); break;
-    case 'wave': cap(1.5); back(2.3, 1.09); fringe(6, -0.85, 0.75, R * 0.6, 0.02, 0.02); sideLocks(R * 2.1, 0.05, 3, 1.15, 0.04); backLocks(R * 2.4, 11, -0.02, 0.025); [-1, 1].forEach((s) => addLock(head, hc, R * 1.02, s * 1.0, R * 0.2, [R * 2.0, 0.04, 0.008, 0.06, 0, 0.03], 0.1)); ring(); break;
-    case 'ponytail': {
-      cap(1.55, -0.3); back(1.9); fringe(6, -0.8, 0.8, R * 0.55, 0.02, 0.01); sideLocks(R * 0.9, 0.02, 1, 1.25, 0.025);
-      for (let k = 0; k < 4; k++) { const m = tm(lockGeo(R * 2.1, 0.05, 0.008, -0.12, (k - 1.5) * 0.02, 0.012), hc, (k - 1.5) * 0.012, R * 0.55, -R * 0.92, 0.05); m.rotation.x = 0.35; head.add(m); }
-      head.add(tm(new THREE.TorusGeometry(0.03, 0.01, 8, 16), '#c8263a', 0, R * 0.55, -R * 0.94)); ring(); break; }
-    case 'bun':
-      cap(1.55, -0.32); back(1.95); fringe(5, -0.7, 0.7, R * 0.5, 0.02); sideLocks(R * 0.85, 0.02, 1, 1.3, 0.022);
-      head.add(tm(new THREE.SphereGeometry(R * 0.42, 20, 14), hc, 0, R * 0.98, -R * 0.42, 0.05));
-      head.add(tm(new THREE.TorusGeometry(R * 0.3, 0.012, 8, 20), dark, 0, R * 0.86, -R * 0.36)); ring(); break;
-    case 'halfup':
-      cap(1.5); back(2.25, 1.08); fringe(6, -0.8, 0.8, R * 0.6, 0.02); sideLocks(R * 1.9, 0.03, 2, 1.15); backLocks(R * 2.2, 10, -0.03, 0.01);
-      head.add(tm(new THREE.SphereGeometry(R * 0.22, 14, 10), hc, 0, R * 0.55, -R * 0.98, 0.05)); ring(); break;
-    case 'hime':
-      cap(1.5); back(2.3, 1.08); fringe(11, -0.85, 0.85, R * 0.52, 0.0, 0, R * 0.62, 0.024);
-      [-1, 1].forEach((s) => { for (let k = 0; k < 3; k++) addLock(head, hc, R * 1.02, s * (1.15 + k * 0.12), R * 0.3, [R * 1.05, 0.03, 0.025, 0.0, 0], 0.03); });
-      backLocks(R * 2.7, 12, -0.02); ring(); break;
-    case 'side':
-      cap(1.5); back(2.0); fringe(6, -0.95, 0.6, R * 0.6, 0.02, 0.04); sideLocks(R * 0.9, 0.02, 1, 1.25, 0.03);
-      for (let k = 0; k < 4; k++) addLock(head, hc, R * 1.0, 1.6 + k * 0.1, R * 0.1, [R * 2.0, 0.045, 0.01, 0.12, 0.02, 0.015], 0.05);
-      head.add(tm(new THREE.SphereGeometry(0.022, 10, 8), '#e8b84a', R * 0.92, R * 0.02, -R * 0.15)); ring(); break;
+  /* ---- 横と後ろ(髪型ごと) ---- */
+  const sides = (len, n = 3, curl = -0.25, w = 0.045, wave = 0, from = 1.15, to = 1.75) => [-1, 1].forEach((sg) => row(n, from, to, (ph, t, k) => st({ th: 0.75 + t * 0.15, ph: sg * ph, len: len * (1 - t * 0.12) + jit(k, 0.01), curl, flare: 0.05, wave }, w)));
+  const backs = (len, n = 9, curl = -0.25, w = 0.055, layer2 = true, wave = 0, spread = 2.4) => {
+    row(n, Math.PI - spread / 2, Math.PI + spread / 2, (ph, t, k) => st({ th: 0.55 + Math.abs(t - 0.5) * 0.4, ph, len: len * (0.95 + jit(k, 0.08)), curl, flare: 0.1, wave }, w));
+    if (layer2) row(n - 2, Math.PI - spread / 2.4, Math.PI + spread / 2.4, (ph, t, k) => st({ th: 0.3, ph, len: len * 0.82, curl: curl * 0.8, flare: 0.14, lift: 0.03, wave }, w * 1.05));
+  };
+  const nape = (len = R * 0.9) => row(7, Math.PI - 1.1, Math.PI + 1.1, (ph, t, k) => st({ th: 0.9, ph, len, curl: 0.05, flare: 0.02 }, 0.04));
+  const topTex = (n = 7, back = true) => row(n, -0.9, 0.9, (ph, t, k) => st({ th: 0.12, ph: ph + (back ? Math.PI : 0), len: R * 0.9, leave: 3, lift: 0.025, sweep: 0 }, 0.05, 0.3));
+
+  /* ---- 前髪 ---- */
+  const bangs = () => {
+    const b = a.bangs || (F ? 'seethrough' : 'down');
+    switch (b) {
+      case 'patsun': row(12, -0.95, 0.95, (ph, t, k) => st({ th: 0.32, ph, len: endLen(0.32, 1.33), leave: 3 }, 0.034, 0.35, 0.55)); break;
+      case 'seethrough': row(8, -0.9, 0.9, (ph, t, k) => st({ th: 0.38, ph, len: endLen(0.38, 1.42 - Math.abs(t - 0.5) * 0.12 + jit(k, 0.06)), leave: 3, curl: -0.04 }, 0.026, 0.35)); break;
+      case 'nagashi': row(9, -0.95, 0.8, (ph, t, k) => st({ th: 0.32, ph, len: endLen(0.32, 1.3 + t * 0.25), leave: 3, sweep: 0.55 }, 0.034, 0.38)); break;
+      case 'center': [-1, 1].forEach((sg) => row(4, 0.12, 0.9, (ph, t, k) => st({ th: 0.3, ph: sg * ph, len: endLen(0.3, 1.38 + t * 0.12), leave: 3, sweep: sg * 0.6, puff: 0.05 }, 0.036, 0.38))); break;
+      case 'long': row(9, -0.9, 0.9, (ph, t, k) => st({ th: 0.35, ph, len: endLen(0.35, 1.6 + jit(k, 0.05)), leave: 3, sweep: 0.15 }, 0.032, 0.38)); break;
+      case 'up': row(8, -0.75, 0.75, (ph, t, k) => st({ th: 0.95, ph, len: R * 0.95, up: true, rise: 0.35 + jit(k, 0.1), sweep: (t - 0.5) * 0.4 }, 0.05, 0.35)); break;   // かき上げ(アップバング)
+      case 'short': row(8, -0.8, 0.8, (ph, t, k) => st({ th: 0.4, ph, len: endLen(0.4, 1.12 + jit(k, 0.06)), leave: 3, sweep: 0.2 }, 0.04, 0.4)); break;
+      case 'sideswept': row(8, -0.9, 0.7, (ph, t, k) => st({ th: 0.3, ph, len: endLen(0.3, 1.25 + t * 0.2), leave: 3, sweep: 0.75, puff: 0.06 }, 0.042, 0.38)); break;
+      default: row(9, -0.85, 0.85, (ph, t, k) => st({ th: 0.4, ph, len: endLen(0.4, 1.3 + jit(k, 0.08)), leave: 3, sweep: 0.05 * Math.sin(k) }, 0.036, 0.4)); // down: 下ろす(ぎざぎざ)
+    }
+  };
+  const ahoge = () => {   // アホ毛: てっぺんから くるっと
+    const p = [new THREE.Vector3(0, R * 1.08, R * 0.05), new THREE.Vector3(R * 0.05, R * 1.35, R * 0.15), new THREE.Vector3(R * 0.18, R * 1.42, R * 0.3), new THREE.Vector3(R * 0.22, R * 1.3, R * 0.42)];
+    add(strandGeo(p, 0.022, 0.4));
+  };
+  const tail = (x, y, z, len, n = 6, w = 0.05, curl = 0.2, side = 0, wave = 0) => {   // 結んだ毛たば(ポニーテール・ツインテール)
+    for (let k = 0; k < n; k++) {
+      const off = (k - (n - 1) / 2) * 0.012, p = [];
+      for (let i = 0; i <= 8; i++) { const t = i / 8; p.push(new THREE.Vector3(x + off + side * Math.sin(t * 2) * 0.06 + (wave ? Math.sin(t * 9 + k) * wave : 0), y + 0.02 - t * len, z - 0.04 - Math.sin(t * Math.PI * 0.6) * 0.08 + curl * t * t * 0.1)); }
+      add(strandGeo(p, w, 0.6));
+    }
+    const tie = tm(new THREE.TorusGeometry(0.026, 0.011, 8, 16), '#c8263a', x, y + 0.01, z - 0.03); tie.rotation.x = Math.PI / 2 - 0.3; head.add(tie);
+  };
+  const L = (d) => d * R;   // 長さ(頭の半径の何倍)
+
+  if (F) switch (a.hair) {
+    case 'bob':      shell({ f: 0.85, s: 1.85, b: 2.15, vol: 0.08 }); sides(L(1.25), 3, -0.35); backs(L(1.15), 9, -0.35); break;
+    case 'shortbob': shell({ f: 0.85, s: 1.8, b: 2.05, vol: 0.08 }); sides(L(0.9), 3, -0.3); backs(L(0.85), 9, -0.3); break;
+    case 'short':    shell({ f: 0.9, s: 1.65, b: 1.95, vol: 0.06, part: 0.5 }); sides(L(0.6), 2, -0.1, 0.035); nape(L(0.6)); break;
+    case 'long':     shell({ f: 0.85, s: 1.85, b: 2.2, vol: 0.07 }); sides(L(2.4), 3, -0.2); backs(L(2.8), 11, -0.15); break;
+    case 'wave':     shell({ f: 0.85, s: 1.85, b: 2.2, vol: 0.09 }); sides(L(2.3), 3, 0.15, 0.05, 0.012); backs(L(2.6), 11, 0.2, 0.06, true, 0.014); break;
+    case 'ponytail': shell({ f: 0.92, s: 1.6, b: 1.9, vol: 0.05, crown: 0.0 }); sides(L(0.9), 1, -0.1, 0.028, 0, 1.25, 1.25); tail(0, R * 0.62, -R * 0.95, L(2.0), 7, 0.05, 0.6); break;
+    case 'twin':     shell({ f: 0.9, s: 1.7, b: 1.95, vol: 0.06, part: Math.PI }); sides(L(0.8), 1, -0.1, 0.028, 0, 1.25, 1.25); [-1, 1].forEach((sg) => tail(sg * R * 0.78, R * 0.38, -R * 0.55, L(1.8), 5, 0.045, 0.5, sg)); break;
+    case 'bun':      shell({ f: 0.92, s: 1.6, b: 1.9, vol: 0.05 }); sides(L(0.85), 1, -0.1, 0.026, 0, 1.25, 1.25);
+      { const bn = tm(new THREE.SphereGeometry(R * 0.42, 22, 16), hc, 0, R * 1.0, -R * 0.42, 0.004); head.add(bn); for (let k = 0; k < 4; k++) { const tw = tm(new THREE.TorusGeometry(R * (0.18 + k * 0.06), 0.008, 6, 22, Math.PI * 1.3), dark, 0, R * 1.0, -R * 0.42); tw.rotation.set(Math.PI / 2 + 0.4, k, 0); head.add(tw); } } break;
+    case 'halfup':   shell({ f: 0.85, s: 1.85, b: 2.2, vol: 0.07 }); sides(L(2.1), 3, -0.15); backs(L(2.4), 10, -0.15); tail(0, R * 0.5, -R * 1.0, L(0.6), 4, 0.04, 0.3); break;
+    case 'side':     shell({ f: 0.88, s: 1.7, b: 1.95, vol: 0.06, part: -0.6 }); sides(L(0.8), 1, -0.1, 0.03, 0, -1.25, -1.25);
+      for (let k = 0; k < 6; k++) st({ th: 0.7 + k * 0.08, ph: 1.4 + k * 0.12, len: L(2.2), curl: -0.2, flare: -0.02, fwd: 0.18, wave: 0.008 }, 0.055);
+      head.add(tm(new THREE.SphereGeometry(0.022, 10, 8), '#e8b84a', R * 0.95, -R * 0.05, -R * 0.2)); break;
+    default: shell({}); sides(L(1.2)); backs(L(1.1));
   }
   else switch (a.hair) {
-    case 'short': cap(1.4, -0.22, 1.06, 1.06); back(1.95); fringe(5, -0.6, 0.6, R * 0.38, 0.03, 0.03, R * 0.66); backLocks(R * 0.55, 7, 0.0); ring(); break;
-    case 'twoblock': cap(1.25, -0.2, 1.08, 1.12); { const sd = tm(new THREE.SphereGeometry(R * 1.015, 28, 16, Math.PI / 2 + 1.05, Math.PI * 2 - 2.1, 0.95, 0.75), shade(hc, 0.75)); head.add(sd); } fringe(6, -0.55, 0.55, R * 0.42, 0.06, 0.02, R * 0.72); ring(); break;
-    case 'center':
-      cap(1.45, -0.2, 1.07, 1.05); back(2.0);
-      for (let k = 0; k < 4; k++) { addLock(head, hc, R, -0.15 - k * 0.2, R * 0.66, [R * (0.62 - k * 0.04), 0.034, 0.004, 0.02, -0.05], 0.38); addLock(head, hc, R, 0.15 + k * 0.2, R * 0.66, [R * (0.62 - k * 0.04), 0.034, 0.004, 0.02, 0.05], 0.38); }
-      sideLocks(R * 0.8, 0.02, 1, 1.3, 0.03); backLocks(R * 0.75, 7, 0.0); ring(); break;
-    case 'mash': cap(1.6, -0.12, 1.1, 1.0); back(2.05, 1.1); fringe(9, -0.95, 0.95, R * 0.56, 0.0, 0, R * 0.62, 0.03); sideLocks(R * 0.75, 0.02, 2, 1.2, 0.035); ring(); break;
-    case 'side': cap(1.42, -0.2, 1.07, 1.08); back(1.95); for (let k = 0; k < 6; k++) addLock(head, hc, R, -0.7 + k * 0.25, R * 0.72, [R * 0.5, 0.035, 0.005, 0.04, 0.09], 0.5 - k * 0.03); backLocks(R * 0.6, 7, 0.0); ring(); break;
-    case 'perm': cap(1.5, -0.15, 1.12, 1.06); back(2.05, 1.1); for (let k = 0; k < 16; k++) { const ang = (k / 16) * Math.PI * 2; addLock(head, hc, R * 1.03, ang, R * (0.45 + (k % 3) * 0.1), [R * 0.55, 0.04, 0.01, 0.04, 0.02, 0.02], 0.25 + (k % 2) * 0.2); } ring(); break;
-    case 'spiky': {
-      cap(1.4, -0.2, 1.06, 1.05); back(1.9);
-      const spike = (ang, el, len, rad) => {   // el: 真上から何度たおすか
-        const pv = new THREE.Group(); pv.rotation.y = ang;
-        const c = tm(new THREE.ConeGeometry(rad, len, 6), hc, 0, 0, 0, 0.05);
-        const r = R * 1.02; c.position.set(0, Math.cos(el) * r + Math.cos(el) * len * 0.35, Math.sin(el) * r + Math.sin(el) * len * 0.35); c.rotation.x = el;
-        pv.add(c); head.add(pv);
-      };
-      for (let k = 0; k < 10; k++) spike((k / 10) * Math.PI * 2, 0.75, 0.15, 0.045);
-      for (let k = 0; k < 5; k++) spike((k / 5) * Math.PI * 2 + 0.3, 0.25, 0.14, 0.045);
-      for (let k = 0; k < 5; k++) spike(-0.6 + k * 0.3, 1.15, 0.11, 0.035);   // 前髪
-      break; }
-    case 'back': { cap(1.38, -0.42, 1.06, 1.04); back(2.0); for (let k = 0; k < 7; k++) { const m = addLock(head, hc, R * 1.0, -0.6 + k * 0.2, R * 0.85, [R * 1.05, 0.03, 0.01, -0.12, 0], -1.2); } ring(); break; }
-    case 'long': cap(1.45, -0.2, 1.07, 1.04); back(2.15); fringe(4, -0.85, -0.2, R * 0.65, 0.02, -0.03); fringe(3, 0.3, 0.8, R * 0.6, 0.02, 0.03); sideLocks(R * 1.0, 0.02, 1, 1.25); backLocks(R * 1.1, 8, -0.02); { const m = tm(lockGeo(R * 1.2, 0.04, 0.012, -0.05), hc, 0, R * 0.05, -R * 1.0, 0.05); m.rotation.x = 0.2; head.add(m); head.add(tm(new THREE.TorusGeometry(0.022, 0.008, 6, 12), '#2a2a2a', 0, R * 0.02, -R * 1.02)); } ring(); break;
-    case 'buzz': { const m = tm(new THREE.SphereGeometry(R * 1.012, 28, 16, 0, Math.PI * 2, 0, 1.55), shade(hc, 1.0)); m.material = toon(hc, { transparent: true, opacity: 0.6 }); m.rotation.x = -0.15; head.add(m); break; }
+    case 'short':    shell({ f: 0.95, s: 1.55, b: 1.9, vol: 0.06, part: -0.5 }); topTex(7); sides(L(0.45), 2, 0.0, 0.03); nape(L(0.45)); break;
+    case 'twoblock': shell({ f: 0.95, s: 1.2, b: 1.35, vol: 0.1 }); { const sd = add(hairShell(D, R, { f: 1.35, s: 1.8, b: 2.0, vol: 0, crown: 0 }), shade(hc, 0.7), 0); sd.scale.setScalar(0.985); } topTex(8); break;
+    case 'mash':     shell({ f: 0.85, s: 1.75, b: 2.0, vol: 0.1 }); sides(L(0.7), 3, -0.15, 0.04); nape(L(0.7)); break;
+    case 'perm':     shell({ f: 0.9, s: 1.7, b: 2.0, vol: 0.12 }); for (let k = 0; k < 18; k++) { const ph = (k / 18) * Math.PI * 2; st({ th: 0.35 + (k % 3) * 0.25, ph, len: L(0.7), lift: 0.04, puff: 0.15, curl: 0.3, wave: 0.01, leave: 1.4 }, 0.05); } break;
+    case 'spiky':    shell({ f: 0.95, s: 1.55, b: 1.9, vol: 0.06 }); spike(0.05, 0, L(0.45), 0.06, 0.6); row(7, -Math.PI, Math.PI * 0.72, (ph, t, k) => spike(0.45, ph, L(0.42) + jit(k, 0.02), 0.06)); row(9, -Math.PI, Math.PI * 0.78, (ph, t, k) => spike(0.95, ph + 0.3, L(0.36) + jit(k + 3, 0.02), 0.055, 0.1)); nape(L(0.4)); break;
+    case 'back':     shell({ f: 0.85, s: 1.6, b: 1.95, vol: 0.07 }); row(9, -0.85, 0.85, (ph, t, k) => st({ th: 0.88, ph, len: L(1.6), up: true, rise: 0.06, lift: 0.015, leave: 0 }, 0.048, 0.35)); [-1, 1].forEach((sg) => row(3, 1.1, 1.5, (ph) => st({ th: 1.2, ph: sg * ph, len: L(1.0), up: true, rise: 0.03, lift: 0.01, sweep: -sg * 0.6, leave: 0 }, 0.04, 0.35))); nape(L(0.55)); break;
+    case 'wolf':     shell({ f: 0.9, s: 1.7, b: 2.0, vol: 0.09, crown: 0.05 }); topTex(7); sides(L(0.8), 2, 0.15, 0.04); backs(L(1.25), 7, 0.25, 0.05, false); break;
+    case 'long':     shell({ f: 0.9, s: 1.7, b: 2.0, vol: 0.06, part: 0 }); sides(L(1.0), 2, -0.1, 0.035); tail(0, R * 0.0, -R * 1.0, L(1.2), 5, 0.045, 0.1); break;
+    case 'medium':   shell({ f: 0.88, s: 1.75, b: 2.05, vol: 0.08, part: -0.45 }); sides(L(0.95), 3, -0.1, 0.04); backs(L(0.95), 8, 0.05, 0.05, false); break;
+    case 'buzz':     { const m = add(hairShell(D, R, { f: 1.05, s: 1.55, b: 1.95, vol: 0.0, crown: 0 }), hc, 0); m.material = toon(hc, { transparent: true, opacity: 0.55 }); m.scale.setScalar(0.975); } return;
+    default: shell({}); topTex(6);
   }
+  if (!(a.sex === 'm' && a.hair === 'back')) bangs();
+  if (a.ahoge === 'on') ahoge();
 }
 
 /* ---------- 体と服 ---------- */
 function torsoGeo(f) {
-  const pts = (f ? [[0.13, 0], [0.135, 0.06], [0.112, 0.17], [0.13, 0.28], [0.135, 0.34], [0.095, 0.4], [0.045, 0.43]]
-                 : [[0.14, 0], [0.145, 0.06], [0.14, 0.17], [0.155, 0.29], [0.16, 0.345], [0.11, 0.405], [0.05, 0.435]]).map(([x, y]) => new THREE.Vector2(x, y));
-  const g = new THREE.LatheGeometry(pts, 24); g.scale(1, 1, 0.72); return g;
+  const pts = TORSO_PTS[f ? 'f' : 'm'].map(([x, y]) => new THREE.Vector2(x, y));
+  const g = new THREE.LatheGeometry(pts, 28);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    let x = p.getX(i), y = p.getY(i), z = p.getZ(i) * 0.7;
+    if (f && z > 0) z += 0.03 * Math.exp(-Math.pow((y - 0.3) / 0.045, 2)) * Math.max(0, 1 - Math.abs(x) / 0.11);   // 胸のふくらみ(ひかえめ)
+    if (!f && z > 0) z += 0.012 * Math.exp(-Math.pow((y - 0.31) / 0.06, 2));
+    p.setXYZ(i, x, y, z);
+  }
+  g.computeVertexNormals(); return g;
 }
-const TOP_DEF = {   // 袖: long / short、ズボンの色、上に重ねる物は buildTop で
-  suit: { sleeve: 'long' }, suitopen: { sleeve: 'long' }, shirt: { sleeve: 'long' }, polo: { sleeve: 'short' }, knit: { sleeve: 'long' }, hoodie: { sleeve: 'long' },
-  jacket: { sleeve: 'long' }, denim: { sleeve: 'long', color: '#4a6a9a' }, work: { sleeve: 'long' }, tee: { sleeve: 'short' },
-  blouse: { sleeve: 'puff' }, onepiece: { sleeve: 'short', skirt: true }, cardigan: { sleeve: 'long' }, office: { sleeve: 'long', skirt: true }, pantsuit: { sleeve: 'long', pants: 'same' },
+function shapeGeo(pts, depth = 0.005, bevel = 0.0015) {
+  // ふちに点を こまかく足す(体のカーブに合わせて曲げたとき、真ん中が沈まないように)
+  const dense = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[i], b = pts[(i + 1) % pts.length], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.008));
+    for (let k = 0; k < n; k++) dense.push([a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n]);
+  }
+  pts = dense;
+  const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]); s.closePath();
+  const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 6 });
+  g.translate(0, 0, -depth / 2); return tessellate(g.index ? g.toNonIndexed() : g, 0.009);
+}
+/* 長い三角形を こまかく分ける(曲げたとき 板の中が沈まないように) */
+function tessellate(geo, maxLen) {
+  const src = geo.attributes.position.array, out = [];
+  const stack = [];
+  for (let i = 0; i < src.length; i += 9) stack.push([src[i], src[i + 1], src[i + 2], src[i + 3], src[i + 4], src[i + 5], src[i + 6], src[i + 7], src[i + 8]]);
+  let guard = 0;
+  while (stack.length && guard++ < 200000) {
+    const t = stack.pop();
+    const d = (a, b) => Math.hypot(t[a] - t[b], t[a + 1] - t[b + 1], t[a + 2] - t[b + 2]);
+    const e = [d(0, 3), d(3, 6), d(6, 0)], m = Math.max(...e);
+    if (m <= maxLen) { out.push(...t); continue; }
+    const k = e.indexOf(m), A = [0, 3, 6][k], B = [3, 6, 0][k], C = [6, 0, 3][k];
+    const M = [(t[A] + t[B]) / 2, (t[A + 1] + t[B + 1]) / 2, (t[A + 2] + t[B + 2]) / 2];
+    const P = (i) => [t[i], t[i + 1], t[i + 2]];
+    stack.push([...P(A), ...M, ...P(C)], [...M, ...P(B), ...P(C)]);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(out, 3)); g.computeVertexNormals();
+  return g;
+}
+/* 胸の前の面に そわせる(ネクタイ・えりなどを 体のカーブに合わせて曲げる) */
+const TORSO_PTS = { f: [[0.13, 0], [0.14, 0.04], [0.118, 0.15], [0.112, 0.2], [0.125, 0.29], [0.128, 0.34], [0.1, 0.39], [0.06, 0.42], [0.036, 0.43]],
+                    m: [[0.135, 0], [0.142, 0.04], [0.138, 0.15], [0.145, 0.24], [0.158, 0.32], [0.16, 0.36], [0.125, 0.4], [0.065, 0.428], [0.04, 0.435]] };
+function torsoR(f, y) { const P = TORSO_PTS[f ? 'f' : 'm']; if (y <= P[0][1]) return P[0][0]; for (let i = 1; i < P.length; i++) if (y <= P[i][1]) { const t = (y - P[i - 1][1]) / (P[i][1] - P[i - 1][1]); return P[i - 1][0] + (P[i][0] - P[i - 1][0]) * t; } return P[P.length - 1][0] * 0.6; }
+function chestZ(f, y, x = 0) {   // 胴の前の面の z(lathe の形 × 0.7 + 胸のふくらみ)
+  const r = torsoR(f, y), xx = Math.min(Math.abs(x), r * 0.98);
+  let z = Math.sqrt(r * r - xx * xx) * 0.7;
+  if (f) z += 0.03 * Math.exp(-Math.pow((y - 0.3) / 0.045, 2)) * Math.max(0, 1 - xx / 0.11); else z += 0.012 * Math.exp(-Math.pow((y - 0.31) / 0.06, 2));
+  return z;
+}
+function onChest(geo, f, x0, y0, lift = 0.004) {
+  const p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i) + x0, y = p.getY(i) + y0; p.setXYZ(i, x, y, p.getZ(i) + chestZ(f, y, x) + lift); }
+  geo.computeVertexNormals(); return geo;
+}
+const TOP_DEF = {
+  suit: { sleeve: 'long' }, suitopen: { sleeve: 'long' }, shirt: { sleeve: 'long' }, polo: { sleeve: 'short' }, knit: { sleeve: 'long', tex: 'rib' }, hoodie: { sleeve: 'long' },
+  jacket: { sleeve: 'long' }, denim: { sleeve: 'long', color: '#4a6a9a', tex: 'denim' }, work: { sleeve: 'long' }, tee: { sleeve: 'short' },
+  blouse: { sleeve: 'puff' }, onepiece: { sleeve: 'short', skirt: true }, cardigan: { sleeve: 'long', tex: 'rib' }, office: { sleeve: 'long', skirt: true }, pantsuit: { sleeve: 'long', pants: 'same' },
   happi: { sleeve: 'wide' }, samue: { sleeve: 'long' }, hakui: { sleeve: 'long', color: '#f4f2ec' }, jinbei: { sleeve: 'wide' }
 };
+const TEX_CACHE = {};
+function fabricTex(kind) {
+  if (TEX_CACHE[kind]) return TEX_CACHE[kind];
+  const t = canvasTex(64, 64, (g) => {
+    g.fillStyle = '#ffffff'; g.fillRect(0, 0, 64, 64);
+    if (kind === 'rib') { g.fillStyle = 'rgba(0,0,0,0.12)'; for (let x = 0; x < 64; x += 8) g.fillRect(x, 0, 3, 64); }
+    if (kind === 'denim') { g.strokeStyle = 'rgba(255,255,255,0.35)'; g.lineWidth = 1; for (let k = -64; k < 64; k += 4) { g.beginPath(); g.moveTo(k, 0); g.lineTo(k + 64, 64); g.stroke(); } }
+  });
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(kind === 'rib' ? 10 : 6, kind === 'rib' ? 1 : 3);
+  return (TEX_CACHE[kind] = t);
+}
 function buildTop(body, a, f, cc) {
-  const W = '#f6f4ee', front = 0.112;   // 胸の前の面(z)
-  const flatPiece = (w, h, color, x, y, z, rz = 0, rx = -0.12) => { const m = tm(new THREE.BoxGeometry(w, h, 0.008), color, x, y, z); m.rotation.set(rx, 0, rz); body.add(m); return m; };
-  const collarV = (color, depth = 0.16) => { [-1, 1].forEach((s) => flatPiece(0.03, depth, color, s * 0.032, 0.36, front + 0.006, s * 0.42)); };
-  const shirtV = (color = W, h = 0.14) => { const m = tm(new THREE.ConeGeometry(0.055, h, 3), color, 0, 0.37, front - 0.01); m.rotation.set(Math.PI, 0, 0); m.scale.z = 0.25; body.add(m); };
-  const lapels = (color) => { [-1, 1].forEach((s) => flatPiece(0.045, 0.2, shade(color, 0.86), s * 0.05, 0.31, front + 0.012, s * 0.32)); };
-  const buttons = (n, x = 0, color = '#2a2a2a', y0 = 0.27) => { for (let k = 0; k < n; k++) body.add(tm(new THREE.SphereGeometry(0.007, 6, 5), color, x, y0 - k * 0.06, front + 0.014)); };
-  const tie = (color) => { body.add(tm(new THREE.BoxGeometry(0.03, 0.16, 0.01), color, 0, 0.33, front + 0.01)); body.add(tm(new THREE.BoxGeometry(0.03, 0.025, 0.014), shade(color, 0.85), 0, 0.41, front + 0.008)); };
-  const neckRing = (color) => { const r = tm(new THREE.TorusGeometry(0.05, 0.012, 6, 18), color, 0, 0.425, 0); r.rotation.x = Math.PI / 2; r.scale.y = 0.75; body.add(r); };
-  const crossCollar = (color) => { [-1, 1].forEach((s) => flatPiece(0.035, 0.26, color, s * 0.03, 0.31, front + 0.008, s * 0.55)); };
-  const hem = (color) => { const r = tm(new THREE.CylinderGeometry(f ? 0.133 : 0.143, f ? 0.133 : 0.143, 0.03, 24, 1, true), color, 0, 0.02, 0); r.scale.z = 0.73; body.add(r); };
-  const pocket = (x, y, color) => flatPiece(0.045, 0.04, color, x, y, front + 0.008, 0, -0.05);
+  const W = '#f6f4ee';
+  const put = (geo, color, line = 0.002) => { const m = tm(geo, color, 0, 0, 0, line); body.add(m); return m; };
+  const tie = (color) => {   // ネクタイ: 結び目(台形)+ 下に広がって 先が とがった剣先
+    put(onChest(shapeGeo([[-0.013, 0.012], [0.013, 0.012], [0.009, -0.012], [-0.009, -0.012]], 0.012, 0.002), f, 0, 0.405, 0.006), shade(color, 0.85));
+    put(onChest(shapeGeo([[-0.008, 0], [0.008, 0], [0.021, -0.15], [0, -0.178], [-0.021, -0.15]], 0.004, 0.0015), f, 0, 0.393, 0.006), color);
+  };
+  const collarWings = (color, spread = 1) => [-1, 1].forEach((s) => {   // シャツのえり(とがった三角)
+    const g = shapeGeo([[0, 0], [s * 0.05 * spread, -0.008], [s * 0.022, -0.06]], 0.004, 0.0015);
+    const m = put(onChest(g, f, s * 0.012, 0.432, 0.012), color); m.rotation.x = -0.05;
+  });
+  const vShirt = (color = W, h = 0.15) => put(onChest(shapeGeo([[-0.05, 0], [0.05, 0], [0, -h]], 0.002, 0), f, 0, 0.43, 0.002), color, 0);
+  const lapels = (color, low = 0.21) => [-1, 1].forEach((s) => {   // ジャケットのえり(切れこみの入った形)
+    const g = shapeGeo([[s * 0.032, 0.0], [s * 0.056, 0.004], [s * 0.07, -0.03], [s * 0.056, -0.04], [s * 0.092, -0.068], [s * 0.05, -low * 0.8], [s * 0.004, -low], [s * 0.012, -low * 0.7]], 0.005, 0.0015);
+    put(onChest(g, f, 0, 0.43, 0.01), shade(color, 0.88));
+  });
+  const buttons = (n, x = 0, color = '#2a2a2a', y0 = 0.27, gap = 0.055) => { for (let k = 0; k < n; k++) { const y = y0 - k * gap; body.add(tm(new THREE.SphereGeometry(0.0065, 8, 6), color, x, y, chestZ(f, y, x) + 0.007, 0)); } };
+  const placket = (color, y0 = 0.42, y1 = 0.05) => put(onChest(shapeGeo([[-0.011, y0], [0.011, y0], [0.011, y1], [-0.011, y1]], 0.002, 0), f, 0, 0, 0.003), color, 0);
+  const pocket = (x, y, color, flap = false) => { put(onChest(shapeGeo([[-0.025, 0.02], [0.025, 0.02], [0.025, -0.02], [0, -0.026], [-0.025, -0.02]], 0.002, 0.001), f, x, y, 0.004), color); if (flap) put(onChest(shapeGeo([[-0.027, 0.024], [0.027, 0.024], [0.027, 0.008], [-0.027, 0.008]], 0.003, 0.001), f, x, y, 0.007), shade(color, 0.9)); };
+  const neckRib = (color, r = 0.046) => { const n = tm(new THREE.TorusGeometry(r, 0.01, 8, 24), color, 0, 0.43, 0.004, 0.002); n.rotation.x = Math.PI / 2 + 0.25; n.scale.y = 0.8; body.add(n); };
+  const hem = (color) => { const r = tm(new THREE.CylinderGeometry(f ? 0.132 : 0.137, f ? 0.132 : 0.137, 0.035, 28, 1, true), color, 0, 0.02, 0, 0); r.scale.z = 0.71; body.add(r); };
+  const crossCollar = (color, w = 0.034) => [-1, 1].forEach((s) => put(onChest(shapeGeo([[s * 0.0, 0.0], [s * w, 0.0], [-s * 0.07 + s * w, -0.3], [-s * 0.07, -0.3]], 0.004, 0.001), f, s * 0.035, 0.43, 0.004 + (s > 0 ? 0.004 : 0)), color));
+  const roundCollar = (color) => [-1, 1].forEach((s) => { const g = new THREE.CircleGeometry(0.035, 24, s > 0 ? -Math.PI / 2 : Math.PI / 2, Math.PI); put(onChest(g, f, s * 0.004, 0.425, 0.012), color, 0.002); });
+  const ribbon = (color) => { [-1, 1].forEach((s) => put(onChest(shapeGeo([[0, 0], [s * 0.035, 0.016], [s * 0.035, -0.016]], 0.006, 0.002), f, 0, 0.4, 0.016), color)); body.add(tm(new THREE.SphereGeometry(0.009, 8, 6), shade(color, 0.85), 0, 0.4, chestZ(f, 0.4) + 0.02, 0)); };
   switch (a.top) {
-    case 'suit': shirtV(); tie(['#8a1f2a', '#2a3a6a', '#3a5a3a'][typeof a.topColor === 'number' ? a.topColor % 3 : 0]); lapels(cc); buttons(2, 0.02, '#1a1a1a', 0.17); break;
-    case 'suitopen': shirtV(); lapels(cc); buttons(2, 0.02, '#1a1a1a', 0.17); break;
-    case 'office': shirtV(W, 0.12); lapels(cc); buttons(1, 0, '#1a1a1a', 0.2); break;
-    case 'pantsuit': shirtV('#e8e2d8', 0.13); lapels(cc); buttons(2, 0, '#1a1a1a', 0.2); break;
-    case 'shirt': collarV(lighten(cc, 0.15), 0.07); buttons(4, 0, lighten(cc, 0.5), 0.36); pocket(-0.06, 0.3, shade(cc, 0.92)); break;
-    case 'polo': collarV(lighten(cc, 0.1), 0.06); buttons(2, 0, '#f2f2f2', 0.39); break;
-    case 'knit': neckRing(shade(cc, 0.85)); hem(shade(cc, 0.85)); for (let k = 0; k < 5; k++) flatPiece(0.004, 0.3, shade(cc, 0.9), -0.06 + k * 0.03, 0.2, front - 0.002, 0, -0.08); break;
-    case 'hoodie': { const hood = tm(new THREE.TorusGeometry(0.09, 0.045, 8, 18), cc, 0, 0.43, -0.05, 0.04); hood.rotation.x = Math.PI / 2.3; body.add(hood);
-      [-1, 1].forEach((s) => body.add(tm(new THREE.CylinderGeometry(0.004, 0.004, 0.09, 5), W, s * 0.03, 0.34, front + 0.012))); flatPiece(0.16, 0.07, shade(cc, 0.9), 0, 0.12, front + 0.004, 0, -0.02); hem(shade(cc, 0.88)); break; }
-    case 'jacket': flatPiece(0.1, 0.36, W, 0, 0.2, front + 0.002, 0, -0.06); lapels(cc); neckRing(W); break;
-    case 'denim': flatPiece(0.1, 0.36, W, 0, 0.2, front + 0.002, 0, -0.06); collarV(shade(cc, 0.85), 0.08); pocket(-0.06, 0.29, shade(cc, 0.85)); pocket(0.06, 0.29, shade(cc, 0.85)); buttons(3, 0.055, '#c8a04a', 0.25); break;
-    case 'work': collarV(shade(cc, 0.85), 0.07); flatPiece(0.006, 0.36, '#8a8a8a', 0, 0.21, front + 0.006, 0, -0.06); pocket(-0.065, 0.29, shade(cc, 0.88)); pocket(0.065, 0.29, shade(cc, 0.88)); hem(shade(cc, 0.82)); break;
-    case 'tee': neckRing(shade(cc, 0.88)); break;
-    case 'blouse': { const r = tm(new THREE.TorusGeometry(0.055, 0.016, 6, 20), lighten(cc, 0.3), 0, 0.415, 0.01); r.rotation.x = Math.PI / 2.2; body.add(r); buttons(3, 0, lighten(cc, 0.6), 0.36); break; }
-    case 'onepiece': neckRing(shade(cc, 0.85)); body.add(tm(new THREE.CylinderGeometry(0.115, 0.115, 0.03, 24), shade(cc, 0.7), 0, 0.17, 0)); break;
-    case 'cardigan': flatPiece(0.1, 0.36, '#f4ece0', 0, 0.2, front + 0.002, 0, -0.06); neckRing('#f4ece0'); buttons(4, 0.05, '#c8b89a', 0.33); hem(shade(cc, 0.88)); break;
-    // 大将の服
-    case 'happi': crossCollar('#f6f4ee'); body.add(tm(new THREE.CylinderGeometry(0.143, 0.146, 0.05, 24), '#2a2018', 0, 0.06, 0)); flatPiece(0.06, 0.06, '#f6f4ee', 0.07, 0.22, front + 0.01, 0, -0.04); break;
-    case 'samue': crossCollar(shade(cc, 0.75)); body.add(tm(new THREE.CylinderGeometry(0.145, 0.146, 0.02, 24), shade(cc, 0.7), 0, 0.12, 0)); break;
-    case 'hakui': { [-1, 1].forEach((s) => flatPiece(0.03, 0.3, '#e6e2d8', s * 0.025, 0.29, front + 0.008, s * 0.5)); const st = tm(new THREE.CylinderGeometry(0.055, 0.058, 0.04, 16, 1, true), '#f4f2ec', 0, 0.43, 0); body.add(st); buttons(3, 0.06, '#d8d4c8', 0.3); break; }
-    case 'jinbei': crossCollar(shade(cc, 0.8)); [-1, 1].forEach((s) => flatPiece(0.04, 0.008, shade(cc, 0.7), s * 0.05, 0.2, front + 0.01, 0, 0)); break;
+    case 'suit': vShirt(W, 0.22); collarWings(W, 0.8); tie(['#8a1f2a', '#2a3a6a', '#3a5a3a', '#6a2a6a'][typeof a.topColor === 'number' ? a.topColor % 4 : 0]); lapels(cc); buttons(2, 0.028, '#151515', 0.17); pocket(-0.07, 0.14, shade(cc, 0.9), true); break;
+    case 'suitopen': vShirt(W, 0.22); collarWings(W, 1.1); lapels(cc); buttons(2, 0.028, '#151515', 0.17); break;
+    case 'office': vShirt(W, 0.19); roundCollar(W); lapels(cc, 0.18); buttons(1, 0.02, '#151515', 0.2); break;
+    case 'pantsuit': vShirt('#e8e2d8', 0.22); lapels(cc); buttons(2, 0.02, '#151515', 0.2); break;
+    case 'shirt': collarWings(lighten(cc, 0.12)); placket(shade(cc, 0.95), 0.41, 0.0); buttons(5, 0, lighten(cc, 0.55), 0.39, 0.07); pocket(-0.06, 0.3, shade(cc, 0.94)); break;
+    case 'polo': collarWings(lighten(cc, 0.1), 1.1); placket(shade(cc, 0.92), 0.42, 0.33); buttons(2, 0, '#f2f2f2', 0.405, 0.04); break;
+    case 'knit': neckRib(shade(cc, 0.85)); hem(shade(cc, 0.82)); break;
+    case 'hoodie': { const hood = tm(new THREE.TorusGeometry(0.075, 0.042, 10, 22, Math.PI * 1.25), cc, 0, 0.43, -0.035, 0.003); hood.rotation.set(Math.PI / 2 - 0.25, 0, Math.PI * 0.375 + Math.PI); body.add(hood);
+      [-1, 1].forEach((s) => { const y = 0.33; body.add(tm(new THREE.CylinderGeometry(0.003, 0.003, 0.09, 5), W, s * 0.028, 0.37, chestZ(f, 0.37, s * 0.028) + 0.006, 0)); body.add(tm(new THREE.CylinderGeometry(0.005, 0.005, 0.014, 6), '#c8c8c8', s * 0.028, 0.32, chestZ(f, 0.32, s * 0.028) + 0.006, 0)); });
+      put(onChest(shapeGeo([[-0.075, 0.06], [0.075, 0.06], [0.085, -0.01], [-0.085, -0.01]], 0.003, 0.0015), f, 0, 0.1, 0.004), shade(cc, 0.92)); hem(shade(cc, 0.86)); break; }
+    case 'jacket': put(onChest(shapeGeo([[-0.045, 0.43], [0.045, 0.43], [0.045, 0.02], [-0.045, 0.02]], 0.002, 0), f, 0, 0, 0.002), W, 0); neckRib(W, 0.042); lapels(cc, 0.3); break;
+    case 'denim': put(onChest(shapeGeo([[-0.045, 0.43], [0.045, 0.43], [0.045, 0.02], [-0.045, 0.02]], 0.002, 0), f, 0, 0, 0.002), W, 0); collarWings(shade(cc, 0.85), 1.2); pocket(-0.062, 0.29, shade(cc, 0.88), true); pocket(0.062, 0.29, shade(cc, 0.88), true); buttons(3, 0.052, '#c8a04a', 0.24, 0.07); break;
+    case 'work': collarWings(shade(cc, 0.85)); put(onChest(shapeGeo([[-0.003, 0.42], [0.003, 0.42], [0.003, 0.02], [-0.003, 0.02]], 0.002, 0), f, 0, 0, 0.004), '#9a9a9a', 0); pocket(-0.065, 0.29, shade(cc, 0.9), true); pocket(0.065, 0.29, shade(cc, 0.9), true); hem(shade(cc, 0.82)); break;
+    case 'tee': neckRib(shade(cc, 0.86), 0.044); break;
+    case 'blouse': roundCollar(lighten(cc, 0.45)); ribbon(shade(cc, 0.7)); buttons(3, 0, lighten(cc, 0.6), 0.36, 0.06); break;
+    case 'onepiece': roundCollar(W); body.add(tm(new THREE.CylinderGeometry(0.113, 0.115, 0.03, 28), shade(cc, 0.72), 0, 0.17, 0, 0.002)); ribbon(shade(cc, 0.6)); break;
+    case 'cardigan': put(onChest(shapeGeo([[-0.045, 0.43], [0.045, 0.43], [0.045, 0.03], [-0.045, 0.03]], 0.002, 0), f, 0, 0, 0.002), '#f6efe4', 0); neckRib('#f6efe4', 0.042); buttons(4, 0.05, '#c8b89a', 0.34, 0.075); hem(shade(cc, 0.86)); break;
+    case 'happi': crossCollar(W); body.add(tm(new THREE.CylinderGeometry(0.143, 0.146, 0.05, 28), '#2a2018', 0, 0.06, 0, 0.002));
+      put(onChest(new THREE.CircleGeometry(0.03, 20), f, 0.07, 0.24, 0.006), W, 0.002); break;
+    case 'samue': crossCollar(shade(cc, 0.72), 0.026); body.add(tm(new THREE.CylinderGeometry(0.145, 0.146, 0.02, 28), shade(cc, 0.7), 0, 0.12, 0, 0.002)); break;
+    case 'hakui': crossCollar('#e8e4da', 0.03); { const st = tm(new THREE.CylinderGeometry(0.05, 0.054, 0.035, 18, 1, true), '#f4f2ec', 0, 0.44, 0, 0.002); body.add(st); } buttons(3, 0.06, '#d8d4c8', 0.3, 0.07); break;
+    case 'jinbei': crossCollar(shade(cc, 0.8), 0.028); [-1, 1].forEach((s) => put(onChest(shapeGeo([[-0.022, 0.003], [0.022, 0.003], [0.022, -0.003], [-0.022, -0.003]], 0.003, 0), f, s * 0.05, 0.2, 0.008), shade(cc, 0.65), 0)); break;
   }
-  if (TOP_DEF[a.top] && TOP_DEF[a.top].skirt) return 'skirt';
-  return '';
+  return TOP_DEF[a.top] && TOP_DEF[a.top].skirt ? 'skirt' : '';
 }
 
 function buildAvatar(raw, opt = {}) {
@@ -341,58 +507,75 @@ function buildAvatar(raw, opt = {}) {
   const root = new THREE.Group();
   const body = new THREE.Group(); root.add(body);
   const R = f ? 0.185 : 0.19;
+  const LN = 0.004;   // ふち線の太さ
 
-  // 胴
-  const torso = tm(torsoGeo(f), cc, 0, 0, 0, 0.035); body.add(torso);
+  // 胴(服)
+  const torsoMat = def.tex ? toon(cc, { map: fabricTex(def.tex) }) : toon(cc);
+  const torso = new THREE.Mesh(torsoGeo(f), torsoMat); torso.add(outlineOf(torso.geometry, LN)); body.add(torso);
   const lower = buildTop(body, a, f, cc);
-  body.add(tm(new THREE.CylinderGeometry(0.038, 0.044, 0.08, 12), skinC, 0, 0.46, 0));   // 首
-  // 腕(袖の形は服で変わる)
+  // 首・肩
+  body.add(tm(new THREE.CylinderGeometry(0.032, 0.038, 0.09, 14), skinC, 0, 0.465, 0, LN));
+  [-1, 1].forEach((s) => { const sh = tm(new THREE.SphereGeometry(f ? 0.042 : 0.05, 16, 12), cc, (f ? 0.112 : 0.13) * s, 0.37, -0.008, LN); sh.scale.set(1, 0.85, 0.9); body.add(sh); });
+  // 腕(袖の形は服で変わる)。 肩から 前へ出して カウンターに置く形
   const arms = [];
   [-1, 1].forEach((s) => {
-    const sh = new THREE.Group(); sh.position.set((f ? 0.135 : 0.155) * s, 0.37, 0);
-    const sleeveC = cc;
-    const upperC = def.sleeve === 'short' ? sleeveC : sleeveC, lowerC = def.sleeve === 'short' ? skinC : sleeveC;
-    const wide = def.sleeve === 'wide', puff = def.sleeve === 'puff';
-    sh.add(tm(new THREE.CapsuleGeometry(puff ? 0.05 : wide ? 0.05 : 0.04, 0.09, 4, 10), upperC, 0, -0.06, 0, 0.05));
-    sh.add(tm(new THREE.CapsuleGeometry(wide ? 0.045 : 0.034, 0.1, 4, 10), lowerC, 0, -0.17, 0, 0.05));
-    if (def.sleeve === 'long' && !wide) sh.add(tm(new THREE.CylinderGeometry(0.037, 0.037, 0.02, 10), shade(sleeveC, 0.85), 0, -0.235, 0));
-    sh.add(tm(new THREE.SphereGeometry(0.036, 12, 10), skinC, 0, -0.26, 0.005, 0.06));
-    sh.rotation.x = -0.75; sh.rotation.z = 0.1 * s;
+    const sh = new THREE.Group(); sh.position.set((f ? 0.125 : 0.145) * s, 0.375, 0);
+    const wide = def.sleeve === 'wide', puff = def.sleeve === 'puff', short = def.sleeve === 'short' || puff;
+    const upper = new THREE.Group(); sh.add(upper);
+    upper.add(tm(new THREE.CapsuleGeometry(wide ? 0.052 : puff ? 0.05 : (f ? 0.036 : 0.042), 0.085, 6, 12), cc, 0, -0.065, 0, LN));
+    if (short) upper.add(tm(new THREE.CylinderGeometry(puff ? 0.05 : 0.044, puff ? 0.042 : 0.044, 0.02, 14, 1, true), shade(cc, 0.88), 0, -0.1, 0, 0));
+    const fore = new THREE.Group(); fore.position.y = -0.135; fore.rotation.x = -0.55; upper.add(fore);
+    fore.add(tm(new THREE.SphereGeometry(short ? (f ? 0.03 : 0.034) : (wide ? 0.05 : 0.04), 12, 10), short ? skinC : cc, 0, 0, 0, LN));
+    fore.add(tm(new THREE.CapsuleGeometry(wide ? 0.048 : short ? (f ? 0.028 : 0.032) : (f ? 0.033 : 0.038), 0.085, 6, 12), short ? skinC : cc, 0, -0.06, 0, LN));
+    if (!short) fore.add(tm(new THREE.CylinderGeometry(wide ? 0.052 : 0.04, wide ? 0.05 : 0.04, 0.018, 14), shade(cc, 0.86), 0, -0.11, 0, 0));
+    // 手(ミトン形+親指)
+    const hand = new THREE.Group(); hand.position.set(0, -0.135, 0.005); fore.add(hand);
+    const palm = tm(new THREE.SphereGeometry(0.032, 14, 10), skinC, 0, 0, 0, LN); palm.scale.set(0.95, 1.15, 0.7); hand.add(palm);
+    const thumb = tm(new THREE.CapsuleGeometry(0.011, 0.02, 4, 8), skinC, -s * 0.026, 0.008, 0.012, LN); thumb.rotation.z = s * 0.7; hand.add(thumb);
+    sh.rotation.x = -0.45; sh.rotation.z = 0.06 * s;
     body.add(sh); arms.push(sh);
   });
   const cheerMug = new THREE.Group();
   cheerMug.add(mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.11, 12), mat('#f2b51c', { transparent: true, opacity: 0.92 }), 0, 0, 0));
   cheerMug.add(mesh(new THREE.CylinderGeometry(0.047, 0.047, 0.03, 12), mat('#fbf7ec'), 0, 0.065, 0));
-  cheerMug.position.set(0, -0.3, 0.03); cheerMug.visible = false; arms[1].add(cheerMug);
+  cheerMug.position.set(0, -0.31, 0.06); cheerMug.visible = false; arms[1].add(cheerMug);
 
   // 足(座っている形)
   if (!opt.standing) {
-    const pantsC = def.pants === 'same' ? cc : (a.top === 'work' ? cc : (f ? '#3a3a48' : '#2c2c36'));
-    const legC = lower === 'skirt' ? (f ? skinC : pantsC) : pantsC;
+    const pantsC = def.pants === 'same' ? cc : (a.top === 'work' ? cc : (f ? '#3a3a4a' : '#2a2c38'));
+    const skirt = lower === 'skirt';
+    const legC = skirt ? skinC : pantsC;
     [-1, 1].forEach((s) => {
-      if (lower !== 'skirt') { const th = tm(new THREE.CapsuleGeometry(0.055, 0.22, 4, 10), legC, 0.07 * s, 0.03, 0.14, 0.04); th.rotation.x = Math.PI / 2; body.add(th); }
-      const sn = tm(new THREE.CapsuleGeometry(0.045, 0.28, 4, 10), legC, 0.07 * s, -0.19, 0.3, 0.04); body.add(sn);
-      body.add(tm(new THREE.BoxGeometry(0.075, 0.05, 0.13), f ? '#5a2a2a' : '#1d1a18', 0.07 * s, -0.39, 0.34, 0.04));
+      const x = (f ? 0.062 : 0.072) * s;
+      if (!skirt) { const th = tm(new THREE.CapsuleGeometry(f ? 0.055 : 0.06, 0.2, 6, 12), legC, x, 0.04, 0.13, LN); th.rotation.x = Math.PI / 2; body.add(th); }
+      body.add(tm(new THREE.SphereGeometry(f ? 0.048 : 0.054, 12, 10), legC, x, 0.035, 0.27, LN));   // ひざ
+      body.add(tm(new THREE.CapsuleGeometry(f ? 0.04 : 0.046, 0.24, 6, 12), legC, x, -0.13, 0.285, LN));
+      if (skirt) body.add(tm(new THREE.CylinderGeometry(0.035, 0.035, 0.07, 10), f ? '#f2ece4' : legC, x, -0.24, 0.285, 0));   // くつした
+      // くつ(丸い つま先+底)
+      const shoeC = f ? (skirt ? '#6a2a2a' : '#3a2a22') : '#1d1a18';
+      const toe = tm(new THREE.SphereGeometry(0.045, 14, 10), shoeC, x, -0.345, 0.32, LN); toe.scale.set(0.85, 0.6, 1.35); body.add(toe);
+      body.add(tm(new THREE.BoxGeometry(0.072, 0.012, 0.13), '#f2ece4', x, -0.372, 0.325, 0));
     });
-    if (lower === 'skirt') {   // ひざの上にかかる布 + 前に垂れる すそ
+    if (skirt) {   // ひざの上にかかる布 + 前に垂れる すそ
       const skc = a.top === 'office' ? '#2c2c36' : cc;
-      const top = tm(new THREE.SphereGeometry(0.17, 22, 14), skc, 0, 0.05, 0.13, 0.04); top.scale.set(1.0, 0.36, 1.12); body.add(top);
-      const drape = new THREE.Mesh(new THREE.CylinderGeometry(0.168, 0.19, 0.12, 22, 1, true, -Math.PI / 2, Math.PI), toon(skc, { side: THREE.DoubleSide }));
-      drape.position.set(0, -0.01, 0.13); drape.scale.z = 1.12; body.add(drape);
-      body.add(tm(new THREE.CylinderGeometry(0.148, 0.15, 0.08, 22), skc, 0, 0.03, 0));
+      const top = tm(new THREE.SphereGeometry(0.16, 24, 14), skc, 0, 0.055, 0.12, LN); top.scale.set(1.0, 0.35, 1.2); body.add(top);
+      const drape = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.175, 0.13, 24, 1, true, -Math.PI / 2, Math.PI), toon(skc, { side: THREE.DoubleSide }));
+      drape.position.set(0, -0.015, 0.14); drape.scale.z = 1.15; body.add(drape);
+      body.add(tm(new THREE.CylinderGeometry(0.135, 0.14, 0.08, 24), skc, 0, 0.035, 0, LN));
     }
   }
 
-  // 頭
+  // 頭(アニメの頭の形)
   const head = new THREE.Group(); head.position.set(0, 0.69, 0); body.add(head);
-  const FACE = { round: [1, 1, 1], egg: [0.96, 1.05, 0.98], sharp: [0.93, 1.08, 0.96], square: [1.05, 0.97, 1.0] }[a.face] || [1, 1, 1];
-  const skull = new THREE.Group(); skull.scale.set(FACE[0], FACE[1], FACE[2]); head.add(skull);
-  skull.add(tm(new THREE.SphereGeometry(R, 36, 26), skinC, 0, 0, 0, 0.035));
-  [-1, 1].forEach((s) => skull.add(tm(new THREE.SphereGeometry(R * 0.2, 12, 10), skinC, R * 0.96 * s, -R * 0.05, 0, 0.06)));
-  const face = new THREE.Mesh(new THREE.SphereGeometry(R * 1.004, 32, 24, Math.PI / 2 - 0.95, 1.9, Math.PI / 2 - 0.8, 1.6),
-    new THREE.MeshBasicMaterial({ map: faceTexture(a), transparent: true, depthWrite: false }));
+  const D = headDeform(a.face);
+  const skull = new THREE.Group(); head.add(skull);
+  const skullGeo = deformGeo(new THREE.SphereGeometry(R, 40, 30), D, R);
+  const sk = new THREE.Mesh(skullGeo, toon(skinC)); sk.add(outlineOf(skullGeo, LN)); skull.add(sk);
+  [-1, 1].forEach((s) => { const ep = sp(D, R, Math.PI / 2 + 0.1, s * Math.PI / 2 * 0.97, R * 0.97); const ear = tm(new THREE.SphereGeometry(R * 0.17, 12, 10), skinC, ep.x, ep.y, ep.z - R * 0.04, LN); ear.scale.set(0.55, 1, 0.8); skull.add(ear); });
+  const faceGeo = deformGeo(new THREE.SphereGeometry(R * 1.004, 36, 28, Math.PI / 2 - 0.95, 1.9, Math.PI / 2 - 0.8, 1.6), D, R);
+  const face = new THREE.Mesh(faceGeo, new THREE.MeshBasicMaterial({ map: faceTexture(a), transparent: true, depthWrite: false }));
   skull.add(face);
-  buildHair(skull, a, R);
+  buildHair(skull, a, R, D);
   buildAcc(skull, body, a, R, f);
   root.scale.setScalar(a.size);
   root.userData = { body, head, arms, cheerMug, torso, t: Math.random() * 10, cheer: 0, talk: 0 };
@@ -414,37 +597,37 @@ function buildAcc(head, body, a, R, f) {
     case 'glasses': glasses('#1a1414'); break;
     case 'thin': glasses('#b8963a', true); break;
     case 'sun': glasses('#1a1414', false, true); break;
-    case 'cap': { const c = tm(new THREE.SphereGeometry(R * 1.1, 26, 14, 0, Math.PI * 2, 0, 1.25), AVATAR.color(AVATAR.CLOTH_COLOR, a.topColor), 0, 0, 0, 0.03); c.rotation.x = -0.12; head.add(c);
+    case 'cap': { const c = tm(new THREE.SphereGeometry(R * 1.1, 26, 14, 0, Math.PI * 2, 0, 1.25), AVATAR.color(AVATAR.CLOTH_COLOR, a.topColor), 0, 0, 0, 0.003); c.rotation.x = -0.12; head.add(c);
       const v = tm(new THREE.CylinderGeometry(R * 0.62, R * 0.62, 0.012, 20, 1, false, -Math.PI / 2, Math.PI), shade(AVATAR.color(AVATAR.CLOTH_COLOR, a.topColor), 0.85), 0, R * 0.42, R * 0.78); v.rotation.x = 0.15; head.add(v); break; }
-    case 'beanie': { const c = tm(new THREE.SphereGeometry(R * 1.12, 26, 14, 0, Math.PI * 2, 0, 1.3), '#c87a3a', 0, R * 0.06, 0, 0.03); c.rotation.x = -0.1; head.add(c);
+    case 'beanie': { const c = tm(new THREE.SphereGeometry(R * 1.12, 26, 14, 0, Math.PI * 2, 0, 1.3), '#c87a3a', 0, R * 0.06, 0, 0.003); c.rotation.x = -0.1; head.add(c);
       const b = tm(new THREE.CylinderGeometry(R * 1.1, R * 1.12, R * 0.3, 26, 1, true), '#a8622a', 0, R * 0.42, -R * 0.06); b.rotation.x = -0.1; head.add(b); head.add(tm(new THREE.SphereGeometry(R * 0.18, 10, 8), '#f2ece0', 0, R * 1.18, -R * 0.12)); break; }
     case 'necklace': case 'earring': break;
-    case 'beret': { const b = tm(new THREE.SphereGeometry(R * 0.95, 24, 12), '#8a2a3a', R * 0.12, R * 0.78, -R * 0.05, 0.04); b.scale.set(1.1, 0.32, 1.05); b.rotation.z = -0.25; head.add(b); break; }
+    case 'beret': { const b = tm(new THREE.SphereGeometry(R * 0.95, 24, 12), '#8a2a3a', R * 0.12, R * 0.78, -R * 0.05, 0.003); b.scale.set(1.1, 0.32, 1.05); b.rotation.z = -0.25; head.add(b); break; }
     case 'band': { const holder = new THREE.Group(); holder.rotation.x = -0.3; holder.position.y = R * 0.05;
       const arc = new THREE.Mesh(new THREE.TorusGeometry(R * 1.07, 0.012, 6, 30, Math.PI), toon('#c8263a')); arc.rotation.y = Math.PI / 2; holder.add(arc); head.add(holder); break; }
-    case 'ribbon': { const g = new THREE.Group(); g.position.set(0, R * 0.45, -R * 0.98); [-1, 1].forEach((s) => { const w = tm(new THREE.ConeGeometry(0.04, 0.07, 4), '#e86a8a', s * 0.035, 0, 0, 0.05); w.rotation.z = s * Math.PI / 2; g.add(w); }); g.add(tm(new THREE.SphereGeometry(0.015, 8, 6), '#c84a6a')); head.add(g); break; }
+    case 'ribbon': { const g = new THREE.Group(); g.position.set(0, R * 0.45, -R * 0.98); [-1, 1].forEach((s) => { const w = tm(new THREE.ConeGeometry(0.04, 0.07, 4), '#e86a8a', s * 0.035, 0, 0, 0.003); w.rotation.z = s * Math.PI / 2; g.add(w); }); g.add(tm(new THREE.SphereGeometry(0.015, 8, 6), '#c84a6a')); head.add(g); break; }
   }
   if (!a.owner && (a.acc === 'earring')) [-1, 1].forEach((s) => { head.add(tm(new THREE.SphereGeometry(0.012, 8, 6), '#e8c84a', R * 0.98 * s, -R * 0.28, 0)); head.add(tm(new THREE.TorusGeometry(0.014, 0.003, 6, 12), '#e8c84a', R * 0.98 * s, -R * 0.36, 0)); });
-  if (!a.owner && a.acc === 'necklace') { const n = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.004, 6, 24, Math.PI), new THREE.MeshBasicMaterial({ color: '#d8b84a' })); n.rotation.set(Math.PI / 2 + 0.5, 0, Math.PI); n.position.set(0, 0.42, 0.04); body.add(n); body.add(tm(new THREE.SphereGeometry(0.012, 8, 6), '#e8e8f0', 0, 0.355, 0.11)); }
+  if (!a.owner && a.acc === 'necklace') { const n = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.004, 6, 24, Math.PI), new THREE.MeshBasicMaterial({ color: '#d8b84a' })); n.rotation.set(Math.PI / 2 + 0.5, 0, Math.PI); n.position.set(0, 0.42, 0.003); body.add(n); body.add(tm(new THREE.SphereGeometry(0.012, 8, 6), '#e8e8f0', 0, 0.355, 0.11)); }
   if (a.owner) {
     switch (a.head) {
       case 'hachimaki': case 'nejiri': {
-        const band = tm(new THREE.TorusGeometry(R * 1.03, a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), '#f6f4ee', 0, R * 0.3, 0, 0.06); band.rotation.x = Math.PI / 2 + 0.15; head.add(band);
+        const band = tm(new THREE.TorusGeometry(R * 1.03, a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), '#f6f4ee', 0, R * 0.3, 0, 0.003); band.rotation.x = Math.PI / 2 + 0.15; head.add(band);
         if (a.head === 'nejiri') for (let k = 0; k < 24; k++) { const ang = k / 24 * Math.PI * 2; head.add(tm(new THREE.BoxGeometry(0.006, 0.03, 0.01), '#2a3a6a', Math.sin(ang) * R * 1.04, R * 0.3 + Math.cos(ang) * R * 0.15 * 0.98, Math.cos(ang) * R * 1.04)); }
-        const knot = tm(new THREE.SphereGeometry(0.025, 8, 6), '#f6f4ee', 0, R * 0.25, -R * 1.02, 0.06); head.add(knot);
+        const knot = tm(new THREE.SphereGeometry(0.025, 8, 6), '#f6f4ee', 0, R * 0.25, -R * 1.02, 0.003); head.add(knot);
         [-1, 1].forEach((s) => { const tl = tm(new THREE.BoxGeometry(0.03, 0.09, 0.006), '#f6f4ee', s * 0.03, R * 0.12, -R * 1.04); tl.rotation.z = s * 0.4; head.add(tl); });
         break; }
-      case 'tenugui': { const c = tm(new THREE.SphereGeometry(R * 1.1, 26, 14, 0, Math.PI * 2, 0, 1.2), '#2a3a6a', 0, 0, 0, 0.03); c.rotation.x = -0.25; head.add(c);
+      case 'tenugui': { const c = tm(new THREE.SphereGeometry(R * 1.1, 26, 14, 0, Math.PI * 2, 0, 1.2), '#2a3a6a', 0, 0, 0, 0.003); c.rotation.x = -0.25; head.add(c);
         for (let k = 0; k < 10; k++) head.add(tm(new THREE.SphereGeometry(0.01, 6, 5), '#f6f4ee', Math.sin(k * 1.9) * R * 0.6, R * 0.8 + Math.cos(k * 2.3) * R * 0.1, Math.cos(k * 1.9) * R * 0.5));
-        head.add(tm(new THREE.SphereGeometry(0.025, 8, 6), '#2a3a6a', 0, R * 0.35, -R * 1.02, 0.06)); break; }
-      case 'itamae': { const c = tm(new THREE.CylinderGeometry(R * 0.95, R * 1.0, R * 0.9, 24), '#f6f4ee', 0, R * 0.8, -R * 0.05, 0.04); head.add(c); break; }
-      case 'bandana': { const c = tm(new THREE.SphereGeometry(R * 1.1, 26, 14, 0, Math.PI * 2, 0, 1.3), '#8a1f2a', 0, 0, 0, 0.03); c.rotation.x = -0.2; head.add(c);
+        head.add(tm(new THREE.SphereGeometry(0.025, 8, 6), '#2a3a6a', 0, R * 0.35, -R * 1.02, 0.003)); break; }
+      case 'itamae': { const c = tm(new THREE.CylinderGeometry(R * 0.95, R * 1.0, R * 0.9, 24), '#f6f4ee', 0, R * 0.8, -R * 0.05, 0.003); head.add(c); break; }
+      case 'bandana': { const c = tm(new THREE.SphereGeometry(R * 1.1, 26, 14, 0, Math.PI * 2, 0, 1.3), '#8a1f2a', 0, 0, 0, 0.003); c.rotation.x = -0.2; head.add(c);
         for (let k = 0; k < 14; k++) head.add(tm(new THREE.SphereGeometry(0.008, 6, 5), '#f6f4ee', Math.sin(k * 2.1) * R * 0.7, R * 0.7 + Math.cos(k * 1.3) * R * 0.15, Math.cos(k * 2.1) * R * 0.6));
-        head.add(tm(new THREE.ConeGeometry(0.03, 0.08, 4), '#8a1f2a', 0, R * 0.2, -R * 1.08, 0.05)); break; }
+        head.add(tm(new THREE.ConeGeometry(0.03, 0.08, 4), '#8a1f2a', 0, R * 0.2, -R * 1.08, 0.003)); break; }
     }
     if (a.apron && a.apron !== 'none') {
       const ac = { navy: '#1f2a4a', black: '#1a1a1e', white: '#f2efe6', brown: '#6a4428' }[a.apron];
-      const ap = tm(new THREE.BoxGeometry(0.27, 0.34, 0.012), ac, 0, -0.05, 0.13, 0.03); ap.rotation.x = -0.05; body.add(ap);
+      const ap = tm(new THREE.BoxGeometry(0.27, 0.34, 0.012), ac, 0, -0.05, 0.13, 0.003); ap.rotation.x = -0.05; body.add(ap);
       body.add(tm(new THREE.CylinderGeometry(0.15, 0.152, 0.025, 24), ac, 0, 0.11, 0));
       body.add(tm(new THREE.BoxGeometry(0.08, 0.05, 0.004), lighten(ac, 0.6), 0.06, 0.0, 0.138));
     }
@@ -854,6 +1037,7 @@ const DRINK_SLOT = [0.26, 0.1];
    ===================================================================== */
 function createShop(canvas, opts) {
   const N = opts.seats;
+  const SHOPNAME = opts.name || SHOP.NAME;   // 回ごとの店の名前(ちょうちん・のれんの文字)
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -939,7 +1123,7 @@ function createShop(canvas, opts) {
     g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 3;
     for (let y = 16; y < 256; y += 22) { g.beginPath(); g.moveTo(0, y); g.lineTo(256, y); g.stroke(); }
     g.fillStyle = '#1a0a06'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    const chars = Array.from(SHOP.NAME.replace(/^居酒屋\s*/, '') || '酒').slice(0, 3);
+    const chars = Array.from(SHOPNAME.replace(/^居酒屋\s*/, '') || '酒').slice(0, 3);
     const sz = chars.length === 1 ? 120 : chars.length === 2 ? 78 : 58;
     g.font = 'bold ' + sz + 'px ' + FONT_JP;
     [64, 192].forEach((cx) => chars.forEach((ch, k) => g.fillText(ch, cx, 128 + (k - (chars.length - 1) / 2) * sz * 1.02)));
@@ -960,7 +1144,7 @@ function createShop(canvas, opts) {
   const norenT = canvasTex(512, 256, (g) => {
     g.fillStyle = '#1f2a4a'; g.fillRect(0, 0, 512, 256);
     g.fillStyle = '#f3efe6'; g.font = 'bold 120px ' + FONT_JP; g.textAlign = 'center'; g.textBaseline = 'middle';
-    const nm = SHOP.NAME.replace(/^居酒屋\s*/, '') || SHOP.NAME;
+    const nm = SHOPNAME.replace(/^居酒屋\s*/, '') || SHOPNAME;
     g.fillText(nm.slice(0, 4), 256, 140);
   });
   for (let k = 0; k < 3; k++) {
@@ -1012,11 +1196,11 @@ function createShop(canvas, opts) {
       case 'first': wantPos.set(x, 1.5, GUEST_Z + 0.22); wantLook.set(x + THREE.MathUtils.clamp((ownerTargetX - x) * 0.6, -1.0, 1.0), 1.08, -0.95); break;   // 向きすぎると となりの頭でふさがる
       case 'back': wantPos.set(x * 0.85, 2.3, GUEST_Z + 1.35); wantLook.set(x * 0.75, 1.0, -0.45); break;   // 頭ごしに 自分の料理が見える高さ
       case 'owner':
-        if (portrait) { wantPos.set(-L / 2 - 0.1, 2.1, -1.25); wantLook.set(L * 0.12, 0.95, 1.45); wantFov = 64; }
+        if (portrait) { const ex = Math.max(0, N - 7) * 0.22; wantPos.set(-L / 2 - 0.1 - ex * 0.5, 2.1 + ex * 0.4, -1.25 - ex * 0.3); wantLook.set(L * 0.12, 0.95, 1.45); wantFov = 64 + Math.max(0, N - 7) * 1.5; }
         else { wantPos.set(0, 2.3, -1.85); wantLook.set(0, 1.2, 1.0); wantFov = fitFov(GUEST_Z + 1.85); }
         break;
       default:
-        if (portrait) { wantPos.set(L / 2 + 0.75, 2.55, 2.75); wantLook.set(-L * 0.12, 1.0, -0.35); wantFov = 64; }
+        if (portrait) { const ex = Math.max(0, N - 7) * 0.32; wantPos.set(L / 2 + 0.75 + ex * 0.4, 2.55 + ex * 0.35, 2.75 + ex); wantLook.set(-L * 0.12, 1.0, -0.35); wantFov = 64 + Math.max(0, N - 7) * 1.5; }
         else { wantPos.set(0, 2.6, 3.25); wantLook.set(0, 1.0, -0.8); wantFov = fitFov(3.25); }
     }
     // 指でぐるっと見回す分
@@ -1034,7 +1218,7 @@ function createShop(canvas, opts) {
   window.addEventListener('pointermove', (e) => {
     if (!drag) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
-    if (Math.abs(dx) + Math.abs(dy) > 6) drag.moved = true;
+    if (Math.abs(dx) + Math.abs(dy) > 14) drag.moved = true;   // 指が少しずれても「押した」にする
     const lim = view.mode === 'first' ? 1.1 : 0.6;
     view.yaw = THREE.MathUtils.clamp(drag.yaw - dx * 0.004, -lim, lim);
     view.pitch = THREE.MathUtils.clamp(drag.pitch + dy * 0.003, -0.45, 0.35);
@@ -1046,6 +1230,7 @@ function createShop(canvas, opts) {
       ray.setFromCamera(ndc, camera);
       // 先に料理・飲み物(押すと食べる・飲む)、なければ いす
       const tagHits = ray.intersectObjects(tagList, false);
+      if (!running) { drag = null; return; }
       if (tagHits.length && api.onTagTap) { const tg = tagHits[0].object; tg.userData.flash = performance.now(); api.onTagTap(tg.userData.menuId); drag = null; return; }
       const itemHits = ray.intersectObjects(itemHitList, false);
       if (itemHits.length && api.onItemTap) { const u = itemHits[0].object.userData; api.onItemTap(u.seat, u.key); drag = null; return; }
@@ -1181,7 +1366,8 @@ function createShop(canvas, opts) {
     talk(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.talk = 1.6; },
     /* 吹き出しを出す位置(画面の点) */
     anchors() { return { seats: seatAvatars.map((a, i) => (a && a.visible ? headPos(a) : null)), owner: headPos(owner), empty: stools.map((s, i) => { tmp.set(seatX(i, N), STOOL_Y + 0.25, GUEST_Z); const v = tmp.clone().project(camera); if (v.z > 1) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }) }; },
-    stop() { running = false; }
+    name: SHOPNAME,
+    stop() { running = false; api.onTap = api.onItemTap = api.onTagTap = api.onFrame = null; window.removeEventListener('resize', resize); renderer.dispose(); }
   };
   return api;
 }

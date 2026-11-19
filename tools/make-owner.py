@@ -19,7 +19,7 @@ for a, b in rep:
     assert a in s, a
     s = s.replace(a, b)
 s = re.sub(r"tagline: '[^']*'", "tagline: '大将の店に立つためのアプリ'", s, count=1)
-s = re.sub(r"desc: '[^']*'", "desc: '居酒屋ノブの大将(お店の人)用です。お客さん用とは別のアプリとしてホーム画面に入ります。注文票・料理を出す・開け閉めができます。'", s, count=1)
+s = re.sub(r"desc: '[^']*'", "desc: 'すべて無料です。居酒屋ノブの大将(お店の人)と、その回のマスター用です。お客さん用とは別のアプリとしてホーム画面に入ります。注文票・料理を出す・開け閉めができます。'", s, count=1)
 s = re.sub(r"points: \[[^\]]*\]", "points: ['注文票と ベルの音で 注文が分かる', 'お客さんの席を押して 料理を出せる', '臨時の開店・閉店ができる']", s, count=1)
 s = s.replace("playLabel: '▶ このまま入る'", "playLabel: '▶ このまま店に立つ'")
 (root / 'owner.html').write_text('<!-- このファイルは tools/make-owner.py が index.html から作る。直接直さない -->\n' + s)

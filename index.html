@@ -36,7 +36,9 @@
     <div class="sign-sub">週に一度の</div>
     <h1 id="shopName">居酒屋ノブ</h1>
     <div id="openState" class="open-state"></div>
+    <div id="masterNote" class="master-note hidden"></div>
     <div id="schedule" class="schedule"></div>
+    <div class="free">すべて無料です</div>
   </div>
   <div class="card">
     <div class="me-row">
@@ -91,7 +93,7 @@
     <div class="mk-title">席を予約</div>
     <span></span>
   </div>
-  <p class="rs-help">予約は<b>開店の3時間前から</b>できます。空いている席を押すと予約、もう一度押すと取り消し。<br>予約の席は、開店から <b id="holdMin">15</b> 分まで取っておきます。</p>
+  <p class="rs-help"><b class="free" style="margin:0 0 6px">すべて無料です</b><br>予約は<b>開店の3時間前から</b>できます。空いている席を押すと予約、もう一度押すと取り消し。<br>予約の席は、開店から <b id="holdMin">15</b> 分まで取っておきます。</p>
   <div id="rsList"></div>
 </section>
 
@@ -155,10 +157,10 @@
 <script>
   window.INSTALL_GATE = { id: 'izakaya', name: '居酒屋ノブ', icon: 'icon-192.png',
     tagline: '週に一度、1時間だけ開く居酒屋',
-    desc: 'スマホの中の小さな居酒屋。カウンター7席で、相談ごとでも世間話でも、なんでも話せる1時間。料理とお酒、みんなで同じ曲も。',
+    desc: 'すべて無料です。スマホの中の小さな居酒屋。カウンター7席で、相談ごとでも世間話でも、なんでも話せる1時間。料理とお酒、みんなで同じ曲も。',
     points: ['自分そっくりのアバターで座れる', '焼き鳥・おでん・ビールが出てくる', '曲はみんなでリクエスト'],
     shots: ['shots/1.jpg', 'shots/2.jpg', 'shots/3.jpg'], badges: ['無料', '広告なし', '登録なし'], color: '#c8261c', playLabel: '▶ このまま入る',
-    note: 'お話にはインターネットが必要です' };
+    note: 'すべて無料です ・ お話にはインターネットが必要です' };
 </script>
 <script src="install.js"></script>
 </body>

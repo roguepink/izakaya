@@ -1,0 +1,9 @@
+{
+ "shop": "居酒屋ノブ",
+ "free": "すべて無料です",
+ "weekly": [{ "day": 5, "start": "21:00", "end": "22:00" }],
+ "events": [],
+ "notice": "",
+ "app": "https://roguepink.github.io/izakaya/",
+ "firebase": ""
+}

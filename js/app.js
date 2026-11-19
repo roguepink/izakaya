@@ -7,7 +7,11 @@
   var $ = function (id) { return document.getElementById(id); };
   var LOCAL = !(SHOP.FIREBASE && SHOP.FIREBASE.databaseURL) || /[#&]local\b/.test(location.hash);
   var OWNER_MODE = !!window.IZ_OWNER || /[#&]owner\b/.test(location.hash);   // 大将用のページ(owner.html)か、アドレスの最後に #owner
-  var N = Math.max(1, Math.min(20, SHOP.SEATS | 0));
+  /* 席の数: 回ごとに変えられる(上限 SHOP.MAX_SEATS)。3Dのカウンターは読みこんだときの数で作るので、
+     次の回の席の数がちがうときは、店に入る前に ページを読みなおして合わせる(checkSeats) */
+  var MAXS = Math.max(1, Math.min(20, SHOP.MAX_SEATS || 12));
+  function clampSeats(v) { return Math.max(1, Math.min(MAXS, (v | 0) || (SHOP.SEATS | 0) || 7)); }
+  var N = clampSeats((function () { try { return +sessionStorage.getItem('iz-seats') || +localStorage.getItem('iz-seats') || SHOP.SEATS; } catch (e) { return SHOP.SEATS; } })());
   var JST = 9 * 3600e3, MIN = 60e3, DAY = 86400e3;
   var WEEK = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -32,21 +36,77 @@
   function fmtDay(ts) { var j = jst(ts); return (j.m + 1) + '月' + j.d + '日(' + WEEK[j.w] + ')'; }
   function fmtTime(ts) { var j = jst(ts); return j.hh + ':' + pad(j.mi); }
   function sessKey(start) { var j = jst(start); return j.y + pad(j.m + 1) + pad(j.d) + '-' + pad(j.hh) + pad(j.mi); }
-  function upcoming(now, days) {
-    var out = [];
+  function keyTs(key) { var m = /^(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})$/.exec(key || ''); return m ? fromJst(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : 0; }
+  function dayOf(ts) { var j = jst(ts); return j.y + '-' + j.m + '-' + j.d; }
+
+  /* ---------------- お知らせ(news.json)と 回ごとの予定 ----------------
+     news.json はホームページと同じものを読む。店のデータの schedule/<回のキー> があれば そちらが勝つ */
+  var NEWS = null;
+  function weekly() { return NEWS && NEWS.weekly && NEWS.weekly.length ? NEWS.weekly : SHOP.SCHEDULE; }
+  function newsEvents() {   // news.json の events を {key,start,end,plan} に
+    return ((NEWS && NEWS.events) || []).map(function (ev) {
+      var d = String(ev.date || '').split('-'), a = hm(ev.start || '21:00'), e = hm(ev.end || '22:00');
+      if (d.length !== 3) return null;
+      var st = fromJst(+d[0], +d[1] - 1, +d[2], a[0], a[1]), en = fromJst(+d[0], +d[1] - 1, +d[2], e[0], e[1]);
+      if (en <= st) en += DAY;
+      return { key: sessKey(st), start: st, end: en, plan: { title: ev.title || '', master: ev.master || '', seats: ev.seats || 0, message: ev.message || '', cancel: !!ev.cancel } };
+    }).filter(Boolean);
+  }
+  /* その回の決まり(店の名前・マスター・席の数・ひとこと・休み)。news.json の上に 店のデータを重ねる */
+  function plan(key) {
+    var o = {};
+    newsEvents().forEach(function (e) { if (e.key === key) o = Object.assign(o, e.plan); });
+    var t = ((tree && tree.schedule) || {})[key];
+    if (t) Object.keys(t).forEach(function (k) { if (t[k] !== null && t[k] !== undefined) o[k] = t[k]; });
+    return o;
+  }
+  function upcoming(now, days, withCancelled) {
+    var out = [], seen = {};
+    function add(x) { if (seen[x.key] || x.end <= now || x.start > now + (days + 1) * DAY) return; seen[x.key] = 1; out.push(x); }
+    var evs = newsEvents(), evDays = {};
+    evs.forEach(function (e) { evDays[dayOf(e.start)] = 1; });
+    var sched = (tree && tree.schedule) || {};
+    Object.keys(sched).forEach(function (k) { if (sched[k] && sched[k].extra && sched[k].replace) evDays[dayOf(keyTs(k))] = 1; });
     for (var i = -1; i <= days; i++) {
       var b = jst(now + i * DAY);
-      SHOP.SCHEDULE.forEach(function (s) {
+      weekly().forEach(function (s) {
         if (b.w !== s.day) return;
         var a = hm(s.start), e = hm(s.end);
         var st = fromJst(b.y, b.m, b.d, a[0], a[1]), en = fromJst(b.y, b.m, b.d, e[0], e[1]);
         if (en <= st) en += DAY;
-        if (en > now) out.push({ start: st, end: en, key: sessKey(st) });
+        var k = sessKey(st);
+        if (evDays[dayOf(st)] && !evs.some(function (x) { return x.key === k; })) return;   // その日はお知らせの回に置きかえ
+        add({ start: st, end: en, key: k });
       });
     }
+    evs.forEach(function (e) { add({ start: e.start, end: e.end, key: e.key }); });
+    Object.keys(sched).forEach(function (k) {   // 臨時の日
+      var t = sched[k]; if (!t || !t.extra) return;
+      var st = keyTs(k); if (!st) return;
+      var e = hm(t.end || '23:00'), j = jst(st), en = fromJst(j.y, j.m, j.d, e[0], e[1]); if (en <= st) en += DAY;
+      add({ start: st, end: en, key: k });
+    });
+    out.forEach(function (x) { x.plan = plan(x.key); });
+    if (!withCancelled) out = out.filter(function (x) { return !x.plan.cancel; });
     out.sort(function (x, y) { return x.start - y.start; });
     return out;
   }
+  /* いまの回か、次の回 */
+  var csMemo = null, csAt = 0, csTree = null, csNews = null;
+  function curSession() {   // 毎フレーム呼ばれるので、1秒は 前の答えを使う
+    var t = Date.now();
+    if (csMemo !== null && t - csAt < 1000 && csTree === tree && csNews === NEWS) return csMemo;
+    csAt = t; csTree = tree; csNews = NEWS;
+    return (csMemo = curSession0());
+  }
+  function curSession0() {
+    var n = now(), st0 = status(n);
+    if (st0.phase !== 'closed' && st0.key) { var p0 = upcoming(n - DAY, 2).filter(function (x) { return x.key === st0.key; })[0]; if (p0) return p0; }
+    return st0.next || null;
+  }
+  function shopName() { var c = curSession(); return (c && c.plan && c.plan.title) || SHOP.NAME; }
+  function seatsFor(sess) { return clampSeats((sess && sess.plan && sess.plan.seats) || SHOP.SEATS); }
+
   function status(now) {
     var st = (tree && tree.state) || {};
     if (st.forceUntil && st.forceUntil > now && !(st.closedAt > st.forceFrom)) {
@@ -86,17 +146,16 @@
     if (scene) return;
     try {
       if (!window.IZ3D) throw new Error('no 3d');
-      scene = window.IZ3D.createShop($('stage'), { seats: N });
+      scene = window.IZ3D.createShop($('stage'), { seats: N, name: shopName() });
     } catch (e) {
       console.warn('3D が使えないので 2D にします', e);
       scene = make2D();
     }
     scene.onTap = function (seat) { if (seat >= 0) onSeatTap(seat); };
     scene.onItemTap = function (seat, key) { if (inside && seat === mySeat && !OWNER_MODE) eat(key); };
-    scene.onTagTap = function (id) {   // 壁の木札を押すと、その品を頼めるか聞く
+    scene.onTagTap = function (id) {   // 壁の木札を押すと、すぐ注文(取り消しもできる)
       if (!inside || OWNER_MODE) return;
-      if (mySeat < 0) { toast('先に席に座ってください'); return; }
-      openSheet('quick', id);
+      order(id);
     };
     scene.onFrame = placeOverlays;
     sceneWait.forEach(function (fn) { fn(scene); }); sceneWait = [];
@@ -286,6 +345,8 @@
   function applyTree() {
     renderEntrance();
     if (!scene) return;
+    // 回の店の名前が決まったら、ちょうちん・のれんの文字も その名前で作りなおす(店に入る前だけ)
+    if (!inside && scene.name && scene.name !== shopName() && window.IZ3D) { try { scene.stop(); } catch (e) {} scene = null; start3D(); return; }
     var ms = members();
     var seats = [];
     for (var i = 0; i < N; i++) {
@@ -306,7 +367,7 @@
     if (s2 !== mySeat) { mySeat = s2; if (!OWNER_MODE) setView(mySeat >= 0 ? (view === 'overview' ? 'first' : view) : 'overview'); }
     $('pickHint').classList.toggle('hidden', OWNER_MODE || mySeat >= 0);
     var cnt = seats.filter(Boolean).length;
-    $('tbCount').textContent = '👥 ' + cnt + '/' + N + (ownerPresent() ? ' ・大将あり' : '');
+    $('tbCount').textContent = '👥 ' + cnt + '/' + N + (ownerPresent() ? ((tree.state || {}).ownerRole === 'master' ? ' ・マスターあり' : ' ・大将あり') : '');
     // 閉店
     if (st.closedAt && st.closedAt > joinAt && !$('closing').classList.contains('show')) showClosing();
     renderLog(); processEvents(); renderOrdersBadge();
@@ -315,8 +376,18 @@
   }
 
   /* ---------------- 入口 ---------------- */
+  var lastNameShown = '';
   function renderEntrance() {
     var n = now(), s = status(n);
+    // 回ごとの店の名前・マスター・ひとこと
+    var nm = shopName();
+    if (nm !== lastNameShown) { lastNameShown = nm; document.title = nm + (OWNER_MODE ? ' 大将' : ''); $('shopName').textContent = nm; $('tbName').textContent = nm; }
+    var cs = curSession(), pl = (cs && cs.plan) || {};
+    var note = (pl.master ? '今回のマスターは <b>' + esc(pl.master) + 'さん</b>' : '') + (pl.message ? (pl.master ? '<br>' : '') + esc(pl.message) : '');
+    if (cs && !LOCAL && s.phase === 'closed') note = '次は <b>' + fmtDay(cs.start) + ' ' + fmtTime(cs.start) + '〜' + fmtTime(cs.end) + '</b>' + (note ? '<br>' + note : '');
+    if ($('masterNote')._h !== note) { $('masterNote')._h = note; $('masterNote').innerHTML = note; $('masterNote').classList.toggle('hidden', !note); }
+    var sc = scheduleText(); if ($('schedule')._h !== sc) { $('schedule')._h = sc; $('schedule').innerHTML = sc; }
+    if (!inside) checkSeats();
     var el = $('openState');
     el.className = 'open-state' + (s.phase === 'open' ? ' on' : s.phase === 'doors' ? ' soon' : '');
     if (LOCAL) { el.textContent = 'おためし営業中'; el.className = 'open-state on'; }
@@ -324,27 +395,45 @@
     else if (s.phase === 'doors') el.textContent = 'まもなく開店 ・ ' + fmtTime(s.start) + 'から';
     else el.textContent = s.next ? '準備中 ・ 次は ' + fmtDay(s.next.start) + ' ' + fmtTime(s.next.start) : '準備中';
     $('enterBtn').disabled = !LOCAL && !OWNER_MODE && s.phase === 'closed';
-    $('enterBtn').textContent = OWNER_MODE ? '🏮 大将として店に立つ' : (s.phase === 'closed' && !LOCAL ? '準備中です' : '🏮 のれんをくぐる');
+    $('enterBtn').textContent = OWNER_MODE ? '🏮 店に立つ' : (s.phase === 'closed' && !LOCAL ? '準備中です' : '🏮 のれんをくぐる');
     if (inside) {
       var left = s.phase === 'open' && !LOCAL ? Math.max(0, Math.ceil((s.end - n) / MIN)) : null;
       $('tbState').textContent = LOCAL ? 'おためし' : s.phase === 'open' ? (s.lastCall ? 'ラストオーダー ・ あと' + left + '分' : 'あと' + left + '分') : s.phase === 'doors' ? 'まもなく開店' : '準備中(仕込み)';
     }
   }
   function scheduleText() {
-    var days = SHOP.SCHEDULE.map(function (s) { return '毎週' + WEEK[s.day] + '曜 ' + s.start + '〜' + s.end; });
+    var days = weekly().map(function (s) { return '毎週' + WEEK[s.day] + '曜 ' + s.start + '〜' + s.end; });
     return days.join(' / ') + '<br>カウンター' + N + '席 ・ 相談ごとも世間話も、なんでもどうぞ';
   }
+  /* 次の回の席の数が いまの3Dとちがえば、店に入る前に読みなおす(何度もくり返さないように見張る) */
+  function checkSeats() {
+    if (inside || !NEWS && !(tree && tree.schedule)) return;
+    var want = seatsFor(curSession());
+    try { localStorage.setItem('iz-seats', want); } catch (e) {}
+    if (want === N) return;
+    var tries = 0; try { tries = +sessionStorage.getItem('iz-seats-reload') || 0; sessionStorage.setItem('iz-seats-reload', tries + 1); sessionStorage.setItem('iz-seats', want); } catch (e) {}
+    if (tries < 3 && !document.querySelector('#maker:not(.hidden), #reserve:not(.hidden)')) location.reload();
+  }
+  /* お知らせ(news.json)を読む。ホームページと同じファイル */
+  function loadNews() {
+    fetch('news.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (j) { NEWS = j; applyTree(); }
+    }).catch(function () {});
+  }
   function initEntrance() {
+    loadNews();
+    try { if (+sessionStorage.getItem('iz-seats-reload') > 0) setTimeout(function () { sessionStorage.removeItem('iz-seats-reload'); }, 8000); } catch (e) {}
     document.title = SHOP.NAME;
     $('shopName').textContent = SHOP.NAME; $('tbName').textContent = SHOP.NAME;
     $('schedule').innerHTML = scheduleText();
     $('holdMin').textContent = SHOP.RESERVE_HOLD_MIN;
     $('nameInput').value = OWNER_MODE ? (ME.ownerName || SHOP.OWNER_NAME) : (ME.name || '');
-    if (SHOP.PASSCODE_HASH && !OWNER_MODE) $('passRow').classList.remove('hidden');
-    if (OWNER_MODE && SHOP.OWNER_HASH) $('ownerRow').classList.remove('hidden');
+    if (SHOP.PASSCODE_HASH) $('passRow').classList.remove('hidden');
+    if (OWNER_MODE) { $('ownerRow').classList.remove('hidden'); if (!SHOP.OWNER_HASH) $('ownerPass').placeholder = '(おためし中は 空のままで入れます)'; }
     $('passInput').value = lsGet('iz-pass', '');
     if (OWNER_MODE) document.body.classList.add('is-owner');
     $('modeNote').textContent = LOCAL ? 'いまは「おためしモード」です。このスマホ(パソコン)の中だけで動きます。タブを2つ開くと2人で試せます。' : (OWNER_MODE && !SHOP.OWNER_HASH ? '大将の合言葉がまだ決まっていません(おためし中)' : '');
+    if (OWNER_MODE) $('modeNote').textContent += (OWNER_MODE ? ' その回のマスターは、ノブさんから聞いた合言葉で入れます。' : '');
     drawFace2D($('meFace'), myAvatar());
     // 合言葉がいらない店なら、すぐ店の様子を読みこむ(営業中かどうか・予約を見るため)
     if (!SHOP.PASSCODE_HASH) connect('main');
@@ -353,10 +442,21 @@
   }
   function msg(t) { $('entMsg').textContent = t || ''; }
 
+  /* 大将用の入口: ノブさん(SHOP.OWNER_HASH)か、その回のマスター(schedule/<回>/masterHash)か。
+     おためし(OWNER_HASH が空)のときは だれでも大将。マスターの合言葉が合えば マスターとして入る */
+  var ROLE = OWNER_MODE ? 'nobu' : 'guest', MASTER = null;
   function checkOwner() {
     if (!OWNER_MODE) return Promise.resolve(true);
-    if (!SHOP.OWNER_HASH) return Promise.resolve(true);
-    return Net.sha256($('ownerPass').value).then(function (h) { return h === SHOP.OWNER_HASH; }).catch(function () { return false; });
+    var pass = $('ownerPass').value.trim();
+    var nearby = function () { var n = now(); return upcoming(n - 2 * 60 * MIN, 8).filter(function (x) { return x.start - n < 7 * DAY; }); };
+    var asNobu = function () { ROLE = 'nobu'; MASTER = null; return true; };
+    if (!pass) return Promise.resolve(SHOP.OWNER_HASH ? false : asNobu());
+    return Net.sha256(pass).then(function (h) {
+      var m = nearby().filter(function (x) { return x.plan.masterHash && x.plan.masterHash === h; })[0];
+      if (m) { ROLE = 'master'; MASTER = { key: m.key, name: m.plan.master || '', title: m.plan.title || '' }; return true; }
+      if (!SHOP.OWNER_HASH || h === SHOP.OWNER_HASH) return asNobu();
+      return false;
+    }).catch(function () { return false; });
   }
   $('enterBtn').onclick = function () {
     unlockAudio();
@@ -367,20 +467,20 @@
     saveMe();
     var pass = $('passInput').value.trim();
     msg('');
-    checkOwner().then(function (ok) {
-      if (!ok) { msg('大将の合言葉がちがいます'); return; }
-      return roomFor(pass).then(function (room) {
-        if (SHOP.PASSCODE_HASH) lsSet('iz-pass', pass);
-        connect(room);
-        var wait = 0;
-        (function go() {   // つながるのを少し待つ
-          if (!net.ready && wait++ < 40) { setTimeout(go, 150); return; }
+    roomFor(pass).then(function (room) {
+      if (SHOP.PASSCODE_HASH) lsSet('iz-pass', pass);
+      connect(room);
+      var wait = 0;
+      (function go() {   // つながるのを少し待つ(マスターの合言葉は 店のデータの予定と くらべるので)
+        if (!net.ready && wait++ < 40) { setTimeout(go, 150); return; }
+        checkOwner().then(function (ok) {
+          if (!ok) { msg(SHOP.OWNER_HASH && !$('ownerPass').value.trim() ? '合言葉を入れてください' : '合言葉がちがいます'); return; }
           var s = status(now());
           if (!LOCAL && !OWNER_MODE && s.phase === 'closed') { msg('いまは準備中です'); return; }
           enter(name);
-        })();
-      }).catch(function () { msg('合言葉がちがいます'); });
-    });
+        });
+      })();
+    }).catch(function () { msg('お店の合言葉がちがいます'); });
   };
 
   /* ---------------- 店に入る・出る ---------------- */
@@ -392,9 +492,10 @@
     Object.keys(tree.events || {}).forEach(function (k) { seenEvt[k] = 1; });
     net.set('members/' + ME.uid, { name: name, avatar: myAvatar(), owner: OWNER_MODE, at: TS, seen: TS, voice: myAvatar().voice || 0 });
     if (OWNER_MODE) {
-      net.update('state', { ownerAvatar: ownerAvatar, ownerName: name });
-      sys('🏮 大将の' + name + 'が店に立ちました');
+      net.update('state', { ownerAvatar: ownerAvatar, ownerName: name, ownerRole: ROLE });
+      sys(ROLE === 'master' ? '🏮 今回のマスター ' + name + 'さんが店に立ちました' : '🏮 大将の' + name + 'が店に立ちました');
     }
+    document.body.classList.toggle('is-nobu', OWNER_MODE && ROLE === 'nobu');
     $('entrance').classList.add('hidden');
     $('shop').classList.remove('hidden');
     $('bBot').classList.toggle('hidden', !LOCAL);
@@ -529,7 +630,7 @@
     var key = String(seat);
     var b = bubbles[key];
     if (!b) { b = bubbles[key] = { el: document.createElement('div'), bn: document.createElement('div'), bt: document.createElement('div') }; b.bn.className = 'bn'; b.bt.className = 'bt'; b.el.appendChild(b.bn); b.el.appendChild(b.bt); }
-    if (!b.el.parentNode) b.el.style.display = 'none';   // 置き場所が決まるまでは隠す
+    b.el.style.display = 'none';   // 中身が変わったら、次に置き場所が決まるまで隠す(古い場所で一瞬重ならないように)
     $('bubbles').appendChild(b.el);   // いちばん新しい吹き出しを、いちばん手前に
     b.el.className = 'bubble' + (phrase ? ' phrase' : '') + (text.length > 50 ? ' long' : '');
     b.bt.textContent = text; b.bt.scrollTop = 0;
@@ -553,6 +654,13 @@
     if (t.textContent !== text) t.textContent = text;
     return t;
   }
+  /* カウンターの中の人の名前: いれば その人、いなければ 今回のマスターか 大将 */
+  function ownerLabel() {
+    var st = tree.state || {};
+    if (ownerPresent() && st.ownerName) return st.ownerRole === 'master' ? 'マスター ' + st.ownerName : st.ownerName;
+    var c = curSession(); if (c && c.plan && c.plan.master) return 'マスター ' + c.plan.master;
+    return SHOP.OWNER_NAME;
+  }
   function placeOverlays() {
     if (!scene) return;
     var a = scene.anchors(), ms = members(), used = {};
@@ -560,7 +668,7 @@
     var put = function (key, cls, text, p, click) { if (!p) return; var t = tagEl(key, cls, text, click); t.style.left = p.x + 'px'; t.style.top = p.y + 'px'; t.style.display = ''; used[key] = 1; };
     if (showTags) {
       var st = tree.state || {};
-      put('owner', 'owner', (st.ownerName || SHOP.OWNER_NAME) + (ownerPresent() ? '' : '(おまかせ中)'), a.owner);
+      put('owner', 'owner', ownerLabel() + (ownerPresent() ? '' : '(おまかせ中)'), a.owner);
       var resv = reservationsNow();
       for (var i = 0; i < N; i++) {
         var uid = seatUid(i), m = uid && ms[uid];
@@ -599,7 +707,7 @@
     list.forEach(function (it) {
       var b = it.b, p = it.p;
       // 名前(ずらしたときだけ見える)
-      var nm = it.k === 'owner' ? ((tree.state && tree.state.ownerName) || SHOP.OWNER_NAME) : (function () { var u = seatUid(+it.k), m = u && ms[u]; return m ? m.name : ''; })();
+      var nm = it.k === 'owner' ? ownerLabel() : (function () { var u = seatUid(+it.k), m = u && ms[u]; return m ? m.name : ''; })();
       if (b.bn.textContent !== nm) b.bn.textContent = nm;
       b.el.style.display = '';
       b.el.classList.remove('moved');   // 測る前に、名前の行を消しておく(ずらすときに付けて、測りなおす)
@@ -763,11 +871,15 @@
     if (mySeat < 0) { toast('先に席に座ってください'); return; }
     var why = whyNot(mySeat, id);
     if (why) { toast(why === '飲み物は1杯ずつ' ? '飲み物は1杯ずつです。飲み終わったら頼めます' : 'テーブルがいっぱいです。食べ終わったら頼めます', 2400); return; }
-    net.push('orders', { uid: ME.uid, name: currentName(), seat: mySeat, item: id, at: TS });
-    event({ type: 'order', seat: mySeat, item: id });
     var it = menuItem(id);
-    toast((it ? it.emoji + ' ' + it.name : '') + ' を注文しました', 1600);
     closeSheet();
+    net.push('orders', { uid: ME.uid, name: currentName(), seat: mySeat, item: id, at: TS }).then(function (key) {
+      toast((it ? it.emoji + ' ' + it.name : '') + ' を注文しました', 3000, '取り消す', function () {
+        if ((tree.orders || {})[key]) { net.remove('orders/' + key); toast('注文を取り消しました', 1500); }
+        else toast('もう出てきました(食べ終わると、また頼めます)', 2000);
+      });
+    });
+    event({ type: 'order', seat: mySeat, item: id });
   }
   function serve(seat, id, orderKey) {
     var o = tree.orders || {};
@@ -804,7 +916,7 @@
     // 大将がいないときは、注文を自動で出す
     if (!ownerPresent()) {
       var o = tree.orders || {};
-      Object.keys(o).forEach(function (k) { if (n - (o[k].at || n) > 2500) serve(o[k].seat, o[k].item, k); });
+      Object.keys(o).forEach(function (k) { if (n - (o[k].at || n) > 3000) serve(o[k].seat, o[k].item, k); });   // 3秒は取り消せる
     }
     // 食べ終わって(空になって)5秒たった物を下げる
     for (var t2 = 0; t2 < N; t2++) {
@@ -882,19 +994,6 @@
   }
   function refreshSheet(force) {
     var body = $('shBody'), html = '', title = '';
-    if (sheetKind === 'quick') {
-      if (!force) return;
-      var it = menuItem(sheetArg); if (!it) { closeSheet(); return; }
-      var why = whyNot(mySeat, it.id);
-      $('shTitle').textContent = '木札から注文';
-      body.innerHTML = '<div class="quick"><span class="q-emoji">' + it.emoji + '</span><div class="q-name">' + esc(it.name) + (it.pun ? ' <i class="mn-badge" style="position:static">名物</i>' : '') + '</div>' +
-        '<div class="q-desc">' + esc(it.desc || '') + '</div>' + (why ? '<div class="q-why">いまは頼めません(' + esc(why) + ')</div>' : '') +
-        '<div class="btn-row" style="justify-content:center;margin-top:10px">' + (why ? '' : '<button id="qOrder" class="red">🙋 これを頼む</button>') + '<button id="qMenu">📜 お品書きを見る</button></div></div>';
-      body._h = '';
-      var qo = body.querySelector('#qOrder'); if (qo) qo.onclick = function () { order(it.id); };
-      body.querySelector('#qMenu').onclick = function () { menuCat = it.cat || menuCat; sheetKind = 'menu'; refreshSheet(true); };
-      return;
-    }
     if (sheetKind === 'menu' || sheetKind === 'seat') {
       var seatM = sheetKind === 'menu' ? mySeat : sheetArg;
       if (sheetKind === 'seat') { var u2 = seatUid(seatM), m2 = u2 && members()[u2]; if (!m2) { closeSheet(); return; } title = (seatM + 1) + '番 ' + m2.name + 'さんに出す'; }
@@ -946,7 +1045,21 @@
         '<button id="openBtn">🏮 臨時で開ける(1時間)</button><button id="closeBtn" class="red">🌙 閉店する</button></div>' +
         '<p class="small-note">いま: ' + (LOCAL ? 'おためしモード' : s.phase === 'open' ? '営業中(' + fmtTime(s.end) + 'まで)' : s.phase === 'doors' ? 'まもなく開店' : '準備中') + '</p>' +
         '<div class="sh-sec">片づけ</div><div class="btn-row"><button id="clearChat">💬 会話を全部消す</button><button id="clearTables">🍽️ 料理を下げる</button></div>' +
-        '<div class="sh-sec">大将の見た目</div><div class="btn-row"><button id="ownerLook">🎨 アバターを作りなおす</button></div>';
+        '<div class="sh-sec">大将の見た目</div><div class="btn-row"><button id="ownerLook">🎨 アバターを作りなおす</button></div>' +
+        (ROLE === 'nobu' ? '<div class="sh-sec">お店の予定</div><div class="btn-row"><button id="planBtn" class="red">📅 お店の予定・マスター交代・席の数</button></div>' : '<p class="small-note">お店の予定は ノブさんだけが直せます。</p>');
+    } else if (sheetKind === 'plan') {
+      title = 'お店の予定';
+      html = planListHTML();
+      if (!force && body._h === html) return;
+    } else if (sheetKind === 'planEdit') {
+      if (!force) return;
+      title = '回の決まりを直す';
+      html = planEditHTML(sheetArg);
+    } else if (sheetKind === 'planAdd') {
+      if (!force) return;
+      title = '臨時の日を足す';
+      html = '<div class="pl-form"><label>日にち<input type="date" id="paDate"></label><label>はじまり<input type="time" id="paStart" value="21:00"></label><label>おわり<input type="time" id="paEnd" value="22:00"></label>' +
+        '<div class="btn-row"><button id="paSave" class="red">足す</button><button id="paBack">もどる</button></div><p class="small-note">足したあと、その日の店の名前・マスター・席の数を決められます。</p></div>';
     } else if (sheetKind === 'bot') {
       if (!force) return;
       title = 'おためし客';
@@ -977,12 +1090,99 @@
       q('#clearChat').onclick = function () { if (confirm('会話を全部消しますか?')) { net.remove('chat'); closeSheet(); } };
       q('#clearTables').onclick = function () { net.remove('tables'); closeSheet(); };
       q('#ownerLook').onclick = function () { closeSheet(); openMaker(); };
+      var pb = q('#planBtn'); if (pb) pb.onclick = function () { openSheet('plan'); };
+    } else if (sheetKind === 'plan') {
+      body.querySelectorAll('[data-pedit]').forEach(function (b) { b.onclick = function () { openSheet('planEdit', b.getAttribute('data-pedit')); }; });
+      q('#plAdd').onclick = function () { openSheet('planAdd'); };
+      var cp = q('#plCopy'); if (cp) cp.onclick = function () {
+        var ta = q('#plNews'); ta.select();
+        try { (navigator.clipboard ? navigator.clipboard.writeText(ta.value) : Promise.reject()).then(function () { toast('写しました。Claude に送ってください', 2200); }, function () { document.execCommand('copy'); toast('写しました', 1500); }); } catch (e) { toast('長押しで写してください'); }
+      };
+    } else if (sheetKind === 'planEdit') {
+      wirePlanEdit(sheetArg);
+    } else if (sheetKind === 'planAdd') {
+      q('#paBack').onclick = function () { openSheet('plan'); };
+      q('#paSave').onclick = function () {
+        var d = (q('#paDate').value || '').split('-'), a = hm(q('#paStart').value || '21:00');
+        if (d.length !== 3) { toast('日にちを選んでください'); return; }
+        var st = fromJst(+d[0], +d[1] - 1, +d[2], a[0], a[1]);
+        if (st < now() - 60 * MIN) { toast('すぎた日には足せません'); return; }
+        var k = sessKey(st);
+        net.update('schedule/' + k, { extra: true, end: q('#paEnd').value || '22:00', cancel: null }).then(function () { toast('臨時の日を足しました', 1500); openSheet('planEdit', k); });
+      };
     } else if (sheetKind === 'bot') {
       q('#botAdd').onclick = function () { addBot(); };
       q('#botAll').onclick = function () { for (var i = 0; i < N; i++) addBot(); };
       q('#botOut').onclick = function () { botsLeave(); closeSheet(); };
     }
   }
+  /* ---------------- お店の予定(ノブさんだけ) ---------------- */
+  function planList() { return upcoming(now() - 60 * MIN, 35, true).slice(0, 4).concat(extraLater()).filter(function (x, i, a) { return a.findIndex(function (y) { return y.key === x.key; }) === i; }).sort(function (x, y) { return x.start - y.start; }); }
+  function extraLater() { return upcoming(now() - 60 * MIN, 60, true).filter(function (x) { return x.plan.extra; }); }
+  function planListHTML() {
+    var h = '<p class="small-note">これから4回ぶんの予定です。回ごとに 店の名前・マスター・席の数・ひとことを決められます。</p><div class="list">';
+    planList().forEach(function (x) {
+      var p = x.plan;
+      h += '<div class="li' + (p.cancel ? ' off' : '') + '"><div class="t"><b>' + fmtDay(x.start) + ' ' + fmtTime(x.start) + '〜' + fmtTime(x.end) + '</b>' + (p.extra ? ' <i class="pl-tag">臨時</i>' : '') +
+        '<small>' + (p.cancel ? 'お休み' : esc(p.title || SHOP.NAME) + ' ・ ' + (p.master ? 'マスター ' + esc(p.master) + 'さん' : 'ノブさん') + ' ・ ' + seatsFor(x) + '席') + (p.message ? '<br>' + esc(p.message) : '') + '</small></div>' +
+        '<button data-pedit="' + x.key + '">直す</button></div>';
+    });
+    h += '</div><div class="btn-row" style="margin-top:10px"><button id="plAdd">➕ 臨時の日を足す</button></div>';
+    var nt = newsText();
+    h += '<div class="sh-sec">ホームページのお知らせに出す文</div><p class="small-note">予定を変えたら、この文を写して Claude に送ってください。ホームページの「居酒屋ノブ」のお知らせと、アプリの予定にのせます。</p>' +
+      '<textarea id="plNews" class="pl-news" readonly>' + esc(nt) + '</textarea><div class="btn-row"><button id="plCopy">📋 写す</button></div>';
+    return h;
+  }
+  /* news.json と同じ形の文(ホームページ用)。合言葉の指紋は のせない */
+  function newsText() {
+    var evs = upcoming(now() - 60 * MIN, 60, true).filter(function (x) { var p = x.plan; return p.extra || p.cancel || p.title || p.master || p.message || (p.seats && p.seats !== SHOP.SEATS); }).map(function (x) {
+      var p = x.plan, j = jst(x.start);
+      return { date: j.y + '-' + pad(j.m + 1) + '-' + pad(j.d), start: fmtTime(x.start).replace(/^(\d):/, '0$1:'), end: fmtTime(x.end).replace(/^(\d):/, '0$1:'),
+        title: p.title || SHOP.NAME, master: p.master || '', seats: seatsFor(x), message: p.message || '', cancel: !!p.cancel };
+    });
+    return JSON.stringify({ shop: SHOP.NAME, free: 'すべて無料です', weekly: weekly(), events: evs, notice: (NEWS && NEWS.notice) || '', app: (NEWS && NEWS.app) || 'https://roguepink.github.io/izakaya/', firebase: (NEWS && NEWS.firebase) || '' }, null, 1);
+  }
+  function findSess(key) { return upcoming(now() - DAY, 70, true).filter(function (x) { return x.key === key; })[0]; }
+  function planEditHTML(key) {
+    var x = findSess(key); if (!x) return '<p>その回は見つかりませんでした</p>';
+    var p = x.plan, other = !!p.master, opts = '';
+    for (var i = 1; i <= MAXS; i++) opts += '<option value="' + i + '"' + (i === seatsFor(x) ? ' selected' : '') + '>' + i + '席' + (i === SHOP.SEATS ? '(いつも)' : '') + (i > 10 ? '(スマホだと見にくい)' : '') + '</option>';
+    return '<div class="pl-form"><div class="pl-when">' + fmtDay(x.start) + ' ' + fmtTime(x.start) + '〜' + fmtTime(x.end) + (p.extra ? ' ・ 臨時' : '') + '</div>' +
+      '<label>店の名前<input id="peTitle" maxlength="16" value="' + esc(p.title || SHOP.NAME) + '"></label>' +
+      '<div class="pl-lbl">マスター(カウンターの中に立つ人)</div><div class="opts pl-opts"><button data-master="me" class="' + (other ? '' : 'on') + '">ノブさん(自分)</button><button data-master="other" class="' + (other ? 'on' : '') + '">ほかの人</button></div>' +
+      '<div id="peOther" class="' + (other ? '' : 'hidden') + '"><label>マスターの名前<input id="peMaster" maxlength="12" value="' + esc(p.master || '') + '" placeholder="例: さくら"></label>' +
+      '<label>マスターの合言葉<input id="pePass" maxlength="40" placeholder="' + (p.masterHash ? '(決めてあります。変えるときだけ入れる)' : 'その人にだけ教える合言葉') + '" autocomplete="off"></label>' +
+      '<p class="small-note">マスターになる人は、大将用のアプリ(owner.html)を開いて、この合言葉で入ります。合言葉は この回だけ使えます。ノブさんは、お客さん用のアプリから お客さんとして入れます。</p></div>' +
+      '<label>席の数<select id="peSeats">' + opts + '</select></label>' +
+      '<label>ひとこと(お知らせ)<textarea id="peMsg" maxlength="120" placeholder="例: さくらさんの誕生日会です！">' + esc(p.message || '') + '</textarea></label>' +
+      '<label class="pl-check"><input type="checkbox" id="peCancel"' + (p.cancel ? ' checked' : '') + '> この回はお休みにする</label>' +
+      '<div class="btn-row"><button id="peSave" class="red">保存する</button><button id="peBack">もどる</button>' + (p.extra ? '<button id="peDel">この臨時の日を消す</button>' : '') + '</div></div>';
+  }
+  function wirePlanEdit(key) {
+    var body = $('shBody'), q = function (sel) { return body.querySelector(sel); };
+    var x = findSess(key); if (!x) return;
+    var mode = x.plan.master ? 'other' : 'me';
+    body.querySelectorAll('[data-master]').forEach(function (b) { b.onclick = function () { mode = b.getAttribute('data-master'); body.querySelectorAll('[data-master]').forEach(function (c) { c.classList.toggle('on', c === b); }); q('#peOther').classList.toggle('hidden', mode !== 'other'); }; });
+    q('#peBack').onclick = function () { openSheet('plan'); };
+    var dl = q('#peDel'); if (dl) dl.onclick = function () { if (confirm('この臨時の日を消しますか?')) net.remove('schedule/' + key).then(function () { openSheet('plan'); }); };
+    q('#peSave').onclick = function () {
+      var title = q('#peTitle').value.trim(), seats = +q('#peSeats').value, msgT = q('#peMsg').value.trim(), cancel = q('#peCancel').checked;
+      var up = { title: title && title !== SHOP.NAME ? title : null, seats: seats !== SHOP.SEATS ? seats : null, message: msgT || null, cancel: cancel || null };
+      var done = function () { net.update('schedule/' + key, up).then(function () { toast('保存しました', 1500); openSheet('plan'); }); };
+      if (mode === 'me') { up.master = null; up.masterHash = null; done(); return; }
+      var mn = q('#peMaster').value.trim(), pw = q('#pePass').value.trim();
+      if (!mn) { toast('マスターの名前を入れてください'); return; }
+      if (!pw && !x.plan.masterHash) { toast('マスターの合言葉を決めてください'); return; }
+      if (pw && pw.length < 4) { toast('合言葉は4文字以上にしてください'); return; }
+      up.master = mn;
+      if (!pw) { done(); return; }
+      Net.sha256(pw).then(function (h) {
+        if (SHOP.OWNER_HASH && h === SHOP.OWNER_HASH) { toast('ノブさんの合言葉とは別のものにしてください'); return; }
+        up.masterHash = h; done();
+      }).catch(function () { toast('この端末では合言葉を作れませんでした(https で開いてください)'); });
+    };
+  }
+
   function pushQueue(item) {
     var q = tree.queue || {}, keys = Object.keys(q);
     if (keys.length >= SHOP.MAX_QUEUE) { toast('順番待ちがいっぱいです'); return; }
@@ -1111,7 +1311,7 @@
       return h + swatch('はだの色', 'skin', AVATAR.SKIN);
     } },
     { name: '目', build: function () { return opts('目', 'eyes') + swatch('目の色', 'eyeColor', AVATAR.EYE_COLOR); } },
-    { name: '髪', build: function () { return opts('髪型', 'hair') + swatch('髪の色', 'hairColor', AVATAR.HAIR_COLOR); } },
+    { name: '髪', build: function () { return opts('髪型', 'hair') + (draft.sex === 'm' && draft.hair === 'back' ? '' : opts('前髪', 'bangs')) + opts('アホ毛', 'ahoge') + swatch('髪の色', 'hairColor', AVATAR.HAIR_COLOR); } },
     { name: '服', build: function () { return opts('服', 'top') + swatch('服の色', 'topColor', AVATAR.CLOTH_COLOR); } },
     { name: '小物', build: function () { return opts('小物', 'acc'); } },
     { name: '体と声', build: function () { return sizeVoice(); } }
@@ -1264,8 +1464,11 @@
 
   /* ---------------- お知らせ ---------------- */
   var toastT = 0;
-  function toast(t, ms) {
+  /* お知らせ。label と fn を渡すと、ボタン(「取り消す」など)が付く */
+  function toast(t, ms, label, fn) {
     var el = $('toast'); el.textContent = t; el.classList.remove('hidden');
+    if (label) { var b = document.createElement('button'); b.className = 'toast-btn'; b.textContent = label; b.onclick = function (e) { e.stopPropagation(); el.classList.add('hidden'); fn(); }; el.appendChild(b); }
+    el.classList.toggle('has-btn', !!label);
     clearTimeout(toastT); toastT = setTimeout(function () { el.classList.add('hidden'); }, ms || 2600);
   }
 

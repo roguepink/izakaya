@@ -37,7 +37,9 @@
     <div class="sign-sub">週に一度の</div>
     <h1 id="shopName">居酒屋ノブ</h1>
     <div id="openState" class="open-state"></div>
+    <div id="masterNote" class="master-note hidden"></div>
     <div id="schedule" class="schedule"></div>
+    <div class="free">すべて無料です</div>
   </div>
   <div class="card">
     <div class="me-row">
@@ -92,7 +94,7 @@
     <div class="mk-title">席を予約</div>
     <span></span>
   </div>
-  <p class="rs-help">予約は<b>開店の3時間前から</b>できます。空いている席を押すと予約、もう一度押すと取り消し。<br>予約の席は、開店から <b id="holdMin">15</b> 分まで取っておきます。</p>
+  <p class="rs-help"><b class="free" style="margin:0 0 6px">すべて無料です</b><br>予約は<b>開店の3時間前から</b>できます。空いている席を押すと予約、もう一度押すと取り消し。<br>予約の席は、開店から <b id="holdMin">15</b> 分まで取っておきます。</p>
   <div id="rsList"></div>
 </section>
 
@@ -157,10 +159,10 @@
 <script>
   window.INSTALL_GATE = { id: 'izakaya-owner', name: '居酒屋ノブ 大将', icon: 'owner/icon-192.png',
     tagline: '大将の店に立つためのアプリ',
-    desc: '居酒屋ノブの大将(お店の人)用です。お客さん用とは別のアプリとしてホーム画面に入ります。注文票・料理を出す・開け閉めができます。',
+    desc: 'すべて無料です。居酒屋ノブの大将(お店の人)と、その回のマスター用です。お客さん用とは別のアプリとしてホーム画面に入ります。注文票・料理を出す・開け閉めができます。',
     points: ['注文票と ベルの音で 注文が分かる', 'お客さんの席を押して 料理を出せる', '臨時の開店・閉店ができる'],
     shots: ['shots/1.jpg', 'shots/2.jpg', 'shots/3.jpg'], badges: ['無料', '広告なし', '登録なし'], color: '#c8261c', playLabel: '▶ このまま店に立つ',
-    note: 'お話にはインターネットが必要です' };
+    note: 'すべて無料です ・ お話にはインターネットが必要です' };
 </script>
 <script src="install.js"></script>
 </body>
