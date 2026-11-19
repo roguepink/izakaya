@@ -50,7 +50,14 @@ function woodTex(base, line, w = 512, h = 128, rep = 1) {
    ===================================================================== */
 const GRAD = (() => { const t = new THREE.DataTexture(new Uint8Array([90, 90, 90, 255, 170, 170, 170, 255, 255, 255, 255, 255]), 3, 1, THREE.RGBAFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
 const TOONS = {};
-function toon(color, o) { const k = color + JSON.stringify(o || {}); return TOONS[k] || (TOONS[k] = new THREE.MeshToonMaterial(Object.assign({ color, gradientMap: GRAD }, o))); }
+/* 肌は影をうすく・なめらかに(3段のくっきりした影だと、顔の半分が暗く見える) */
+const SKIN_GRAD = (() => { const t = new THREE.DataTexture(new Uint8Array([200, 200, 200, 255, 228, 228, 228, 255, 246, 246, 246, 255, 255, 255, 255, 255]), 4, 1, THREE.RGBAFormat); t.minFilter = t.magFilter = THREE.LinearFilter; t.needsUpdate = true; return t; })();
+const SKIN_SET = new Set();
+function toon(color, o) {
+  const skin = typeof color === 'string' && SKIN_SET.has(color.toLowerCase());
+  const k = (skin ? 's:' : '') + color + JSON.stringify(o || {});
+  return TOONS[k] || (TOONS[k] = new THREE.MeshToonMaterial(Object.assign({ color, gradientMap: skin ? SKIN_GRAD : GRAD }, o)));
+}
 const LINE_M = new THREE.MeshBasicMaterial({ color: '#2a1810', side: THREE.BackSide });
 /* ふち線: 形を 面の向きに少し ふくらませた黒い殻(内がわだけ描く)。細かい部品でも きれいに出る */
 function outlineOf(geo, th) {
@@ -92,11 +99,10 @@ function faceTexture(a) {
     }
     // ひげ(男性)
     const bc = shade(hairC, 0.9);
-    if (a.beard === 'stubble' || a.beard === 'full') {
+    if (a.beard === 'stubble') {
       g.fillStyle = 'rgba(60,45,40,0.22)'; g.beginPath(); g.moveTo(150, 340); g.quadraticCurveTo(256, 470, 362, 340); g.quadraticCurveTo(256, 400, 150, 340); g.fill();
       g.fillStyle = 'rgba(40,30,28,0.35)'; for (let k = 0; k < 260; k++) { const tt = Math.random() * Math.PI, r = 70 + Math.random() * 40; g.fillRect(256 + Math.cos(tt) * r * 1.2, 330 + Math.sin(tt) * r * 0.75, 2, 2); }
     }
-    if (a.beard === 'chin' || a.beard === 'full') { g.fillStyle = bc; g.beginPath(); g.moveTo(206, 392); g.quadraticCurveTo(256, 470, 306, 392); g.quadraticCurveTo(256, 418, 206, 392); g.fill(); }
     if (a.beard === 'mustache' || a.beard === 'full') { g.fillStyle = bc; g.beginPath(); g.moveTo(206, 356); g.quadraticCurveTo(232, 336, 256, 348); g.quadraticCurveTo(280, 336, 306, 356); g.quadraticCurveTo(256, 352, 206, 356); g.fill(); }
     // まゆ
     const browC = shade(hairC === '#e8e2d8' ? '#9a8a7a' : hairC, 0.85);
@@ -315,6 +321,7 @@ function hairTint(geo, R) {
   return geo;
 }
 function buildHair(head, a, R, D) {
+  const HAT = !a.owner && (a.acc === 'cap' || a.acc === 'beanie' || a.acc === 'beret');   // 帽子をかぶっているときは、帽子の中に入る てっぺんの毛は作らない(帽子から突きぬけないように)
   const hc = AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor);
   const dark = shade(hc, 0.78);
   const F = a.sex === 'f';
@@ -323,6 +330,7 @@ function buildHair(head, a, R, D) {
   const shell = (o) => { VOL = o.vol ?? 0.07; const m = add(hairShell(D, R, Object.assign({ f: 0.95, s: 1.65, b: 2.0, vol: 0.07, crown: 0.03 }, o)), o.color || hc, 0); m.material = toon(o.color || hc, { side: THREE.DoubleSide, vertexColors: true }); return m; };
   const st = (s, w = 0.03, flat = 0.4, blunt = 0, color) => { if (s.vol == null) s.vol = VOL; return add(strandGeo(strandPath(D, R, s), w, flat, blunt, s.wave || 0), color); };
   const spike = (th, ph, len, w = 0.05, back = 0.35) => {   // ツンツン: 根もとから 外へ、少し上・後ろへ
+    if (HAT) return;
     const r = R * (1.06 + VOL * Math.pow(Math.max(0, Math.cos(th)), 1.4)); const p0 = sp(D, R, th, ph, r * 0.97);
     const n = p0.clone().normalize(); const up = new THREE.Vector3(0, 1, -back).normalize();
     const pts = [p0, p0.clone().addScaledVector(n, len * 0.45).addScaledVector(up, len * 0.15), p0.clone().addScaledVector(n, len * 0.8).addScaledVector(up, len * 0.35), p0.clone().addScaledVector(n, len).addScaledVector(up, len * 0.55)];
@@ -339,7 +347,7 @@ function buildHair(head, a, R, D) {
     if (layer2) row(n - 2, Math.PI - spread / 2.4, Math.PI + spread / 2.4, (ph, t, k) => st({ th: 0.3, ph, len: len * 0.82, curl: curl * 0.8, flare: 0.14, lift: 0.03, wave }, w * 1.05));
   };
   const nape = (len = R * 0.9) => row(7, Math.PI - 1.1, Math.PI + 1.1, (ph, t, k) => st({ th: 0.9, ph, len, curl: 0.05, flare: 0.02 }, 0.04));
-  const topTex = (n = 7, back = true) => row(n, -0.9, 0.9, (ph, t, k) => st({ th: 0.12, ph: ph + (back ? Math.PI : 0), len: R * 0.9, leave: 3, lift: 0.025, sweep: 0 }, 0.05, 0.3));
+  const topTex = (n = 7, back = true) => HAT ? 0 : row(n, -0.9, 0.9, (ph, t, k) => st({ th: 0.12, ph: ph + (back ? Math.PI : 0), len: R * 0.9, leave: 3, lift: 0.025, sweep: 0 }, 0.05, 0.3));
 
   /* ---- 前髪 ---- */
   const bangs = () => {
@@ -381,7 +389,7 @@ function buildHair(head, a, R, D) {
   // 顔まわり(触角): 顔の横に そう 長めの毛。あると顔が小さく かわいく見える
   const frame = (endY = -0.95, w = 0.032, curl = -0.15, wave = 0) => [-1, 1].forEach((sg) => { [0.98, 1.12].forEach((ph, k) => st({ th: 0.5 + k * 0.08, ph: sg * ph, endY: endY + k * 0.12, curl, flare: -0.05, sweep: -sg * 0.05, wave, leave: 1.35, inward: 1 }, w - k * 0.004)); });
   // てっぺん: つむじ(後ろの上)から 流れる毛
-  const crown = (n = 14, len = 1.0) => { for (let k = 0; k < n; k++) { const ph = Math.PI + (k / n - 0.5) * Math.PI * 1.9; st({ th: 0.24, ph, endY: null, len: R * len, leave: 3, lift: -0.012, sweep: 0 }, 0.06, 0.28); } };
+  const crown = (n = 14, len = 1.0) => { if (HAT) return; for (let k = 0; k < n; k++) { const ph = Math.PI + (k / n - 0.5) * Math.PI * 1.9; st({ th: 0.24, ph, endY: null, len: R * len, leave: 3, lift: -0.012, sweep: 0 }, 0.06, 0.28); } };
   // 結び目へ 引っぱられる毛(ポニーテール・ツインテール・おだんご): 生えぎわから 結び目まで 頭の表面を通る
   const pull = (tieTh, tiePh, n = 16, w = 0.05) => {
     const T = sp(D, R, tieTh, tiePh, 1).normalize();
@@ -461,7 +469,7 @@ function buildHair(head, a, R, D) {
       case 'medium':   shell({ f: 0.85, s: 1.85, b: 2.2, vol: 0.09, part: -0.4 }); crown(); frame(-0.7, 0.03, -0.1); fSides(-0.75, 4, -0.2, 0.046); fBacks(-0.85, 11, -0.15, 0.054); break;
       case 'wolf':     shell({ f: 0.88, s: 1.75, b: 2.2, vol: 0.1, crown: 0.05 }); crown(13, 0.95); fSides(-0.35, 3, 0.28, 0.045, 0, 1.25, 1.85); fBacks(-1.3, 10, 0.4, 0.05); break;
       case 'perm':     shell({ f: 0.85, s: 1.8, b: 2.15, vol: 0.15 }); crown(14, 1.0); fSides(-0.42, 4, 0.22, 0.05, 0.013); fBacks(-0.62, 11, 0.28, 0.058, 0.015);
-        for (let k = 0; k < 10; k++) st({ th: 0.3 + (k % 2) * 0.3, ph: (k / 10) * Math.PI * 2, len: L(0.55), lift: 0.05, puff: 0.12, curl: 0.35, wave: 0.012, leave: 1.3 }, 0.045); break;
+        if (!HAT) for (let k = 0; k < 10; k++) st({ th: 0.3 + (k % 2) * 0.3, ph: (k / 10) * Math.PI * 2, len: L(0.55), lift: 0.05, puff: 0.12, curl: 0.35, wave: 0.012, leave: 1.3 }, 0.045); break;
       case 'spiky':    shell({ f: 0.92, s: 1.6, b: 1.95, vol: 0.07 }); fSides(-0.08, 3, 0.1, 0.04, 0, 1.3, 1.9); fBacks(-0.38, 9, 0.12, 0.05, 0, 2.2);
         row(6, -Math.PI * 0.85, Math.PI * 0.85, (ph, t, k) => spike(0.35, ph + Math.PI, L(0.5) + jit(k, 0.03), 0.075, 0.8));   // てっぺん: 後ろへ
         row(8, -Math.PI * 0.9, Math.PI * 0.9, (ph, t, k) => spike(0.8, ph + Math.PI, L(0.42) + jit(k + 3, 0.03), 0.07, 0.5)); spike(0.05, 0, L(0.5), 0.08, 0.6); break;
@@ -473,9 +481,9 @@ function buildHair(head, a, R, D) {
     }
   }
   head.userData.hairR = R * (1.045 + VOL + 0.04);   // 髪のいちばん外がわ(帽子・カチューシャの大きさの目安)
-  if (a.hair !== 'buzz') { const cp = new THREE.Mesh(hairTint(new THREE.SphereGeometry(R * (1.045 + VOL + 0.032), 28, 6, 0, Math.PI * 2, 0, 0.4), R), toon(hc, { vertexColors: true })); cp.rotation.x = -0.12; head.add(cp); }   // つむじ
+  if (a.hair !== 'buzz' && !HAT) { const cp = new THREE.Mesh(hairTint(new THREE.SphereGeometry(R * (1.045 + VOL + 0.032), 28, 6, 0, Math.PI * 2, 0, 0.4), R), toon(hc, { vertexColors: true })); cp.rotation.x = -0.12; head.add(cp); }   // つむじ
   if (!(a.sex === 'm' && (a.hair === 'back' || a.hair === 'buzz'))) bangs();
-  if (a.ahoge === 'on') ahoge();
+  if (a.ahoge === 'on' && !HAT) ahoge();
 }
 
 /* ---------- 体と服 ---------- */
@@ -656,7 +664,7 @@ function bakeAvatar(root, pivots, skip) {
 function buildAvatar(raw, opt = {}) {
   const a = AVATAR.fix(raw) || AVATAR.fallback(1);
   const f = a.sex === 'f';
-  const skinC = AVATAR.color(AVATAR.SKIN, a.skin);
+  const skinC = AVATAR.color(AVATAR.SKIN, a.skin); SKIN_SET.add(String(skinC).toLowerCase());
   const def = TOP_DEF[a.top] || { sleeve: 'long' };
   const cc = def.color || AVATAR.color(AVATAR.CLOTH_COLOR, a.topColor);
   const root = new THREE.Group();
@@ -672,7 +680,7 @@ function buildAvatar(raw, opt = {}) {
   body.add(tm(new THREE.CylinderGeometry(0.032, 0.038, 0.09, 14), skinC, 0, 0.465, 0, LN));
   [-1, 1].forEach((s) => { const sh = tm(new THREE.SphereGeometry(f ? 0.042 : 0.05, 16, 12), cc, (f ? 0.112 : 0.13) * s, 0.37, -0.008, LN); sh.scale.set(1, 0.85, 0.9); body.add(sh); });
   // 腕(袖の形は服で変わる)。 肩から 前へ出して カウンターに置く形
-  const arms = [];
+  const arms = [], fores = [], hands = [];
   [-1, 1].forEach((s) => {
     const sh = new THREE.Group(); sh.position.set((f ? 0.125 : 0.145) * s, 0.375, 0);
     const wide = def.sleeve === 'wide', puff = def.sleeve === 'puff', short = def.sleeve === 'short' || puff;
@@ -688,12 +696,16 @@ function buildAvatar(raw, opt = {}) {
     const palm = tm(new THREE.SphereGeometry(0.032, 14, 10), skinC, 0, 0, 0, LN); palm.scale.set(0.95, 1.15, 0.7); hand.add(palm);
     const thumb = tm(new THREE.CapsuleGeometry(0.011, 0.02, 4, 8), skinC, -s * 0.026, 0.008, 0.012, LN); thumb.rotation.z = s * 0.7; hand.add(thumb);
     sh.rotation.x = -0.45; sh.rotation.z = 0.06 * s;
-    body.add(sh); arms.push(sh);
+    body.add(sh); arms.push(sh); fores.push(fore); hands.push(hand);
   });
-  const cheerMug = new THREE.Group();
-  cheerMug.add(mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.11, 12), mat('#f2b51c', { transparent: true, opacity: 0.92 }), 0, 0, 0));
-  cheerMug.add(mesh(new THREE.CylinderGeometry(0.047, 0.047, 0.03, 12), mat('#fbf7ec'), 0, 0.065, 0));
-  cheerMug.position.set(0, -0.31, 0.06); cheerMug.visible = false; arms[1].add(cheerMug);
+  /* 乾杯のジョッキ: 手に持つ(取っ手を にぎる)。ガラス + ビール + もこもこの あわ */
+  const cheerMug = new THREE.Group(), mugIn = new THREE.Group(); cheerMug.add(mugIn); mugIn.position.set(0, 0.035, 0.055);
+  mugIn.add(tm(new THREE.CylinderGeometry(0.044, 0.04, 0.11, 16), '#f2b51c', 0, 0, 0, 0.003));
+  mugIn.add(mesh(new THREE.CylinderGeometry(0.047, 0.043, 0.112, 16, 1, true), new THREE.MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.22, side: THREE.DoubleSide })));
+  for (let k = 0; k < 7; k++) { const an = k / 7 * Math.PI * 2; mugIn.add(tm(new THREE.SphereGeometry(0.019, 8, 6), '#fbf7ec', Math.cos(an) * 0.026, 0.062, Math.sin(an) * 0.026)); }
+  mugIn.add(tm(new THREE.SphereGeometry(0.026, 10, 8), '#fffdf6', 0, 0.07, 0));
+  const hdl = tm(new THREE.TorusGeometry(0.027, 0.008, 8, 14, Math.PI), '#e8eef2', 0, 0, -0.046, 0.002); hdl.rotation.z = -Math.PI / 2; hdl.rotation.y = Math.PI / 2; mugIn.add(hdl);
+  cheerMug.visible = false; hands[1].add(cheerMug);
 
   // 足(座っている形)
   if (!opt.standing) {
@@ -730,11 +742,24 @@ function buildAvatar(raw, opt = {}) {
   const faceGeo = deformGeo(new THREE.SphereGeometry(R * 1.004, 36, 28, Math.PI / 2 - 0.95, 1.9, Math.PI / 2 - 0.8, 1.6), D, R);
   const face = new THREE.Mesh(faceGeo, new THREE.MeshBasicMaterial({ map: faceTexture(a), transparent: true, depthWrite: false }));
   skull.add(face);
+  if (!f && a.beard && a.beard !== 'none' && a.beard !== 'mustache') {   // ひげ: あごの形に そった殻(あごひげ=あごの先、フル=もみあげから あご全体、ぶしょう=うすく)
+    const hcB = shade(AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor), 0.92);
+    const kind = a.beard, ph = kind === 'chin' ? 0.62 : 1.45, th0 = kind === 'chin' ? 2.25 : kind === 'full' ? 1.95 : 1.9;
+    const bg = new THREE.SphereGeometry(R * (kind === 'stubble' ? 1.006 : 1.03), 28, 14, Math.PI / 2 - ph, ph * 2, th0, Math.PI - 0.1 - th0), bp = bg.attributes.position;
+    for (let i = 0; i < bp.count; i++) {   // 上のふちを ぎざぎざに、あご先は 少し ふくらませる
+      const x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i), th = Math.acos(Math.max(-1, Math.min(1, y / (R * 1.03))));
+      const bulge = kind === 'stubble' ? 1 : 1 + 0.07 * Math.pow(Math.max(0, (th - th0) / (Math.PI - th0)), 1.2) * Math.max(0, z / R);
+      bp.setXYZ(i, x * bulge, y * (kind === 'stubble' ? 1 : 1.02), z * bulge);
+    }
+    deformGeo(bg, D, R);
+    if (kind === 'stubble') skull.add(new THREE.Mesh(bg, new THREE.MeshBasicMaterial({ color: '#3a2a24', transparent: true, opacity: 0.2, depthWrite: false })));
+    else { const bm = tm(bg, hcB, 0, 0, 0, LN); skull.add(bm); }
+  }
   buildHair(skull, a, R, D);
   buildAcc(skull, body, a, R, f);
   root.scale.setScalar(a.size);
-  root.userData = { body, head, arms, cheerMug, torso, t: Math.random() * 10, cheer: 0, talk: 0 };
-  if (!window.__nobake) bakeAvatar(root, [body, head, arms[0], arms[1]], new Set([cheerMug]));
+  root.userData = { body, head, arms, fores, cheerMug, torso, t: Math.random() * 10, cheer: 0, talk: 0 };
+  if (!window.__nobake) bakeAvatar(root, [body, head, arms[0], arms[1], fores[0], fores[1]], new Set([cheerMug]));
   return root;
 }
 
@@ -754,7 +779,7 @@ function buildAcc(head, body, a, R, f) {
     case 'thin': glasses('#b8963a', true); break;
     case 'sun': glasses('#1a1414', false, true); break;
     case 'cap': {   // キャップ: 前が高く後ろが低い山(6枚はぎ)+ てっぺんのボタン + 前に出る つば
-      const HR = head.userData.hairR || R * 1.12, cc = AVATAR.color(AVATAR.CLOTH_COLOR, a.topColor), g = new THREE.Group();
+      const HR = head.userData.hairR || R * 1.12, cc = AVATAR.color(AVATAR.CLOTH_COLOR, a.accColor), g = new THREE.Group();
       g.position.set(0, R * 0.12, -R * 0.02); g.rotation.x = -0.18; head.add(g);
       const dome = new THREE.SphereGeometry(HR * 1.1, 30, 14, 0, Math.PI * 2, 0, 1.42), dp = dome.attributes.position;
       for (let i = 0; i < dp.count; i++) { const z = dp.getZ(i), y = dp.getY(i); dp.setY(i, y * 0.86 + Math.max(0, z / HR) * 0.04 * HR); }   // 前を少し高く、全体は少し平たく
@@ -767,7 +792,7 @@ function buildAcc(head, body, a, R, f) {
       const bm = tm(brim, shade(cc, 0.85), 0, HR * 0.16, HR * 0.62, 0.003); bm.rotation.x = 0.14; g.add(bm);
       break; }
     case 'beanie': {   // ニット帽: 頭を深くおおう 編み目の帽子 + 折り返しのふち + ぼんぼり
-      const HR = head.userData.hairR || R * 1.12, bc = '#c87a3a', g = new THREE.Group(); g.position.set(0, R * 0.06, -R * 0.03); g.rotation.x = -0.12; head.add(g);
+      const HR = head.userData.hairR || R * 1.12, bc = AVATAR.color(AVATAR.CLOTH_COLOR, a.accColor), g = new THREE.Group(); g.position.set(0, R * 0.06, -R * 0.03); g.rotation.x = -0.12; head.add(g);
       const dome = new THREE.SphereGeometry(HR * 1.12, 32, 16, 0, Math.PI * 2, 0, 1.62), dp = dome.attributes.position;
       for (let i = 0; i < dp.count; i++) dp.setY(i, dp.getY(i) * 1.06);
       dome.computeVertexNormals();
@@ -779,25 +804,50 @@ function buildAcc(head, body, a, R, f) {
     case 'necklace': case 'earring': break;
     case 'beret': {   // ベレー帽: 平たい丸い帽子を 少しななめに。てっぺんに小さな つまみ
       const HR = head.userData.hairR || R * 1.15, g = new THREE.Group(); g.position.set(R * 0.08, HR * 0.62, -R * 0.08); g.rotation.set(-0.15, 0, -0.28); head.add(g);
-      const b2 = tm(new THREE.SphereGeometry(HR * 1.08, 28, 14), '#8a2a3a', 0, 0, 0, 0.003); b2.scale.set(1.1, 0.4, 1.08); g.add(b2);
-      g.add(tm(new THREE.CylinderGeometry(HR * 0.82, HR * 0.85, HR * 0.08, 28), shade('#8a2a3a', 0.85), 0, -HR * 0.2, 0, 0.002));   // かぶり口
-      g.add(tm(new THREE.CylinderGeometry(0.006, 0.008, 0.03, 6), '#5a1a24', 0, HR * 0.38, 0)); break; }
+      const btc = AVATAR.color(AVATAR.CLOTH_COLOR, a.accColor); const b2 = tm(new THREE.SphereGeometry(HR * 1.08, 28, 14), btc, 0, 0, 0, 0.003); b2.scale.set(1.1, 0.4, 1.08); g.add(b2);
+      g.add(tm(new THREE.CylinderGeometry(HR * 0.82, HR * 0.85, HR * 0.08, 28), shade(btc, 0.85), 0, -HR * 0.2, 0, 0.002));   // かぶり口
+      g.add(tm(new THREE.CylinderGeometry(0.006, 0.008, 0.03, 6), shade(btc, 0.6), 0, HR * 0.38, 0)); break; }
     case 'band': { const HR = head.userData.hairR || R * 1.12, holder = new THREE.Group(); holder.rotation.x = -0.32; holder.position.set(0, R * 0.05, -R * 0.02);   // カチューシャ: 耳から耳へ、前髪の うしろを通す
-      const arc = new THREE.Mesh(new THREE.TorusGeometry(HR * 1.05, 0.016, 8, 36, Math.PI), toon('#c8263a')); arc.scale.z = 1.6; holder.add(arc); head.add(holder); break; }
+      const arc = new THREE.Mesh(new THREE.TorusGeometry(HR * 1.05, 0.016, 8, 36, Math.PI), toon(AVATAR.color(AVATAR.CLOTH_COLOR, a.accColor))); arc.scale.z = 1.6; holder.add(arc); head.add(holder); break; }
     case 'ribbon': { const HR = head.userData.hairR || R * 1.12, g = new THREE.Group(); g.position.set(HR * 0.7, HR * 0.78, HR * 0.08); g.rotation.set(0, 0.55, -0.6);   // リボン: 頭の右上(前から見える)
-      [-1, 1].forEach((s2) => { const w = tm(new THREE.ConeGeometry(0.05, 0.085, 4), '#e86a8a', s2 * 0.038, 0, 0, 0.003); w.rotation.z = s2 * Math.PI / 2; w.scale.z = 0.5; g.add(w); });
-      g.add(tm(new THREE.SphereGeometry(0.018, 8, 6), '#c84a6a')); head.add(g); break; }
+      const rc = AVATAR.color(AVATAR.CLOTH_COLOR, a.accColor);
+      [-1, 1].forEach((s2) => { const w = tm(new THREE.ConeGeometry(0.05, 0.085, 4), rc, s2 * 0.038, 0, 0, 0.003); w.rotation.z = s2 * Math.PI / 2; w.scale.z = 0.5; g.add(w); });
+      g.add(tm(new THREE.SphereGeometry(0.018, 8, 6), shade(rc, 0.85))); head.add(g); break; }
   }
-  if (!a.owner && (a.acc === 'earring')) [-1, 1].forEach((s2) => {   // イヤリング: 耳たぶから下がる 金の輪と しずく(髪の外がわに見えるように)
-    const x = s2 * (head.userData.hairR || R * 1.1) * 0.93, y = -R * 0.42, z = R * 0.2;
-    head.add(tm(new THREE.SphereGeometry(0.009, 8, 6), '#e8c84a', x, y, z)); const hoop = tm(new THREE.TorusGeometry(0.016, 0.0035, 6, 16), '#e8c84a', x, y - 0.02, z); hoop.rotation.y = Math.PI / 2; head.add(hoop);
-    head.add(tm(new THREE.SphereGeometry(0.011, 8, 6), '#f2f2f8', x, y - 0.04, z));
+  /* ---- イヤリング・ネックレス(キャラクターなので 大きめ・はっきりした形に) ---- */
+  const heartGeo = (sz, d = 0.006) => { const pts = []; for (let k = 0; k < 28; k++) { const t = (k / 28) * Math.PI * 2; pts.push([16 * Math.pow(Math.sin(t), 3) * sz / 17, (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * sz / 17]); } return shapeGeo(pts, d, 0.0015); };
+  const starGeo = (sz, d = 0.006) => { const pts = []; for (let k = 0; k < 10; k++) { const an = Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? sz * 0.45 : sz; pts.push([Math.cos(an) * r, Math.sin(an) * r]); } return shapeGeo(pts, d, 0.0015); };
+  const flower = (sz, c1, c2) => { const g = new THREE.Group(); for (let k = 0; k < 5; k++) { const an = k / 5 * Math.PI * 2; const pt = tm(new THREE.SphereGeometry(sz * 0.42, 10, 8), c1, Math.cos(an) * sz * 0.5, Math.sin(an) * sz * 0.5, 0, 0.0015); pt.scale.z = 0.45; g.add(pt); } g.add(tm(new THREE.SphereGeometry(sz * 0.3, 10, 8), c2, 0, 0, sz * 0.1)); return g; };
+  const GOLD = '#f0c84a', SILVER = '#d8dce6';
+  if (!a.owner && /^ear/.test(a.acc || '')) [-1, 1].forEach((s2) => {   // イヤリング: 耳たぶから 下がる(髪の外がわ・あごの横)
+    const x = s2 * (head.userData.hairR || R * 1.1) * 0.95, y = -R * 0.5, z = R * 0.3;
+    const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = s2 * 0.5; head.add(g);
+    g.add(tm(new THREE.SphereGeometry(0.008, 8, 6), GOLD, 0, 0.012, 0));   // 耳たぶの金具
+    switch (a.acc) {
+      case 'earring': { const hp = tm(new THREE.TorusGeometry(0.03, 0.005, 8, 24), GOLD, 0, -0.022, 0, 0.0015); g.add(hp); break; }   // 大きな金の輪
+      case 'ear_heart': { g.add(tm(new THREE.CylinderGeometry(0.0015, 0.0015, 0.02, 4), GOLD, 0, 0.0, 0)); const h = tm(heartGeo(0.024), '#ff5a8a', 0, -0.03, 0, 0.0015); g.add(h); break; }
+      case 'ear_star': { g.add(tm(new THREE.CylinderGeometry(0.0015, 0.0015, 0.02, 4), GOLD, 0, 0.0, 0)); g.add(tm(starGeo(0.026), GOLD, 0, -0.03, 0, 0.0015)); break; }
+      case 'ear_pearl': { g.add(tm(new THREE.CylinderGeometry(0.0015, 0.0015, 0.024, 4), GOLD, 0, -0.002, 0)); const pl = tm(new THREE.SphereGeometry(0.016, 14, 10), '#fbf6ee', 0, -0.03, 0, 0.0015); pl.scale.y = 1.25; g.add(pl); break; }
+      case 'ear_flower': { const fl = flower(0.028, '#ff9ec4', GOLD); fl.position.y = -0.016; g.add(fl); break; }
+      case 'ear_stud': { const st2 = tm(new THREE.OctahedronGeometry(0.012, 0), '#bfe6ff', 0, 0.012, 0.004, 0.0015); g.add(st2); break; }   // ピアス(男性)
+    }
   });
-  if (!a.owner && a.acc === 'necklace') {   // ネックレス: 首の付け根から胸へ、体に そって たれる細い鎖 + 飾り
-    const pts = [];
-    for (let k = 0; k <= 20; k++) { const u = -1 + k / 10, x = u * 0.062, y = 0.425 - 0.085 * (1 - u * u); pts.push(new THREE.Vector3(x, y, chestZ(f, y, x) + 0.006 - Math.pow(Math.abs(u), 3) * 0.02)); }
-    const chain = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.0036, 6, false), new THREE.MeshBasicMaterial({ color: '#d8b84a' })); body.add(chain);
-    const py = 0.34, gem = tm(new THREE.OctahedronGeometry(0.018, 0), '#e8e8f0', 0, py - 0.008, chestZ(f, py - 0.008, 0) + 0.012, 0.0015); gem.scale.y = 1.3; body.add(gem);
+  if (!a.owner && /^neck/.test(a.acc || '')) {   // ネックレス: 首の付け根から胸へ、体に そって たれる鎖 + 大きめの飾り
+    const thick = a.acc === 'neck_chain', drop = a.acc === 'neck_pearl' ? 0.07 : 0.085, pts = [];
+    for (let k = 0; k <= 20; k++) { const u = -1 + k / 10, x = u * 0.064, y = 0.425 - drop * (1 - u * u); pts.push(new THREE.Vector3(x, y, chestZ(f, y, x) + 0.007 - Math.pow(Math.abs(u), 3) * 0.02)); }
+    const curve = new THREE.CatmullRomCurve3(pts), py = 0.425 - drop, pz = chestZ(f, py - 0.02, 0) + 0.014;
+    const metal = a.acc === 'necklace' && !f ? SILVER : a.acc === 'neck_tag' ? SILVER : GOLD;
+    if (a.acc === 'neck_pearl') { for (let k = 0; k <= 22; k++) { const p = curve.getPointAt(k / 22); body.add(tm(new THREE.SphereGeometry(0.0085, 10, 8), '#fbf6ee', p.x, p.y, p.z + 0.003)); } }   // 真珠のつぶ
+    else body.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 40, thick ? 0.007 : 0.0042, 6, false), new THREE.MeshBasicMaterial({ color: metal })));
+    switch (a.acc) {
+      case 'necklace': if (f) { const md = tm(new THREE.CylinderGeometry(0.02, 0.02, 0.006, 20), GOLD, 0, py - 0.022, pz, 0.0015); md.rotation.x = Math.PI / 2; body.add(md); body.add(tm(new THREE.OctahedronGeometry(0.01, 0), '#ff6a8a', 0, py - 0.022, pz + 0.006)); }
+        else { const gm = tm(new THREE.OctahedronGeometry(0.014, 0), SILVER, 0, py - 0.016, pz, 0.0015); gm.scale.y = 1.4; body.add(gm); } break;
+      case 'neck_heart': body.add(tm(heartGeo(0.032), '#ff4a7a', 0, py - 0.03, pz, 0.0015)); break;
+      case 'neck_star': body.add(tm(starGeo(0.034), GOLD, 0, py - 0.03, pz, 0.0015)); break;
+      case 'neck_pearl': body.add(tm(new THREE.SphereGeometry(0.014, 12, 10), '#fbf6ee', 0, py - 0.012, pz, 0.0015)); break;
+      case 'neck_tag': { const tg = tm(new THREE.BoxGeometry(0.03, 0.045, 0.004), SILVER, 0, py - 0.028, pz, 0.0015); body.add(tg); break; }
+      case 'neck_chain': break;
+    }
   }
   if (a.owner) {
     const Rh = f ? R * 1.2 : R;   // 女性は髪がふくらんでいるので、頭の飾りを ひとまわり大きく(髪にうもれないように)
@@ -866,10 +916,29 @@ function animateAvatar(av, dt) {
   let hx = Math.sin(u.t * 0.7) * 0.035, hy = Math.sin(u.t * 0.43) * 0.12;
   if (u.talk > 0) hx += Math.sin(u.t * 14) * 0.06;
   u.head.rotation.set(hx, hy, Math.sin(u.t * 0.5) * 0.03);
-  const k = u.cheer > 0 ? Math.min(1, u.cheer * 3, (2.2 - u.cheer) * 4) : 0;
-  u.arms[1].rotation.x = -0.75 - k * 2.0;
-  u.arms[1].rotation.z = 0.1 - k * 0.25;
-  u.cheerMug.visible = k > 0.2;
+  /* 乾杯(2.2秒): 持ち上げる → 前へ出して カチン → 掲げる → 口へ運んで ひと口 → 下ろす */
+  const e = u.cheer > 0 ? CHEER_T - u.cheer : -1;
+  const P = e < 0 ? CHEER_KEYS[0] : cheerPose(e);
+  u.arms[1].rotation.x = P[0] + (e > 0.55 && e < 1.25 ? Math.sin(e * 9) * 0.03 : 0);
+  u.arms[1].rotation.z = P[1];
+  if (u.fores) u.fores[1].rotation.x = P[2];
+  u.head.rotation.x += P[4];
+  u.body.rotation.x = P[5];
+  if (e >= 0) {   // ジョッキは いつも まっすぐ(飲むときだけ 口のほうへ かたむける)
+    u.cheerMug.rotation.set(-(P[0] + P[2]) + P[3], 0, -P[1]);
+  }
+  u.cheerMug.visible = e >= 0 && e < CHEER_T - 0.12;
+}
+const CHEER_T = 2.2;
+// [肩の前後, 肩の内外, ひじ, ジョッキのかたむき, 頭の上下, 体の前後] を時間ごとに
+// 掲げるときは 顔の横の上(顔は かくさない)、飲むときだけ 口の前へ
+const CHEER_KEYS = [[-0.75, 0.1, -0.55, 0, 0, 0], [-1.85, 0.6, -0.7, 0, -0.06, 0.02], [-2.12, 0.34, -0.5, 0.15, -0.1, 0.05], [-1.9, 0.52, -0.65, 0, -0.12, -0.02], [-1.9, 0.52, -0.65, 0, -0.12, -0.02],
+                    [-1.42, -0.08, -1.88, -0.85, -0.3, -0.05], [-1.42, -0.08, -1.88, -0.85, -0.3, -0.05], [-0.75, 0.1, -0.55, 0, 0, 0]];
+const CHEER_AT = [0, 0.32, 0.46, 0.6, 1.15, 1.45, 1.8, 2.2];
+function cheerPose(e) {
+  let i = 0; while (i < CHEER_AT.length - 2 && e > CHEER_AT[i + 1]) i++;
+  const t = Math.min(1, Math.max(0, (e - CHEER_AT[i]) / (CHEER_AT[i + 1] - CHEER_AT[i]))), k = t * t * (3 - 2 * t);
+  return CHEER_KEYS[i].map((v, j) => v + (CHEER_KEYS[i + 1][j] - v) * k);
 }
 
 /* =====================================================================
@@ -1708,6 +1777,7 @@ function createShop(canvas, opts) {
     },
     _hideMine() { seatAvatars.forEach((a, i) => { if (a) a.visible = !(view.mode === 'first' && i === view.seat); }); if (owner) owner.visible = view.mode !== 'owner'; },
     cheer(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.cheer = 2.2; },
+    cheerAt(seat, e) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.cheer = Math.max(0.001, CHEER_T - e); },   // 確認用: 乾杯の途中の形
     cheerAll() { seatAvatars.forEach((a) => a && (a.userData.cheer = 2.2)); if (owner) owner.userData.cheer = 2.2; },
     talk(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.talk = 1.6; },
     /* 吹き出しを出す位置(画面の点) */

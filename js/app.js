@@ -1578,7 +1578,7 @@
     { name: '目', build: function () { return opts('目', 'eyes') + swatch('目の色', 'eyeColor', AVATAR.EYE_COLOR); } },
     { name: '髪', build: function () { return opts('髪型', 'hair') + (draft.sex === 'm' && draft.hair === 'back' ? '' : opts('前髪', 'bangs')) + opts('アホ毛', 'ahoge') + swatch('髪の色', 'hairColor', AVATAR.HAIR_COLOR); } },
     { name: '服', build: function () { return opts('服', 'top') + swatch('服の色', 'topColor', AVATAR.CLOTH_COLOR); } },
-    { name: '小物', build: function () { return opts('小物', 'acc'); } },
+    { name: '小物', build: function () { return opts('小物', 'acc') + (AVATAR.ACC_COLOR.indexOf(draft.acc) >= 0 ? swatch('小物の色', 'accColor', AVATAR.CLOTH_COLOR) : ''); } },
     { name: '体と声', build: function () { return sizeVoice(); } }
   ];
   var OWNER_TABS = [

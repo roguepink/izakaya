@@ -32,7 +32,8 @@ var AVATAR = {
       beard: [['none', 'なし'], ['stubble', 'ぶしょうひげ'], ['chin', 'あごひげ'], ['mustache', '口ひげ'], ['full', 'フルひげ']],
       top:   [['suit', 'スーツ'], ['suitopen', 'スーツ(ノーネクタイ)'], ['shirt', 'シャツ'], ['polo', 'ポロシャツ'], ['knit', 'ニット'],
               ['hoodie', 'パーカー'], ['jacket', 'ジャケット+Tシャツ'], ['denim', 'デニムジャケット'], ['work', '作業着'], ['tee', 'Tシャツ']],
-      acc:   [['none', 'なし'], ['glasses', '黒ぶちメガネ'], ['thin', 'ほそぶちメガネ'], ['sun', 'サングラス'], ['cap', 'キャップ'], ['beanie', 'ニット帽'], ['necklace', 'ネックレス']]
+      acc:   [['none', 'なし'], ['glasses', '黒ぶちメガネ'], ['thin', 'ほそぶちメガネ'], ['sun', 'サングラス'], ['cap', 'キャップ'], ['beanie', 'ニット帽'],
+              ['necklace', 'ネックレス(シルバー)'], ['neck_chain', '太い金のチェーン'], ['neck_tag', 'プレートのネックレス'], ['ear_stud', 'ピアス(光る石)']]
     },
     f: {
       label: '女性',
@@ -44,7 +45,9 @@ var AVATAR = {
       brows: [['soft', 'ふんわり'], ['thin', '細め'], ['straight', '平行'], ['up', 'きりっ'], ['worry', 'こまり']],
       top:   [['blouse', 'ブラウス'], ['onepiece', 'ワンピース'], ['knit', 'ニット'], ['cardigan', 'カーディガン'], ['office', 'オフィスジャケット'],
               ['pantsuit', 'パンツスーツ'], ['hoodie', 'パーカー'], ['tee', 'Tシャツ'], ['denim', 'デニムジャケット'], ['work', '作業着']],
-      acc:   [['none', 'なし'], ['earring', 'イヤリング'], ['necklace', 'ネックレス'], ['glasses', 'メガネ'], ['beret', 'ベレー帽'], ['band', 'カチューシャ'], ['ribbon', 'リボン'], ['sun', 'サングラス']]
+      acc:   [['none', 'なし'], ['earring', 'イヤリング(大きな金の輪)'], ['ear_heart', 'ハートのイヤリング'], ['ear_star', '星のイヤリング'], ['ear_pearl', 'しずくの真珠イヤリング'], ['ear_flower', '花のイヤリング'],
+              ['necklace', 'ネックレス(金のペンダント)'], ['neck_heart', 'ハートのネックレス'], ['neck_pearl', '真珠のネックレス'], ['neck_star', '星のネックレス'],
+              ['glasses', 'メガネ'], ['beret', 'ベレー帽'], ['cap', 'キャップ'], ['beanie', 'ニット帽'], ['band', 'カチューシャ'], ['ribbon', 'リボン'], ['sun', 'サングラス']]
     }
   },
   /* 髪型を選んだときに いっしょに付ける前髪(あとで変えられる)。オールバック・ぼうずは前髪なし */
@@ -64,6 +67,7 @@ var AVATAR = {
     apron: [['none', 'なし'], ['frill', '白のフリルエプロン'], ['pinkfrill', 'ピンクのフリルエプロン'], ['pink', 'ピンクの前掛け'], ['red', '赤の前掛け'],
             ['navy', '紺の前掛け'], ['black', '黒の前掛け'], ['white', '白の前掛け'], ['brown', '茶の前掛け']]
   },
+  ACC_COLOR: ['cap', 'beanie', 'beret', 'band', 'ribbon'],   // 色を選べる小物
   SIZE_MIN: 0.88, SIZE_MAX: 1.12,
   VOICES: [
     { name: '男性・低め', pitch: 0.75, rate: 1.0 },
@@ -130,7 +134,11 @@ var AVATAR = {
     else { o.lip = c(a.lip, AVATAR.LIP_COLOR, 0); o.cheek = a.cheek >= 0 && a.cheek <= 2 ? Math.floor(a.cheek) : 1; }
     o.top = id('top'); o.topColor = c(a.topColor, AVATAR.CLOTH_COLOR, 0);
     if (o.owner) { o.head = id('head', 'none'); o.apron = id('apron', 'none'); }
-    else o.acc = id('acc', 'none');
+    else {
+      o.acc = id('acc', 'none');
+      var AC = { cap: a.topColor >= 0 ? a.topColor : 0, beanie: 5, beret: 3, band: 3, ribbon: 8 };   // 色を選べる小物と、はじめの色
+      if (o.acc in AC) o.accColor = c(a.accColor, AVATAR.CLOTH_COLOR, typeof AC[o.acc] === 'number' ? AC[o.acc] : 0);
+    }
     o.voice = a.voice >= 0 && a.voice < AVATAR.VOICES.length ? Math.floor(a.voice) : (o.sex === 'f' ? 2 : 1);
     var s = +a.size; o.size = s >= AVATAR.SIZE_MIN && s <= AVATAR.SIZE_MAX ? s : 1;
     return o;
