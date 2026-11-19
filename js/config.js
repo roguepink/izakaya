@@ -134,6 +134,15 @@ var SHOP = {
     { id: 'r02', title: '水月',   src: 'https://roguepink.github.io/rosoku/music/02-moonlight-over-still-water.mp3' },
     { id: 'r04', title: '夜の鈴', src: 'https://roguepink.github.io/rosoku/music/04-midnight-forest-chimes.mp3' }
   ],
+  // お店の動画(大将のうしろのモニターで流せる。足すときは ここに1行)
+  VIDEOS: [
+    { id: 'v-hunter', src: 'https://youtu.be/6-EKdZDA0-Q', title: 'ハンターカブ PV「ARE YOU A HUNTER?」' },
+    { id: 'v-kokoro', src: 'https://youtu.be/WsvsmZkaC2Q', title: '心上等' },
+    { id: 'v-omocha', src: 'https://youtu.be/9gTNoVWstSk', title: 'ひみつのおもちゃ箱' },
+    { id: 'v-sena', src: 'https://www.youtube.com/shorts/zTkUrPNrBEo', title: '聖奈のルール(縦長)' }
+  ],
+  // 壁の木札にかならず出す品(ほかは名物から順に、入るだけ)
+  TAG_ALWAYS: ['beer', 'sake', 'reishu'],
   ALLOW_YOUTUBE: true,        // お客さんが YouTube のリンクを貼ってリクエストできるか
   MAX_QUEUE: 20,              // リクエストの順番待ちは何曲まで
 

@@ -1240,7 +1240,9 @@ function createShop(canvas, opts) {
   const tagW = 0.17, tagH = 0.5;
   const tagXs = [];
   for (let x = TV_GAP + 0.06 + tagW / 2; x < L / 2 - 0.2 - tagW / 2 + 0.001; x += tagW + 0.03) tagXs.push(x, -x);
-  const items = SHOP.MENU.filter((m) => m.pun).concat(SHOP.MENU.filter((m) => !m.pun && m.kind !== 'drink'), SHOP.MENU.filter((m) => m.kind === 'drink')).slice(0, tagXs.length);
+  const must = (SHOP.TAG_ALWAYS || []).map((id) => SHOP.MENU.find((m) => m.id === id)).filter(Boolean);
+  const items = must.concat(SHOP.MENU.filter((m) => m.pun), SHOP.MENU.filter((m) => !m.pun && m.kind !== 'drink'), SHOP.MENU.filter((m) => m.kind === 'drink'))
+    .filter((m, i, a) => a.indexOf(m) === i).slice(0, tagXs.length);
   items.forEach((it, i) => {
     const t = canvasTex(64, 200, (g) => {
       g.fillStyle = '#e8d3a6'; g.fillRect(0, 0, 64, 200);
@@ -1258,7 +1260,9 @@ function createShop(canvas, opts) {
   // 大将のうしろのモニター(動画はこの画面の上に重ねて流す。何もない時は店の名前と曲名)
   const TV_W = 1.1, TV_H = 0.62;
   const tv = new THREE.Group(); tv.position.set(0, 2.16, -2.0); tv.rotation.x = -0.12;   // 少し下向き=座っている人に見やすい
-  tv.add(mesh(new THREE.BoxGeometry(TV_W + 0.08, TV_H + 0.08, 0.05), mat('#141210'), 0, 0, 0));
+  const tvBezel = mesh(new THREE.BoxGeometry(TV_W + 0.08, TV_H + 0.08, 0.05), mat('#141210'), 0, 0, 0); tv.add(tvBezel);
+  const TV_TALL = { w: 0.45, h: 0.8, y: 2.17 }, TV_WIDE = { w: TV_W, h: TV_H, y: 2.16 };
+  const tvCur = { w: TV_W, h: TV_H, y: 2.16 }; let tvWant = TV_WIDE;
   tv.add(mesh(new THREE.BoxGeometry(0.06, 0.06, 0.12), mat('#2a2622'), 0, 0, -0.07));   // 壁の金具
   let tvInfo = { title: '', sub: '', playing: false };
   const tvCanvas = document.createElement('canvas'); tvCanvas.width = 640; tvCanvas.height = 360;
@@ -1279,7 +1283,16 @@ function createShop(canvas, opts) {
   drawTV();
   const tvScreen = mesh(new THREE.PlaneGeometry(TV_W, TV_H), new THREE.MeshBasicMaterial({ map: tvTex, toneMapped: false }), 0, 0, 0.027);
   tv.add(tvScreen); scene.add(tv);
-  const tvCorner = [[-TV_W / 2, TV_H / 2], [TV_W / 2, TV_H / 2], [TV_W / 2, -TV_H / 2], [-TV_W / 2, -TV_H / 2]].map((c) => new THREE.Vector3(c[0], c[1], 0.028));
+  const tvCorner = [[-0.5, 0.5], [0.5, 0.5], [0.5, -0.5], [-0.5, -0.5]].map((c) => new THREE.Vector3(c[0] * TV_W, c[1] * TV_H, 0.028));   // 画面の大きさに合わせて伸びる(スクリーンの scale)
+  function tvStep(dt) {   // 縦⇔横へ なめらかに形を変える
+    const k = Math.min(1, dt * 5);
+    let moved = false;
+    ['w', 'h', 'y'].forEach((n) => { const d = tvWant[n] - tvCur[n]; if (Math.abs(d) > 0.0005) { tvCur[n] += d * k; moved = true; } else tvCur[n] = tvWant[n]; });
+    if (!moved && tvScreen.scale.x === tvCur.w / TV_W) return;
+    tvScreen.scale.set(tvCur.w / TV_W, tvCur.h / TV_H, 1);
+    tvBezel.scale.set((tvCur.w + 0.08) / (TV_W + 0.08), (tvCur.h + 0.08) / (TV_H + 0.08), 1);
+    tv.position.y = tvCur.y;
+  }
 
   // ちょうちん
   const lanternTex = canvasTex(256, 256, (g) => {
@@ -1378,6 +1391,7 @@ function createShop(canvas, opts) {
   // 指の操作(見回す・席をタップ)
   let drag = null;
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  canvas.addEventListener('touchend', (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });   // 指で押したあとの「おまけのクリック」が、開いたばかりの画面に当たって閉じてしまうのを防ぐ
   canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, yaw: view.yaw, pitch: view.pitch, moved: false }; });
   window.addEventListener('pointermove', (e) => {
     if (!drag) return;
@@ -1437,6 +1451,7 @@ function createShop(canvas, opts) {
       const k2 = Math.sin(e * Math.PI);
       m.scale.set(1 + k2 * 0.18, 1 - k2 * 0.12 + Math.sin(e * Math.PI * 2) * 0.05, 1 + k2 * 0.18); m.position.y = k2 * 0.03;
     }));
+    tvStep(dt);
     if (owner) { animateAvatar(owner, dt); owner.position.x += (ownerTargetX - owner.position.x) * Math.min(1, dt * 3); }
     lanterns.forEach((l, i) => { l.rotation.z = Math.sin(clock.elapsedTime * 0.8 + i) * 0.03; });
     renderer.render(scene, camera);
@@ -1553,6 +1568,8 @@ function createShop(canvas, opts) {
       }
       return pts;
     },
+    setMonitorShape(tall) { tvWant = tall ? TV_TALL : TV_WIDE; },
+    monitorTall() { return tvWant === TV_TALL; },
     setMonitor(info) { const t = info.title || '', u = info.sub || '', pl = !!info.playing; if (t === tvInfo.title && u === tvInfo.sub && pl === tvInfo.playing) return; tvInfo = { title: t, sub: u, playing: pl }; drawTV(); },
     // 大将の頭の形(画面の上の輪郭)。モニターの動画を頭の形に切りぬいて、頭が手前に見えるようにする
     ownerHeadHull() {
@@ -1594,6 +1611,7 @@ function createPreview(canvas) {
   stool.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 8), mat('#2a2a2a'), 0, -0.3, 0));
   scene.add(stool);
   let av = null, rotY = 0.35, drag = null;
+  canvas.addEventListener('touchend', (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });   // 指で押したあとの「おまけのクリック」が、開いたばかりの画面に当たって閉じてしまうのを防ぐ
   canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, r: rotY }; });
   window.addEventListener('pointermove', (e) => { if (drag) rotY = drag.r + (e.clientX - drag.x) * 0.01; });
   window.addEventListener('pointerup', () => { drag = null; });
