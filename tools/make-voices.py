@@ -55,8 +55,8 @@ def spoken(t):
     return READ.get(t, t).replace("〜", "ー")
 
 
-def request(text, voice, style):
-    body = {"model": MODEL,
+def request(text, voice, style, model=None):
+    body = {"model": model or MODEL,
             "input": [{"type": "user_input", "content": [{"type": "text", "text": text,
                        "annotations": [{"type": "speech_metadata", "style": style}]}]}],
             "response_format": {"type": "audio"},
@@ -203,7 +203,7 @@ def main():
                 subprocess.run(["python3", HITO, "--wait"], check=False)
             style = v["style"] + " これは一行ずつ別々の場面のひとことです。行と行のあいだは、たっぷり一秒ほど間をあけてください。番号や記号は読まないでください。"
             print(f"{v['id']} ({v['tts']}): {len(texts)} 個を注文中…", flush=True)
-            raw.write_bytes(request(SEP.join(texts), v["tts"], style))
+            raw.write_bytes(request(SEP.join(texts), v["tts"], style, v.get("model")))
             calls += 1; chars += sum(len(t) for t in texts)
         pcm = pcm_of(raw.read_bytes())
         starts, total, how = split_points(pcm, texts, raw)

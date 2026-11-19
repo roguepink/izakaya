@@ -72,24 +72,55 @@ var AVATAR = {
   /* 決まり文句の声。お客さん用と大将用は まったく別(混ぜない)。
      tts: Google(Gemini)の声の名前。voice/<id>/<言葉のid>.m4a に置いてある(tools/make-voices.py で作る)。
      ファイルがないときは、スマホの読み上げ(pitch・rate)で代わりに読む */
+  /* 決まり文句の声。お客さん用と大将用は まったく別(声の種類も かぶらせない)。
+     tts: Google(Gemini)の声(全30種)。voice/<id>/<言葉のid>.m4a(tools/make-voices.py で作る)。ファイルがないときは スマホの読み上げで代わりに読む。
+     sex: m 男性 / f 女性 / c キャラ(同じ声に 言い方の指示をつけた。cs が男女)。2026-11-20 ノブさん: お客さん30種・大将は男性3女性3 */
   GUEST_VOICES: [
-    { id: 'm1', name: '男性・明るい',   sex: 'm', tts: 'Puck',    pitch: 1.0,  rate: 1.08, style: '20〜30代の男性。友だちと居酒屋で飲んでいる。明るく、ノリがよく、楽しそう。自然な日本語の話し言葉。' },
-    { id: 'm2', name: '男性・やさしい', sex: 'm', tts: 'Achird',  pitch: 0.92, rate: 1.0,  style: '20〜30代の男性。友だちと居酒屋で飲んでいる。やさしく、おだやかで、人なつっこい。自然な日本語の話し言葉。' },
-    { id: 'm3', name: '男性・低め',     sex: 'm', tts: 'Charon',  pitch: 0.75, rate: 0.98, style: '30〜40代の男性。友だちと居酒屋で飲んでいる。低めで落ち着いた声。気さくで、少し渋い。自然な日本語の話し言葉。' },
-    { id: 'f1', name: '女性・明るい',   sex: 'f', tts: 'Leda',    pitch: 1.4,  rate: 1.1,  style: '20代の女性。友だちと居酒屋で飲んでいる。明るく、元気で、よく笑う。自然な日本語の話し言葉。' },
-    { id: 'f2', name: '女性・さわやか', sex: 'f', tts: 'Aoede',   pitch: 1.25, rate: 1.05, style: '20〜30代の女性。友だちと居酒屋で飲んでいる。さわやかで、ほがらか。自然な日本語の話し言葉。' },
-    { id: 'f3', name: '女性・落ち着き', sex: 'f', tts: 'Sulafat', pitch: 1.1,  rate: 1.0,  style: '30代の女性。友だちと居酒屋で飲んでいる。落ち着いた、あたたかい声。やわらかく話す。自然な日本語の話し言葉。' }
+    { id: 'g_puck', name: '明るい', sex: 'm', tts: 'Puck', pitch: 1.0, rate: 1.08, style: '20〜30代の男性。明るく、ノリがよく、楽しそう。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_achird', name: '人なつっこい', sex: 'm', tts: 'Achird', pitch: 0.92, rate: 1.0, style: '20〜30代の男性。やさしく、人なつっこい。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_charon', name: '低め', sex: 'm', tts: 'Charon', pitch: 0.75, rate: 0.98, style: '30〜40代の男性。低めで落ち着いた声。気さくで少し渋い。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_orus', name: 'きりっと', sex: 'm', tts: 'Orus', pitch: 0.85, rate: 1.02, style: '30代の男性。きりっとして、はっきり話す。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_enceladus', name: 'ささやき系', sex: 'm', tts: 'Enceladus', pitch: 0.85, rate: 0.98, style: '30代の男性。息まじりの、やわらかい声。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_iapetus', name: 'すっきり', sex: 'm', tts: 'Iapetus', pitch: 0.95, rate: 1.04, style: '20代の男性。すっきりした、聞きやすい声。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_umbriel', name: 'のんびり', sex: 'm', tts: 'Umbriel', pitch: 0.88, rate: 0.95, style: '30代の男性。のんびり、マイペース。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_algieba', name: 'なめらか', sex: 'm', tts: 'Algieba', pitch: 0.82, rate: 1.0, style: '30代の男性。なめらかで、色っぽい声。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_rasalgethi', name: 'ていねい', sex: 'm', tts: 'Rasalgethi', pitch: 0.85, rate: 1.0, style: '40代の男性。ていねいで、人がいい。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_schedar', name: '落ち着き', sex: 'm', tts: 'Schedar', pitch: 0.8, rate: 0.98, style: '40代の男性。落ち着いて、おだやか。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_zubenelgenubi', name: '気さく', sex: 'm', tts: 'Zubenelgenubi', pitch: 0.95, rate: 1.05, style: '20〜30代の男性。気さくで、くだけた話し方。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_sadachbia', name: '元気', sex: 'm', tts: 'Sadachbia', pitch: 1.0, rate: 1.1, style: '20代の男性。元気いっぱいで、いきいき。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_sadaltager', name: 'ものしり', sex: 'm', tts: 'Sadaltager', pitch: 0.85, rate: 0.98, style: '40代の男性。ものしりで、ゆったり。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_zephyr', name: '明るい', sex: 'f', tts: 'Zephyr', pitch: 1.4, rate: 1.1, style: '20代の女性。明るく、元気で、よく笑う。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_autonoe', name: 'はつらつ', sex: 'f', tts: 'Autonoe', pitch: 1.35, rate: 1.08, style: '20代の女性。はつらつとして、まっすぐ。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_kore', name: 'はきはき', sex: 'f', tts: 'Kore', pitch: 1.25, rate: 1.05, style: '30代の女性。はきはきして、頼れる感じ。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_aoede', name: 'さわやか', sex: 'f', tts: 'Aoede', pitch: 1.25, rate: 1.05, style: '20〜30代の女性。さわやかで、ほがらか。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_callirrhoe', name: 'のんびり', sex: 'f', tts: 'Callirrhoe', pitch: 1.2, rate: 0.98, style: '30代の女性。のんびり、おおらか。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_despina', name: 'なめらか', sex: 'f', tts: 'Despina', pitch: 1.15, rate: 1.0, style: '30代の女性。なめらかで、上品。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_erinome', name: 'すっきり', sex: 'f', tts: 'Erinome', pitch: 1.3, rate: 1.04, style: '20代の女性。すっきりした、聞きやすい声。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_laomedeia', name: 'ノリノリ', sex: 'f', tts: 'Laomedeia', pitch: 1.4, rate: 1.12, style: '20代の女性。ノリがよく、テンションが高い。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_achernar', name: 'やわらか', sex: 'f', tts: 'Achernar', pitch: 1.3, rate: 1.0, style: '20代の女性。やわらかく、ふんわり。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_vindemiatrix', name: 'おだやか', sex: 'f', tts: 'Vindemiatrix', pitch: 1.15, rate: 0.98, style: '30代の女性。おだやかで、やさしい。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'g_sulafat', name: 'あたたか', sex: 'f', tts: 'Sulafat', pitch: 1.1, rate: 1.0, style: '30代の女性。落ち着いた、あたたかい声。友だちと居酒屋で飲んでいる。自然な日本語の話し言葉。' },
+    { id: 'c_yopparai', name: '酔っぱらい', sex: 'c', tts: 'Umbriel', pitch: 0.85, rate: 0.9, style: 'ほろ酔いの男性。ご機嫌で、ろれつが少しあやしく、語尾がのびる。居酒屋で友だちと飲んでいる。', cs: 'm' },
+    { id: 'c_hisohiso', name: 'ひそひそ声', sex: 'c', tts: 'Achernar', pitch: 1.25, rate: 0.95, style: '女性が、内緒話のように 小さな声で ささやく。居酒屋で友だちと話している。', cs: 'f' },
+    { id: 'c_taiiku', name: '体育会系', sex: 'c', tts: 'Sadachbia', pitch: 1.0, rate: 1.12, style: '体育会系の男性。声が大きく、元気いっぱいで、はきはき。居酒屋で仲間と飲んでいる。', cs: 'm' },
+    { id: 'c_ojousama', name: 'おっとりお嬢さま', sex: 'c', tts: 'Vindemiatrix', pitch: 1.3, rate: 0.92, style: '上品なお嬢さま。ゆっくり、おっとり、ていねい。居酒屋で友だちと話している。', cs: 'f' },
+    { id: 'c_ojii', name: 'おじいちゃん', sex: 'c', tts: 'Schedar', pitch: 0.7, rate: 0.88, style: '70代の男性。ゆっくり、少ししわがれた、あたたかい声。居酒屋で若い人と飲んでいる。', cs: 'm' },
+    { id: 'c_obaa', name: 'おばあちゃん', sex: 'c', tts: 'Sulafat', pitch: 1.0, rate: 0.9, style: '70代の女性。ゆっくり、やさしく、少し年配らしい話し方。居酒屋で若い人と話している。', cs: 'f' },
   ],
   OWNER_VOICES: [
-    { id: 'nobu', name: 'ノブの声(録音)', sex: 'm', rec: true, fallback: 'om2', pitch: 0.85, rate: 1.0 },
-    { id: 'om1', name: '男性・威勢がいい', sex: 'm', tts: 'Fenrir',  pitch: 0.9,  rate: 1.08, style: '40代の男性。小さな居酒屋の大将。威勢がよく、元気で、あたたかい。お客さんに声をかける。自然な日本語の話し言葉。' },
-    { id: 'om2', name: '男性・落ち着き',   sex: 'm', tts: 'Alnilam', pitch: 0.8,  rate: 1.0,  style: '40代の男性。小さな居酒屋の大将。落ち着いていて、やさしく、人がいい。お客さんに声をかける。自然な日本語の話し言葉。' },
-    { id: 'of1', name: '女性・元気',       sex: 'f', tts: 'Kore',    pitch: 1.3,  rate: 1.08, style: '30代の女性。小さな居酒屋の女将。明るく、元気で、気さく。お客さんに声をかける。自然な日本語の話し言葉。' },
-    { id: 'of2', name: '女性・やわらか',   sex: 'f', tts: 'Despina', pitch: 1.15, rate: 1.0,  style: '30〜40代の女性。小さな居酒屋の女将。やわらかく、おっとりして、あたたかい。お客さんに声をかける。自然な日本語の話し言葉。' }
+    { id: 'nobu', name: 'ノブの声(録音)', sex: 'm', rec: true, fallback: 'o_alnilam', pitch: 0.85, rate: 1.0 },
+    { id: 'o_fenrir', name: '威勢がいい', sex: 'm', tts: 'Fenrir', pitch: 0.9, rate: 1.08, style: '40代の男性。下町の居酒屋の大将。威勢がよく、元気で、あたたかい。小さな居酒屋で お客さんに声をかける。自然な日本語の話し言葉。' },
+    { id: 'o_algenib', name: 'しゃがれ声の職人', sex: 'm', tts: 'Algenib', pitch: 0.75, rate: 0.98, style: '50代の男性。職人肌の板前。しゃがれた低い声で、ぶっきらぼうだけど人情がある。小さな居酒屋で お客さんに声をかける。自然な日本語の話し言葉。' },
+    { id: 'o_alnilam', name: 'どっしり', sex: 'm', tts: 'Alnilam', pitch: 0.8, rate: 1.0, style: '40代の男性。居酒屋の大将。どっしり落ち着いて、やさしい。小さな居酒屋で お客さんに声をかける。自然な日本語の話し言葉。' },
+    { id: 'o_leda', name: 'いたずらっぽい', sex: 'f', tts: 'Leda', pitch: 1.4, rate: 1.1, style: '20代の女性。居酒屋の看板娘。明るく、テンポが速め。無邪気で、少しいたずらっぽい。標準語。小さな居酒屋で お客さんに声をかける。自然な日本語の話し言葉。', model: 'gemini-3.8-flash-lite-tts' },
+    { id: 'o_gacrux', name: '貫禄の女将', sex: 'f', tts: 'Gacrux', pitch: 1.05, rate: 0.95, style: '50代の女性。貫禄のある女将。ゆったり、あたたかく、包みこむように。小さな居酒屋で お客さんに声をかける。自然な日本語の話し言葉。' },
+    { id: 'o_pulcherrima', name: '姉御肌', sex: 'f', tts: 'Pulcherrima', pitch: 1.2, rate: 1.06, style: '30代の女性。姉御肌の女将。きっぷがよく、はっきり、さばさば。小さな居酒屋で お客さんに声をかける。自然な日本語の話し言葉。' },
   ],
+  VOICE_ALIAS: { m1: 'g_puck', m2: 'g_achird', m3: 'g_charon', f1: 'g_zephyr', f2: 'g_aoede', f3: 'g_sulafat', om1: 'o_fenrir', om2: 'o_alnilam', of1: 'o_leda', of2: 'o_gacrux' },   // 前の名前(保存してあるアバター用)
   voiceList: function (owner) { return owner ? AVATAR.OWNER_VOICES : AVATAR.GUEST_VOICES; },
   voiceOf: function (id, owner) {
     var L = AVATAR.voiceList(owner);
+    id = AVATAR.VOICE_ALIAS[id] || id;
     for (var i = 0; i < L.length; i++) if (L[i].id === id) return L[i];
     return L[owner ? 1 : 0];
   },
@@ -133,7 +164,7 @@ var AVATAR = {
     p.sex = sex; p.hair = pick(S.hair)[0]; p.bangs = pick(S.bangs)[0]; p.ahoge = sex === 'f' && Math.random() < 0.3 ? 'on' : 'off'; p.hairColor = Math.floor(Math.random() * 6); p.eyes = pick(S.eyes)[0];
     p.top = pick(S.top)[0]; p.topColor = Math.floor(Math.random() * AVATAR.CLOTH_COLOR.length);
     p.acc = Math.random() < 0.5 ? 'none' : pick(S.acc)[0]; p.skin = Math.floor(Math.random() * 4);
-    var vs = AVATAR.GUEST_VOICES.filter(function (v) { return v.sex === sex; }); p.voice = pick(vs).id;
+    var vs = AVATAR.GUEST_VOICES.filter(function (v) { return v.sex === sex; }); p.voice = pick(vs).id;   // おまかせは 男女ふつうの声から
     p.size = Math.round((0.94 + Math.random() * 0.12) * 100) / 100;
     return AVATAR.fix(p);
   },
@@ -158,7 +189,8 @@ var AVATAR = {
       if (o.acc in AC) o.accColor = c(a.accColor, AVATAR.CLOTH_COLOR, typeof AC[o.acc] === 'number' ? AC[o.acc] : 0);
     }
     var VL = AVATAR.voiceList(o.owner), vOld = typeof a.voice === 'number' ? (o.owner ? (o.sex === 'f' ? 'of1' : 'om1') : ['m1', 'm2', 'f1', 'f2'][a.voice]) : a.voice;   // 古いデータは番号だった
-    o.voice = VL.some(function (v) { return v.id === vOld; }) ? vOld : (o.owner ? (o.sex === 'f' ? 'of1' : (SHOP.NOBU_VOICE && SHOP.NOBU_VOICE.length ? 'nobu' : 'om1')) : (o.sex === 'f' ? 'f1' : 'm1'));
+    vOld = AVATAR.VOICE_ALIAS[vOld] || vOld;
+    o.voice = VL.some(function (v) { return v.id === vOld; }) ? vOld : (o.owner ? (o.sex === 'f' ? 'o_leda' : (SHOP.NOBU_VOICE && SHOP.NOBU_VOICE.length ? 'nobu' : 'o_fenrir')) : (o.sex === 'f' ? 'g_zephyr' : 'g_puck'));
     var s = +a.size; o.size = s >= AVATAR.SIZE_MIN && s <= AVATAR.SIZE_MAX ? s : 1;
     return o;
   },

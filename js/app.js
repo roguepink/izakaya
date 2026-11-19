@@ -276,8 +276,9 @@
       var p = a.play(); if (p && p.catch) p.catch(function () {});
     })(0);
   }
-  function previewVoice(voiceId, owner) {   // アバター作りで 声を選んだとき
-    var ph = owner ? SHOP.OWNER_PHRASES.filter(function (p) { return p.id === 'irasshai'; })[0] : SHOP.GUEST_PHRASES[0];
+  function previewVoice(voiceId, owner, phId) {   // アバター作りで 声を選んだとき・試し聞き
+    var ph = SHOP.PHRASES.filter(function (p) { return p.id === (phId || (owner ? 'irasshai' : 'kanpai')); })[0] || SHOP.GUEST_PHRASES[0];
+    unlockAudio();
     var c = voiceFiles(ph, voiceId), f = c.files.filter(function (x) { return !voiceMissing[x]; })[0];
     if (!f) { speak(ph.say, c.v.id, owner); return; }
     voicePool(); var a = vpool[vpoolI++ % vpool.length];
@@ -1897,11 +1898,21 @@
     GUEST_TABS[6]
   ];
   function tabs() { return OWNER_MODE ? OWNER_TABS : GUEST_TABS; }
+  var voiceTab = null;
+  function voiceLabel(v) { return v.rec ? v.name : (v.sex === 'm' ? '男性・' : v.sex === 'f' ? '女性・' : 'キャラ・') + v.name; }
   function sizeVoice() {
     var h = '<div class="mk-sec">体の大きさ</div><input type="range" id="mkSize" min="' + AVATAR.SIZE_MIN + '" max="' + AVATAR.SIZE_MAX + '" step="0.01" value="' + draft.size + '">';
-    h += '<div class="mk-sec">「乾杯」などの声</div><div class="opts">';
-    AVATAR.voiceList(OWNER_MODE).forEach(function (v) { h += '<button data-voice="' + v.id + '" class="' + (draft.voice === v.id ? 'on' : '') + '">' + esc(v.name) + '</button>'; });
-    return h + '</div><div class="mk-sec">押すと声が聞けます。' + (OWNER_MODE ? '大将の声は、大将用の言葉だけを話します。「ノブの声(録音)」は、録音してある言葉だけノブさんの声で、ほかは落ち着いた男性の声になります。' : 'お客さんの声は、お客さん用の言葉だけを話します。') + '</div>';
+    var L = AVATAR.voiceList(OWNER_MODE), cur = AVATAR.voiceOf(draft.voice, OWNER_MODE);
+    var tabs = OWNER_MODE ? [['m', '男性'], ['f', '女性']] : [['m', '男性'], ['f', '女性'], ['c', 'キャラ']];
+    if (!voiceTab) voiceTab = cur.sex === 'c' ? 'c' : (cur.sex || draft.sex || 'm');
+    var S = OWNER_MODE ? [['irasshai', 'いらっしゃい'], ['haiyo', 'はいよ']] : [['kanpai', 'かんぱーい'], ['g_sorena', 'それな']];
+    h += '<div class="mk-sec">「乾杯」などの声(' + L.length + '種類) ・ いまの声: <b>' + esc(voiceLabel(cur)) + '</b></div>';
+    h += '<div class="opts vc-tabs">' + tabs.map(function (t) { return '<button data-vtab="' + t[0] + '" class="' + (voiceTab === t[0] ? 'on' : '') + '">' + t[1] + '(' + L.filter(function (v) { return v.sex === t[0]; }).length + ')</button>'; }).join('') + '</div>';
+    h += '<div class="vc-grid">' + L.filter(function (v) { return v.sex === voiceTab; }).map(function (v) {
+      return '<div class="vc' + (cur.id === v.id ? ' on' : '') + '" data-voice="' + v.id + '"><b>' + esc(v.name) + (cur.id === v.id ? ' ✓' : '') + '</b><div class="vc-btns">' +
+        S.map(function (x) { return '<button data-vs="' + v.id + '|' + x[0] + '">▶ ' + x[1] + '</button>'; }).join('') + '</div></div>';
+    }).join('') + '</div>';
+    return h + '<div class="mk-sec">▶ で声が聞けます。カードを押すと その声に決まります。' + (OWNER_MODE ? '大将の声は、大将用の言葉だけを話します(お客さんとは別の声です)。「ノブの声(録音)」は、録音してある言葉だけノブさんの声で、ほかは どっしりした男性の声になります。' : 'お客さんの声は、お客さん用の言葉だけを話します。') + '</div>';
   }
   function opts(label, key) {   // 形を選ぶ(値は id)
     var h = '<div class="mk-sec">' + label + '</div><div class="opts">';
@@ -1921,8 +1932,8 @@
   }
   function chooseSex(sx) {
     var keep = draft ? { voice: draft.voice, size: draft.size } : {};
-    if (OWNER_MODE) { var o = JSON.parse(JSON.stringify(AVATAR.OWNER)); o.sex = sx; if (sx === 'f') { var fp = OWNER_PRESETS_F[0]; o.hair = 'bun'; o.bangs = 'seethrough'; o.eyes = 'big'; o.brows = 'soft'; o.mouth = 'smile'; o.face = 'egg'; o.skin = 1; o.hairColor = 1; o.lip = 1; o.cheek = 2; o.size = 1; o.voice = 'of1'; o.top = fp.top; o.topColor = fp.topColor; o.head = fp.head; o.apron = fp.apron; } draft = AVATAR.fix(o); }
-    else { var p = JSON.parse(JSON.stringify(AVATAR.PRESETS[sx][0])); p.sex = sx; p.voice = sx === 'f' ? 'f1' : 'm1'; draft = AVATAR.fix(p); }
+    if (OWNER_MODE) { var o = JSON.parse(JSON.stringify(AVATAR.OWNER)); o.sex = sx; if (sx === 'f') { var fp = OWNER_PRESETS_F[0]; o.hair = 'bun'; o.bangs = 'seethrough'; o.eyes = 'big'; o.brows = 'soft'; o.mouth = 'smile'; o.face = 'egg'; o.skin = 1; o.hairColor = 1; o.lip = 1; o.cheek = 2; o.size = 1; o.voice = 'o_leda'; o.top = fp.top; o.topColor = fp.topColor; o.head = fp.head; o.apron = fp.apron; } draft = AVATAR.fix(o); }
+    else { var p = JSON.parse(JSON.stringify(AVATAR.PRESETS[sx][0])); p.sex = sx; p.voice = sx === 'f' ? 'g_zephyr' : 'g_puck'; draft = AVATAR.fix(p); }
     if (keep.size) draft.size = keep.size;
     mkTab = 0; sexStep = false; updateDraft(); renderMaker();
   }
@@ -1968,6 +1979,10 @@
     body.querySelectorAll('[data-voice]').forEach(function (b) {
       b.onclick = function () { draft.voice = b.getAttribute('data-voice'); draft = AVATAR.fix(draft); previewVoice(draft.voice, OWNER_MODE); updateDraft(); renderMaker(); };
     });
+    body.querySelectorAll('[data-vs]').forEach(function (b) {
+      b.onclick = function (e) { e.stopPropagation(); var x = b.getAttribute('data-vs').split('|'); previewVoice(x[0], OWNER_MODE, x[1]); };
+    });
+    body.querySelectorAll('[data-vtab]').forEach(function (b) { b.onclick = function () { voiceTab = b.getAttribute('data-vtab'); renderMaker(); }; });
     body.querySelectorAll('[data-n]').forEach(function (b) {
       b.onclick = function () {
         var k = b.getAttribute('data-n'); draft[k] = +b.getAttribute('data-v'); draft = AVATAR.fix(draft);

@@ -394,3 +394,11 @@ body.photo-mode .bottom, body.photo-mode .side, body.photo-mode #tags, body.phot
 .kp-banner.go { animation: kpban 1.9s ease-out forwards; }
 @keyframes kpban { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.5); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); } 30% { transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60%) scale(1); } }
 body.photo-mode .kp, body.photo-mode .kp-banner { display: none; }
+
+/* ---------- 声えらび(試し聞きつきのカード) ---------- */
+.vc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
+.vc { background: #f3e6cc; color: var(--ink); border-radius: 12px; padding: 9px 10px; border: 2px solid transparent; cursor: pointer; }
+.vc.on { border-color: #c8261c; background: #ffe9b8; }
+.vc b { display: block; font-size: 15px; margin-bottom: 6px; }
+.vc-btns { display: flex; gap: 5px; flex-wrap: wrap; }
+.vc-btns button { background: #5a3a22; color: #fff; border-radius: 999px; padding: 5px 9px; font-size: 12.5px; font-weight: 800; }
