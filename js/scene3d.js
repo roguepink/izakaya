@@ -1186,9 +1186,17 @@ const PHOTO_LAYOUTS = {
   N3: { name: 'N3 なかよし2だん', w: 1080, h: 1350, edge: 0.22, lean: 0.18, tilt: 0.5, cam: 1.95, under: 0.42,   // れんが積み2だん(まえ4人・うしろ 大将+4人)。人数が多いと3だん目
         slots: [[0, 1.42, 1.6], [-0.15, 1.62, 1.31], [0.15, 1.62, 1.31], [-0.3, 1.42, 1.6], [0.3, 1.42, 1.6], [-0.45, 1.62, 1.31], [0.45, 1.62, 1.31],
                 [-0.6, 1.42, 1.6], [0.6, 1.42, 1.6], [-0.15, 1.22, 1.92], [0.15, 1.22, 1.92], [-0.45, 1.22, 1.92], [0.45, 1.22, 1.92], [-0.75, 1.62, 1.31]] },
-  N4: { name: 'N4 すき間に顔', w: 1080, h: 1350, edge: 0.22, lean: 0.16, tilt: 0.45, cam: 1.95, under: 0.42,   // れんが積み3だん。下の2人の頭の すき間に 上の人の顔
-        slots: [[0, 1.46, 1.56], [-0.28, 1.62, 1.3], [0.28, 1.62, 1.3], [-0.28, 1.26, 1.86], [0.28, 1.26, 1.86], [-0.56, 1.46, 1.56], [0.56, 1.46, 1.56],
-                [0, 1.1, 2.14], [-0.56, 1.1, 2.12], [0.56, 1.1, 2.12], [-0.84, 1.26, 1.84], [0.84, 1.26, 1.84], [-0.56, 1.62, 1.28], [0.56, 1.62, 1.28]] }
+  N4: { name: 'N4 すき間に顔', w: 1080, h: 1350, edge: 0.24, lean: 0.1, tilt: 0.28, cam: 1.95, under: 0.42, underMany: 0.3, auto: true,
+        /* れんが積み(ノブさん 2026-11-20 これに決定)。同じ段のとなりは 0.52m(顔1つぶん あける)。上の段の顔は 下の2人の すき間へ。
+           0番は大将(2だん目のまん中)。お客さんは 人数がふえるほど 外がわ・上へ */
+        slots: [[0, 1.46, 1.56],
+                [-0.26, 1.62, 1.3], [0.26, 1.62, 1.3],        // 1だん目(前)
+                [-0.26, 1.28, 1.84], [0.26, 1.28, 1.84],      // 3だん目(大将の上の すき間)
+                [-0.52, 1.46, 1.56], [0.52, 1.46, 1.56],      // 2だん目(大将の となり)
+                [0, 1.12, 2.12],                              // 4だん目(まん中)
+                [-0.78, 1.62, 1.3], [0.78, 1.62, 1.3],        // 1だん目の外
+                [-0.78, 1.28, 1.84], [0.78, 1.28, 1.84],      // 3だん目の外
+                [-0.52, 1.12, 2.1], [0.52, 1.12, 2.1]] }      // 4だん目の外
 };
 function photoAttach(av, list) {   // 指(ピースの2本・いいねの親指)を その時だけ手につける。list = [[種類, 手], ...]
   const u = av.userData;
@@ -2165,12 +2173,15 @@ function createShop(canvas, opts) {
       // 前の人から順に、全員(大将も)の顔が 見えるように並べる。
       // うしろの人が前の人に かくれるときは、まず横の あいている所へ少し ずれる。それでも かくれるときだけ 上げる
       const camY = photo.cam.y, camZ = photo.cam.z;
-      const needY = (e, x) => {   // その横の位置で、顔が見えるのに必要な高さ
+      const needY = (e, x) => {   // その横の位置で、顔が見えるのに必要な高さ。頭は丸いので、下の2人の頭の間の V字の すき間に あごが入ってよい
         let y = e.y0;
         E.forEach((f) => {
-          if (f === e || !f.done || f.z <= e.z + 0.05 || Math.abs(f.x - x) >= f.hm.hw * 0.95 + 0.14) return;   // 髪どうしは重なってよい。顔(はば約0.28m)が かくれなければよい
-          const k = (f.z - e.z) / (camZ - e.z), chinNeed = (f.y + f.hm.top - camY * k) / (1 - k);
-          y = Math.max(y, chinNeed - e.hm.chin + 0.015);
+          if (f === e || !f.done || f.z <= e.z + 0.05) return;
+          const o = Math.abs(f.x - x) - 0.11;   // 顔のはし(顔はば約0.26m)から 前の人の頭の まん中まで
+          if (o >= f.hm.hw * 0.92) return;
+          const topF = f.y + f.hm.top * Math.sqrt(1 - Math.pow(Math.max(0, o) / (f.hm.hw * 0.92), 2));   // その位置での 前の人の頭の高さ
+          const k = (f.z - e.z) / (camZ - e.z), need = (topF - camY * k) / (1 - k);   // カメラから見て かさならない あごの高さ
+          y = Math.max(y, need - (e.hm.chin + (o > 0 ? 0.06 : 0)) + 0.01);   // 顔のはしは あごより少し上
         });
         return y;
       };
@@ -2178,7 +2189,7 @@ function createShop(canvas, opts) {
       E.forEach((e) => { e.y0 = e.y; e.done = false; });
       E.slice().sort((p, q) => q.z - p.z || Math.abs(p.x) - Math.abs(q.x)).forEach((e) => {
         let best = { x: e.x, y: needY(e, e.x), cost: 0 };
-        if (best.y - e.y0 > 0.04) [-0.2, -0.13, -0.07, 0.07, 0.13, 0.2].forEach((dx) => {
+        if (best.y - e.y0 > 0.06) [-0.1, -0.05, 0.05, 0.1].forEach((dx) => {
           const x = e.x + dx; if (crowd(e, x)) return;
           const y = needY(e, x), cost = (y - e.y0) + Math.abs(dx) * 0.6;
           if (cost < best.cost + (best.y - e.y0)) best = { x, y, cost: Math.abs(dx) * 0.6 };
@@ -2192,10 +2203,11 @@ function createShop(canvas, opts) {
         u.lookT = 0; u.lw = 0;
         u.photo = { pose: e.p.pose || 'normal', face: e.p.face || 'smile', owner: e.isOwner, tilt: Math.max(-0.35, Math.min(0.35, e.x * (LY.tilt || 0.4))), lean: Math.max(-0.25, Math.min(0.25, e.x * LY.lean * 2)) };   // 頭と体を まん中へ かたむける
       });
+      window.__photoDbg = E.map((e) => ({ k: e.isOwner ? 'owner' : e.p.key, x: +e.x.toFixed(2), z: e.z, y: +e.y.toFixed(2), y0: e.y0, top: +e.hm.top.toFixed(2), chin: +e.hm.chin.toFixed(2), hw: +e.hm.hw.toFixed(2) }));   // 確認用
       const gs = E.filter((e) => !e.isOwner);
       photo.half = Math.max(0.45, ...E.map((e) => Math.abs(e.x) + LY.edge));   // 横のはしの人は 少し切れてもよい(自撮りらしく)
       photo.top = Math.max(...E.map((e) => e.y + e.hm.top)) + 0.12;
-      photo.bot = (gs.length ? Math.min(...gs.map((e) => e.y)) : 1.3) - (LY.under || 0.45);   // 前の列は胸から上
+      photo.bot = (gs.length ? Math.min(...gs.map((e) => e.y)) : 1.3) - (gs.length >= 8 && LY.underMany ? LY.underMany : (LY.under || 0.45));   // 前の列は胸から上(人数が多いときは顔と首くらい)
       photo.look.y = (photo.top + photo.bot) / 2;
     },
     photoEnd() {
@@ -2209,6 +2221,10 @@ function createShop(canvas, opts) {
     capturePhoto(w, h) {
       if (!photo) return null;
       w = w || (photo.ly && photo.ly.w) || 1080; h = h || (photo.ly && photo.ly.h) || 1350;
+      if (photo.ly && photo.ly.auto) {   // 横に広い集まりは 正方形〜横長に(縦長のままだと顔が小さくなる)。長い辺は1350
+        const r = Math.max(0.8, Math.min(1.3, (2 * photo.half) / (photo.top - photo.bot)));
+        if (r < 1) { h = 1350; w = Math.round(1350 * r); } else { w = 1350; h = Math.round(1350 / r); }
+      }
       const pr = renderer.getPixelRatio(), sz = renderer.getSize(new THREE.Vector2()), cam = camera.clone();
       cam.clearViewOffset(); photoCam(cam, w / h);
       renderer.setPixelRatio(1); renderer.setSize(w, h, false);
