@@ -15,7 +15,7 @@ const Q = new URLSearchParams(location.search); const mode = Q.get('m') || 'pres
 const list = [];
 const P = (sex, i) => Object.assign(JSON.parse(JSON.stringify(AVATAR.PRESETS[sex][i])), { sex });
 if (mode === 'presets') { ['m', 'f'].forEach((sx) => AVATAR.PRESETS[sx].forEach((p, i) => list.push([P(sx, i), p.name]))); list.push([AVATAR.OWNER, '大将']); }
-const vary = (sex, key, base) => AVATAR.parts({ sex }, key).forEach(([id, nm]) => { const a = P(sex, base); a[key] = id; if (key === 'acc') a.hair = sex === 'm' ? 'short' : 'bob'; list.push([a, nm]); });
+const vary = (sex, key, base) => AVATAR.parts({ sex }, key).forEach(([id, nm]) => { const a = P(sex, base); a[key] = id; if (key === 'acc') a.hair = sex === 'm' ? 'short' : 'bob'; if (key === 'hair' && sex === 'm') a.bangs = AVATAR.HAIR_BANGS.m[id]; list.push([a, nm]); });
 if (mode.startsWith('hair-')) vary(mode.slice(5), 'hair', 0);
 if (mode.startsWith('top-')) vary(mode.slice(4), 'top', 1);
 if (mode.startsWith('acc-')) vary(mode.slice(4), 'acc', 0);

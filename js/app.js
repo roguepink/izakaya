@@ -1661,7 +1661,7 @@
     var keep = body.scrollTop;
     body.innerHTML = T[mkTab].build();
     body.scrollTop = keep;
-    body.querySelectorAll('[data-k]').forEach(function (b) { b.onclick = function () { draft[b.getAttribute('data-k')] = b.getAttribute('data-v'); draft = AVATAR.fix(draft); updateDraft(); renderMaker(); }; });
+    body.querySelectorAll('[data-k]').forEach(function (b) { b.onclick = function () { var kk = b.getAttribute('data-k'); draft[kk] = b.getAttribute('data-v'); if (kk === 'hair' && draft.sex === 'm' && AVATAR.HAIR_BANGS.m[draft.hair]) draft.bangs = AVATAR.HAIR_BANGS.m[draft.hair]; draft = AVATAR.fix(draft); updateDraft(); renderMaker(); }; });
     body.querySelectorAll('[data-n]').forEach(function (b) {
       b.onclick = function () {
         var k = b.getAttribute('data-n'); draft[k] = +b.getAttribute('data-v'); draft = AVATAR.fix(draft);

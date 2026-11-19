@@ -47,6 +47,8 @@ var AVATAR = {
       acc:   [['none', 'なし'], ['earring', 'イヤリング'], ['necklace', 'ネックレス'], ['glasses', 'メガネ'], ['beret', 'ベレー帽'], ['band', 'カチューシャ'], ['ribbon', 'リボン'], ['sun', 'サングラス']]
     }
   },
+  /* 髪型を選んだときに いっしょに付ける前髪(あとで変えられる)。オールバック・ぼうずは前髪なし */
+  HAIR_BANGS: { m: { short: 'short', twoblock: 'sideswept', mash: 'long', medium: 'center', wolf: 'down', perm: 'down', spiky: 'up', back: 'up', long: 'center', buzz: 'short' } },
   /* 大将だけの服と小物(男女どちらでも) */
   OWNER_PARTS: {
     top:   [['happi', '法被(はっぴ)'], ['samue', '作務衣(さむえ)'], ['hakui', '板前の白衣'], ['jinbei', '甚平'], ['tee', 'Tシャツ']],
