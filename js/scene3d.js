@@ -2038,6 +2038,7 @@ function createShop(canvas, opts) {
   }
   requestAnimationFrame(frame);
 
+  const LOOK_BUSY = 2;   // 話しかけが集中したときの 1人あたりの秒数
   function lookStart(a, target, secs) {
     const t = target === 'owner' ? owner : seatAvatars[target]; if (!t) return;
     let yaw = Math.atan2(t.position.x - a.position.x, t.position.z - a.position.z) - a.rotation.y;
@@ -2257,9 +2258,9 @@ function createShop(canvas, opts) {
       const u = a.userData;
       if (u.lookT > 0.2 || (u.lookQ && u.lookQ.length)) {
         if (u.lookTo === target && u.lookT > 0) { u.lookT = Math.max(u.lookT, secs); return; }   // 同じ人に また話しかけられたら のばすだけ
-        // 話しかけが集中したときだけ 1秒ずつ(待たせると会話が成り立たない。ノブさん 2026-11-20)
-        u.lookT = Math.min(u.lookT, 1);
-        (u.lookQ = u.lookQ || []).push({ target, secs: 1 }); if (u.lookQ.length > 2) u.lookQ.shift();
+        // 話しかけが集中したときだけ 2秒ずつ(待たせると会話が成り立たない。1秒は早すぎた。ノブさん 2026-11-20)
+        u.lookT = Math.min(u.lookT, LOOK_BUSY);
+        (u.lookQ = u.lookQ || []).push({ target, secs: LOOK_BUSY }); if (u.lookQ.length > 2) u.lookQ.shift();
         return;
       }
       lookStart(a, target, secs);
