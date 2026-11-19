@@ -168,7 +168,7 @@
   else {
     window.addEventListener('iz3d-ready', start3D);
     var waited = 0;
-    (function poll() { if (scene) return; if (window.IZ3D_FAIL || waited > 5000) { start3D(); return; } waited += 250; setTimeout(poll, 250); })();
+    (function poll() { if (scene) return; if (window.IZ3D_FAIL || waited > 25000) { start3D(); return; } waited += 250; setTimeout(poll, 250); })();
   }
   function make2D() {
     document.body.classList.add('no3d');
@@ -248,6 +248,7 @@
   /* ---------------- 曲を みんなで そろえる ---------------- */
   var curKey = '', ytOn = false, ytState = -1, ytLoadedAt = 0;
   function musicKey(m) { return m ? m.id + '@' + m.start : ''; }
+  function mDur(m) { return m && m.dur > 0 && m.durK === musicKey(m) ? m.dur : 0; }   // その曲の長さ(ほかの曲の長さが まじらないように)
   function elapsed(m) { return Math.max(0, (now() - m.start) / 1000); }
   function syncMusic() {
     var m = tree.state && tree.state.music;
@@ -319,7 +320,7 @@
   function tvShow(on) { $('tv').classList.toggle('hidden', !on); if (!on) tvBig(false); }
   function showYT(m) {
     var id = ytId(m.src); if (!id) return;
-    if (m.dur > 0 && elapsed(m) > m.dur - 1) return;   // もう終わっている動画は流さない(次へ進むのを待つ)
+    if (mDur(m) > 0 && elapsed(m) > mDur(m) - 1) return;   // もう終わっている動画は流さない(次へ進むのを待つ)
     ytOn = true; ytState = -1; ytLoadedAt = Date.now(); ytMuted = false; ytReady = false; ytDur = 0; ytLastCT = 0;
     var f = document.createElement('iframe');
     f.allow = 'autoplay; encrypted-media; fullscreen'; f.allowFullscreen = true;
@@ -335,7 +336,7 @@
     v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto'; v.src = m.src;
     v.addEventListener('ended', function () { if (amLeader()) advance(curKey); });
     v.addEventListener('error', function () { var k = curKey; if (amLeader()) setTimeout(function () { advance(k); }, 3000); });
-    v.addEventListener('loadedmetadata', function () { if (tvVideo === v) { tvShape(v.videoHeight > v.videoWidth); var mm = tree.state && tree.state.music; if (mm && musicKey(mm) === curKey && !(mm.dur > 0) && isFinite(v.duration) && v.duration > 1) net.update('state/music', { dur: Math.round(v.duration) }); } });
+    v.addEventListener('loadedmetadata', function () { if (tvVideo === v) { tvShape(v.videoHeight > v.videoWidth); var mm = tree.state && tree.state.music; if (mm && musicKey(mm) === curKey && !(mDur(mm) > 0) && isFinite(v.duration) && v.duration > 1) net.update('state/music', { dur: Math.round(v.duration), durK: musicKey(mm) }); } });
     var go = function () { try { v.currentTime = elapsed(m); } catch (e) {} setVol(); var p = v.play(); if (p && p.catch) p.catch(function () { v.muted = true; v.play().catch(function () {}); tvBadge(); }); };
     if (v.readyState >= 1) go(); else v.addEventListener('loadedmetadata', go, { once: true });
     tvVideo = v;
@@ -453,23 +454,24 @@
     try { f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: args || [] }), '*'); } catch (e) {}
   }
   window.addEventListener('message', function (e) {
-    if (!/youtube/.test(e.origin)) return;
+    if (!/^https:\/\/www\.youtube(-nocookie)?\.com$/.test(e.origin)) return;
+    var yf = $('tvHolder').firstChild; if (!yf || yf.tagName !== 'IFRAME' || e.source !== yf.contentWindow) return;   // 自分で入れた動画の窓からの合図だけ
     var d; try { d = JSON.parse(e.data); } catch (x) { return; }
     if (!d || !d.info) return;
     if (!ytReady) { ytReady = true; ytNoCaptions(); }
     var m = tree.state && tree.state.music, isYT = ytOn && m && m.kind === 'yt' && musicKey(m) === curKey;
-    if (typeof d.info.duration === 'number' && d.info.duration > 1) { ytDur = d.info.duration; if (isYT && !(m.dur > 0)) net.update('state/music', { dur: Math.round(ytDur) }); }   // 動画の長さを みんなに知らせる
+    if (typeof d.info.duration === 'number' && d.info.duration > 1) { ytDur = d.info.duration; if (isYT && !(mDur(m) > 0)) net.update('state/music', { dur: Math.round(ytDur), durK: musicKey(m) }); }   // 動画の長さを みんなに知らせる
     if (typeof d.info.playerState === 'number') {
       if (d.info.playerState !== ytState) ytNoCaptions();
       ytState = d.info.playerState;
-      if (ytState === 0 && isYT) { if (amLeader()) advance(curKey); else if (!m.ended) net.update('state/music', { ended: true }); }   // 終わった → 次へ(まとめ役でなければ「終わった」と知らせる)
+      if (ytState === 0 && isYT) { if (amLeader()) advance(curKey); else if (m.ended !== musicKey(m)) net.update('state/music', { ended: musicKey(m) }); }   // 終わった → 次へ(まとめ役でなければ「終わった」と知らせる)
     }
     if (typeof d.info.muted === 'boolean' && ytOn) { ytMuted = d.info.muted; tvBadge(); }
-    var dur = (m && m.dur > 0) ? m.dur : ytDur;
+    var dur = mDur(m) > 0 ? mDur(m) : ytDur;
     if (isYT && dur > 0 && elapsed(m) > dur + 0.5 && ytState === 1) { ytCmd('pauseVideo'); return; }   // 時間が過ぎたら止めて待つ(最初からくり返さない)
     // 戻った(ショート動画などが勝手に最初からくり返した) → 終わったことにする
     if (isYT && typeof d.info.currentTime === 'number') {
-      if (ytLastCT - d.info.currentTime > 5 && Date.now() - ytSeekAt > 3000 && dur > 0 && elapsed(m) > dur - 8) { ytCmd('pauseVideo'); if (amLeader()) advance(curKey); else if (!m.ended) net.update('state/music', { ended: true }); }
+      if (ytLastCT - d.info.currentTime > 5 && Date.now() - ytSeekAt > 3000 && dur > 0 && elapsed(m) > dur - 8) { ytCmd('pauseVideo'); if (amLeader()) advance(curKey); else if (m.ended !== musicKey(m)) net.update('state/music', { ended: musicKey(m) }); }
       ytLastCT = d.info.currentTime;
     }
     // みんなと同じ所を見る(4秒以上ずれたら合わせる)。終わりの近く・終わったあとは合わせない
@@ -605,7 +607,7 @@
   function checkOwner() {
     if (!OWNER_MODE) return Promise.resolve(true);
     var pass = $('ownerPass').value.trim();
-    var nearby = function () { var n = now(); return upcoming(n - 2 * 60 * MIN, 8).filter(function (x) { return x.start - n < 7 * DAY; }); };
+    var nearby = function () { var n = now(); return upcoming(n - 2 * 60 * MIN, 8).filter(function (x) { return x.start - 60 * MIN <= n && n <= (x.end || x.start + 60 * MIN) + 10 * MIN; }); };   // その回の開店1時間前から閉店まで
     var asNobu = function () { ROLE = 'nobu'; MASTER = null; return true; };
     if (!pass) return Promise.resolve(SHOP.OWNER_HASH ? false : asNobu());
     return Net.sha256(pass).then(function (h) {
@@ -683,6 +685,8 @@
     setView('overview');
   }
   /* 「帰る」を押さずに画面を閉じた: すぐには帰さず「席を外しています」にする(3分は席と料理が残る。戻ればそのまま座れる) */
+  var hereNow = function () { if (inside && net && document.visibilityState !== 'hidden' && members()[ME.uid]) net.update('members/' + ME.uid, { seen: TS }); };   // 画面にもどったら すぐ「いるよ」(席を外している扱いから もどす)
+  document.addEventListener('visibilitychange', hereNow); window.addEventListener('pageshow', hereNow);
   window.addEventListener('pagehide', function () {
     if (!inside || !net) return;
     if (OWNER_MODE || mySeat < 0) { if (mySeat >= 0) net.leaveBeacon('seats/' + mySeat); net.leaveBeacon('members/' + ME.uid); return; }
@@ -757,7 +761,8 @@
     var ln = e.target.closest && e.target.closest('.ln[data-seat]'), big = document.querySelector('.log-wrap').classList.contains('big');
     if (ln && !ln.getAttribute('data-me') && ln.getAttribute('data-seat') !== '') {
       var k = ln.getAttribute('data-seat'); if (k !== 'owner') k = +k;
-      var nm = nameOfSeat(k) || (ln.querySelector('b') ? ln.querySelector('b').textContent.replace(/^🏮 /, '') : '');
+      var u = ln.getAttribute('data-uid'), mu = u && members()[u];
+      var nm = (mu && mu.name) || (ln.querySelector('b') ? ln.querySelector('b').textContent.replace(/^🏮 /, '') : '');   // 書いた本人の名前(帰っていても、書いたときの名前)
       if (k === 'owner' && OWNER_MODE) return;
       if (big) toggleLog(false);
       replyTo(nm, k === 'owner'); return;
@@ -810,9 +815,9 @@
       if (m.owner) { return '<div class="ln owner" data-seat="owner"><b>🏮 ' + esc(m.name || '') + '</b>' + esc(m.text) + '</div>'; }
       var col = typeof m.seat === 'number' ? SEAT_COLORS[m.seat % SEAT_COLORS.length] : '';
       var fresh2 = OWNER_MODE && (m.at || 0) > lastOwnerAt && m.uid !== ME.uid;   // 大将が まだ返事していない新しいコメント
-      return '<div class="ln' + (fresh2 ? ' new' : '') + '" data-seat="' + (typeof m.seat === 'number' ? m.seat : '') + '"' + (m.uid === ME.uid ? ' data-me="1"' : '') + '><b' + (col ? ' style="color:' + col + '"' : '') + '>' + esc(m.name || '') + '</b>' + esc(m.text) + '</div>';
+      return '<div class="ln' + (fresh2 ? ' new' : '') + '" data-uid="' + esc(m.uid || '') + '" data-seat="' + (okSeat(m.seat) ? m.seat : '') + '"' + (m.uid === ME.uid ? ' data-me="1"' : '') + '><b' + (col ? ' style="color:' + col + '"' : '') + '>' + esc(m.name || '') + '</b>' + esc(m.text) + '</div>';
     }).join('');
-    if (log._h !== html) { log.innerHTML = html; log._h = html; if (atBottom || true) log.scrollTop = log.scrollHeight; }
+    if (log._h !== html) { log.innerHTML = html; log._h = html; if (atBottom) log.scrollTop = log.scrollHeight; }
     keys.forEach(function (k) {
       if (seenChat[k]) return; seenChat[k] = 1;
       var m = c[k]; if (m.sys || (m.at || 0) < joinAt - 5000) return;
@@ -824,8 +829,9 @@
 
   /* 頭の上の吹き出し */
   var bubbles = {};   // seat → {el, until}
+  function okSeat(v) { return typeof v === 'number' && v >= 0 && v < N && Math.floor(v) === v; }   // 席番号として正しいか(おかしな値で画面がこわれないように)
   function bubble(seat, text, phrase) {
-    if (seat == null) return;
+    if (seat !== 'owner' && !okSeat(seat)) return;
     var key = String(seat);
     var b = bubbles[key];
     if (!b) { b = bubbles[key] = { el: document.createElement('div'), bn: document.createElement('div'), bt: document.createElement('div') }; b.bn.className = 'bn'; b.bt.className = 'bt'; b.el.appendChild(b.bn); b.el.appendChild(b.bt); }
@@ -1050,7 +1056,7 @@
     var h = list.map(function (x) {
       var it = menuItem(x.id) || { emoji: '🍽️', name: x.id }, drink = it.kind === 'drink';
       var verb = drink ? (x.half ? '飲み干す' : '飲む') : (x.half ? '食べ終わる' : '食べる');
-      return '<button data-eat="' + x.key + '">' + it.emoji + ' <b>' + verb + '</b></button>';
+      return '<button data-eat="' + esc(x.key) + '">' + it.emoji + ' <b>' + verb + '</b></button>';
     }).join('');
     if (h && !tipShown) { tipShown = true; lsSet('iz-tip-eat', 1); setTimeout(function () { toast('料理や飲み物を そのまま押しても、食べたり飲んだりできます', 3500); }, 1500); }
     if (box._h !== h) { box._h = h; box.innerHTML = h; box.classList.toggle('hidden', !h);
@@ -1107,7 +1113,7 @@
   }
 
   /* ---------------- まとめ役の仕事(いちばん先にいる人のスマホが、1台だけでやる) ---------------- */
-  var closingFor = '';
+  var closingFor = '', autoServed = {};
   function tick() {
     if (!amLeader()) return;
     var n = now(), ms = members(), st = tree.state || {};
@@ -1121,7 +1127,7 @@
     // 大将がいないときは、注文を自動で出す
     if (!ownerPresent()) {
       var o = tree.orders || {};
-      Object.keys(o).forEach(function (k) { if (n - (o[k].at || n) > 3000) serve(o[k].seat, o[k].item, k); });   // 3秒は取り消せる
+      Object.keys(o).forEach(function (k) { if (n - (o[k].at || n) > 3000 && !autoServed[k]) { autoServed[k] = 1; serve(o[k].seat, o[k].item, k); } });   // 3秒は取り消せる
     }
     // 食べ終わって(空になって)5秒たった物を下げる
     for (var t2 = 0; t2 < N; t2++) {
@@ -1137,8 +1143,8 @@
     // 曲
     var m = st.music;
     if (!m) advance('');
-    else if ((m.kind === 'yt' || m.kind === 'video') && m.dur > 0 && elapsed(m) > m.dur + 3) advance(musicKey(m));   // 動画の長さが過ぎた(どの画面で流れていても)
-    else if (m.kind === 'yt' && m.ended && elapsed(m) > 5) advance(musicKey(m));   // だれかの画面で「終わった」
+    else if ((m.kind === 'yt' || m.kind === 'video') && mDur(m) > 0 && elapsed(m) > mDur(m) + 3) advance(musicKey(m));   // 動画の長さが過ぎた(どの画面で流れていても)
+    else if (m.kind === 'yt' && m.ended === musicKey(m) && elapsed(m) > 5) advance(musicKey(m));   // だれかの画面で「終わった」
     else if (m.kind === 'yt' && elapsed(m) > 12 * 60) advance(musicKey(m));
     else if (m.kind === 'video') { if (tvVideo && isFinite(tvVideo.duration) && tvVideo.duration > 0 && elapsed(m) > tvVideo.duration + 4) advance(musicKey(m)); else if (elapsed(m) > 30 * 60) advance(musicKey(m)); }
     else if (m.kind !== 'yt' && audio.src && isFinite(audio.duration) && audio.duration > 0 && elapsed(m) > audio.duration + 4) advance(musicKey(m));
@@ -1233,7 +1239,7 @@
       html += '<p class="small-note">音の大きさは自分のスマホだけ。曲はお店にいる全員で同じものを聞きます。</p>';
       html += '<div class="sh-sec">リクエストの順番待ち(' + qk.length + ')</div><div class="list">';
       if (!qk.length) html += '<div class="li"><div class="t"><small>まだありません。下の一覧からリクエストできます。</small></div></div>';
-      qk.forEach(function (k, i) { var it = q[k]; html += '<div class="li"><div class="t">' + (i + 1) + '. ' + esc(it.title) + '<small>' + esc(it.byName || '') + 'さん</small></div>' + ((it.by === ME.uid || OWNER_MODE) ? '<button class="gray" data-del="' + k + '">取り消し</button>' : '') + '</div>'; });
+      qk.forEach(function (k, i) { var it = q[k]; html += '<div class="li"><div class="t">' + (i + 1) + '. ' + esc(it.title) + '<small>' + esc(it.byName || '') + 'さん</small></div>' + ((it.by === ME.uid || OWNER_MODE) ? '<button class="gray" data-del="' + esc(k) + '">取り消し</button>' : '') + '</div>'; });
       html += '</div>';
       if (SHOP.ALLOW_YOUTUBE) html += '<div class="sh-sec">📺 動画のリンクを貼ってリクエスト</div><div class="yt-row"><input id="ytIn" placeholder="YouTube などのリンク" inputmode="url"><button id="ytAdd">追加</button></div><p class="small-note">大将のうしろのモニターに、みんな同じ場面で映ります。モニターを押すと大きく見られます。YouTube は公式の埋めこみで流すので、広告が入ることがあります。</p>';
       if ((SHOP.VIDEOS || []).length) {
@@ -1250,7 +1256,7 @@
       var o = tree.orders || {}, ok = Object.keys(o).sort();
       html += '<div class="list">';
       if (!ok.length) html += '<div class="li"><div class="t"><small>注文はありません</small></div></div>';
-      ok.forEach(function (k) { var it = menuItem(o[k].item) || { emoji: '🍽️', name: o[k].item }; html += '<div class="li"><div class="t">' + it.emoji + ' ' + esc(it.name) + '<small>' + (o[k].seat + 1) + '番 ' + esc(o[k].name) + 'さん</small></div><button data-serve="' + k + '">出す</button></div>'; });
+      ok.forEach(function (k) { var it = menuItem(o[k].item) || { emoji: '🍽️', name: o[k].item }; html += '<div class="li"><div class="t">' + it.emoji + ' ' + esc(it.name) + '<small>' + (okSeat(o[k].seat) ? o[k].seat + 1 : '?') + '番 ' + esc(o[k].name) + 'さん</small></div><button data-serve="' + esc(k) + '">出す</button></div>'; });
       html += '</div><p class="small-note">お客さんの席を押すと、注文がなくても好きな物を出せます。</p>';
       if (!force && body._h === html) return;
     } else if (sheetKind === 'owner') {
@@ -1438,8 +1444,9 @@
   $('bMusic').onclick = function () { openSheet('music'); };
   $('nowPlaying').onclick = function () { openSheet('music'); };
   /* 大将だけ: 今の曲・動画を取り消して次へ */
+  var skipAt = 0;
   function ownerSkip() {
-    if (!OWNER_MODE) return;
+    if (!OWNER_MODE || Date.now() - skipAt < 1500) return; skipAt = Date.now();
     var m = tree.state && tree.state.music; if (!m) return;
     advance(musicKey(m));
     toast('⏭ 「' + m.title + '」を取り消して、次へ進めました', 2200);
