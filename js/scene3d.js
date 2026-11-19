@@ -1169,6 +1169,23 @@ const PHOTO_POSES = [['normal', '🙂 ふつう', 'down', 'down'], ['peace', '�
   ['guts', '💪 ガッツポーズ', 'guts', 'down'], ['thumb', '👍 いいね', 'thumb', 'down', 'thumb'], ['heart', '🫶 ハート', 'heart', 'heart'], ['cross', '😎 腕組み', 'cross', 'cross']];
 const PHOTO_FACES = [['smile', '😊 にっこり', { eyes: 'smile', mouth: 'grin' }], ['wink', '😉 ウインク', { eyes: 'wink', mouth: 'grin' }], ['laugh', '😆 大笑い', { eyes: 'smile', mouth: 'open' }],
   ['surprise', '😲 びっくり', { eyes: 'round', mouth: 'open' }], ['normal', '🙂 いつもの顔', null]];
+/* ---------- 記念撮影の並び方(パターン) ----------
+   slots: [横, 前後, 顔の高さ]。0番は大将(まん中で みんなに埋もれる。顔は少し出す)。1番から順に お客さんで埋める
+   lean: まん中へ寄せる強さ / w,h: 写真の大きさ / bot: 写真の下のはし(足元を かくす高さ) / edge: 横のはしの余白 */
+const PHOTO_LAYOUTS = {
+  A: { name: 'A 最初の形(ふつう)', w: 1080, h: 1350, bot: 0.62, edge: 0.2, lean: 0.12,
+       slots: [[0, 1.36, 1.6], [-0.24, 1.58, 1.36], [0.24, 1.58, 1.36], [-0.5, 1.42, 1.5], [0.5, 1.42, 1.5], [-0.26, 1.18, 1.72], [0.26, 1.18, 1.72],
+               [-0.76, 1.3, 1.6], [0.76, 1.3, 1.6], [0, 1.04, 1.88], [-0.54, 1.06, 1.86], [0.54, 1.06, 1.86], [-0.72, 1.56, 1.3], [0.72, 1.56, 1.3]] },
+  B: { name: 'B ぎゅうぎゅう', w: 1080, h: 1350, bot: 0.66, edge: 0.18, lean: 0.22,
+       slots: [[0, 1.36, 1.6], [-0.2, 1.56, 1.37], [0.2, 1.56, 1.37], [-0.4, 1.42, 1.52], [0.4, 1.42, 1.52], [-0.2, 1.2, 1.74], [0.2, 1.2, 1.74],
+               [-0.6, 1.32, 1.62], [0.6, 1.32, 1.62], [0, 1.08, 1.9], [-0.42, 1.1, 1.88], [0.42, 1.1, 1.88], [-0.58, 1.55, 1.32], [0.58, 1.55, 1.32]] },
+  C: { name: 'C 3だん(上下に重なる)', w: 1080, h: 1350, bot: 0.62, edge: 0.2, lean: 0.14,
+       slots: [[0, 1.36, 1.62], [-0.26, 1.6, 1.3], [0.26, 1.6, 1.3], [-0.5, 1.44, 1.52], [0.5, 1.44, 1.52], [-0.16, 1.12, 1.9], [0.16, 1.12, 1.9],
+               [-0.46, 1.1, 1.86], [0.46, 1.1, 1.86], [-0.7, 1.58, 1.28], [0.7, 1.58, 1.28], [-0.74, 1.3, 1.66], [0.74, 1.3, 1.66], [0, 0.98, 2.08]] },
+  D: { name: 'D 正方形', w: 1080, h: 1080, bot: 0.78, edge: 0.3, lean: 0.14,
+       slots: [[0, 1.36, 1.6], [-0.24, 1.58, 1.36], [0.24, 1.58, 1.36], [-0.5, 1.42, 1.5], [0.5, 1.42, 1.5], [-0.26, 1.18, 1.72], [0.26, 1.18, 1.72],
+               [-0.76, 1.3, 1.6], [0.76, 1.3, 1.6], [0, 1.04, 1.88], [-0.54, 1.06, 1.86], [0.54, 1.06, 1.86], [-0.72, 1.56, 1.3], [0.72, 1.56, 1.3]] }
+};
 function photoAttach(av, list) {   // 指(ピースの2本・いいねの親指)を その時だけ手につける。list = [[種類, 手], ...]
   const u = av.userData;
   (u.atts || []).forEach((g) => { g.parent && g.parent.remove(g); g.traverse((m) => m.geometry && m.geometry.dispose()); });
@@ -1184,7 +1201,7 @@ function photoAttach(av, list) {   // 指(ピースの2本・いいねの親指)
 }
 function photoPose(av, dt) {
   const u = av.userData, P = u.photo; u.t += dt;
-  u.body.position.y = Math.sin(u.t * 2.1) * 0.004; u.body.rotation.set(0, 0, 0);
+  u.body.position.y = Math.sin(u.t * 2.1) * 0.004; u.body.rotation.set(0, 0, P.lean || 0);   // まん中へ寄りそう
   const pose = PHOTO_POSES.find((p) => p[0] === P.pose) || PHOTO_POSES[0], wave = pose[0] === 'wave';
   const setArm = (i, key, wv) => { const sd = i === 1 ? 1 : -1, A = ARM[key]; u.arms[i].rotation.set(A[0], 0, sd * A[1] + (wv ? Math.sin(u.t * 9) * 0.28 * sd : 0)); if (u.fores) u.fores[i].rotation.x = A[2]; };
   let main = 1;
@@ -2115,15 +2132,13 @@ function createShop(canvas, opts) {
     talk(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.talk = 1.6; },
     /* ---------- 記念撮影(大将の自撮り風) ----------
        list = [{ key: 席の番号 か 'owner', pose, face }](写らない人は入れない)。何回よんでもよい(選びなおし・人の出入り) */
-    photoSet(list) {
+    photoSet(list, layoutId) {
       if (!photo) photo = { cam: new THREE.Vector3(0, 1.66, 2.85), look: new THREE.Vector3(0, 1.56, 1.45), half: 0.6, top: 2.1, bot: 1.05 };
       const want = new Set(list.map((p) => String(p.key)));
       seatAvatars.forEach((a, i) => { if (!a) return; a.visible = want.has(String(i)); if (!a.visible) photoClear(a); });
       if (owner) { owner.visible = want.has('owner'); if (!owner.visible) photoClear(owner); }
       // 席の順(左から)に並べる。大将がいれば まん中の前。顔が上下に重なるように 前後2〜3列
-      // [横, 前後, 顔の高さ]。前の列(低い)・真ん中の列(高い)・うしろの列(いちばん高い)。顔どうしが少し重なるくらい ぎゅっと
-      const SL = [[0, 1.62, 1.38], [-0.3, 1.56, 1.33], [0.3, 1.56, 1.33], [-0.15, 1.36, 1.72], [0.15, 1.36, 1.72], [-0.45, 1.38, 1.67], [0.45, 1.38, 1.67],
-                  [0, 1.12, 2.02], [-0.3, 1.14, 1.98], [0.3, 1.14, 1.98], [-0.6, 1.5, 1.3], [0.6, 1.5, 1.3], [-0.75, 1.3, 1.66], [0.75, 1.3, 1.66]];
+      const LY = PHOTO_LAYOUTS[layoutId] || PHOTO_LAYOUTS.A, SL = LY.slots; photo.ly = LY;
       const own = list.find((p) => p.key === 'owner'), guests = list.filter((p) => p.key !== 'owner').sort((x, y) => x.key - y.key);
       const slots = (own ? SL.slice(1, 1 + guests.length) : SL.slice(0, guests.length)).slice().sort((x, y) => x[0] - y[0]);
       const place = (a, p, sl, isOwner) => {
@@ -2132,13 +2147,13 @@ function createShop(canvas, opts) {
         a.position.set(sl[0], sl[2] - u.headOff, sl[1]);
         a.rotation.y = Math.atan2(photo.cam.x - sl[0], photo.cam.z - sl[1]);
         u.lookT = 0; u.lw = 0;
-        u.photo = { pose: p.pose || 'normal', face: p.face || 'smile', owner: isOwner, tilt: Math.max(-0.22, Math.min(0.22, -sl[0] * 0.3)) };
+        u.photo = { pose: p.pose || 'normal', face: p.face || 'smile', owner: isOwner, tilt: Math.max(-0.3, Math.min(0.3, sl[0] * 0.4)), lean: Math.max(-0.25, Math.min(0.25, sl[0] * LY.lean * 2)) };   // 頭と体を まん中へ かたむける
       };
       if (own && owner) place(owner, own, SL[0], true);
       guests.forEach((p, k) => { const a = seatAvatars[p.key]; if (a && slots[k]) place(a, p, slots[k], false); });
       const used = (own ? [SL[0]] : []).concat(slots);
-      photo.half = Math.max(0.5, ...used.map((sl) => Math.abs(sl[0]) + 0.38));   // 上げた手・ジョッキが切れないように
-      photo.top = Math.max(...used.map((sl) => sl[2])) + 0.26; photo.bot = Math.min(...used.map((sl) => sl[2])) - 0.3;
+      photo.half = Math.max(0.45, ...used.map((sl) => Math.abs(sl[0]) + LY.edge));   // 横のはしの人は 少し切れてもよい(自撮りらしく)
+      photo.top = Math.max(...used.map((sl) => sl[2])) + 0.28; photo.bot = Math.max(LY.bot, Math.min(...used.map((sl) => sl[2])) - 0.95);   // 足元は かくす
       photo.look.y = (photo.top + photo.bot) / 2;
     },
     photoEnd() {
@@ -2149,8 +2164,9 @@ function createShop(canvas, opts) {
     },
     get photoOn() { return !!photo; },
     /* いまの集合の絵を、写真の大きさ(正方形。顔の集まりは横に広いので、足が写らず顔が大きい)で1枚 写しとる。画面と同じ色の仕上げにするため、一瞬だけ大きく描く */
-    capturePhoto(w = 1080, h = 1080) {
+    capturePhoto(w, h) {
       if (!photo) return null;
+      w = w || (photo.ly && photo.ly.w) || 1080; h = h || (photo.ly && photo.ly.h) || 1350;
       const pr = renderer.getPixelRatio(), sz = renderer.getSize(new THREE.Vector2()), cam = camera.clone();
       cam.clearViewOffset(); photoCam(cam, w / h);
       renderer.setPixelRatio(1); renderer.setSize(w, h, false);
@@ -2160,7 +2176,7 @@ function createShop(canvas, opts) {
       renderer.render(scene, camera);
       return c;
     },
-    photoPoses: PHOTO_POSES, photoFaces: PHOTO_FACES,
+    photoPoses: PHOTO_POSES, photoFaces: PHOTO_FACES, photoLayouts: PHOTO_LAYOUTS,
     /* seat の人が target の人のほうを secs 秒 向く(target は 席の番号か 'owner') */
     lookAt(seat, target, secs) {
       const a = seat === 'owner' ? owner : seatAvatars[seat], t = target === 'owner' ? owner : seatAvatars[target];

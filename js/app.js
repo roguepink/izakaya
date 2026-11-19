@@ -1587,7 +1587,7 @@
     $('phChoose').classList.toggle('off', myPick.hide || !picking);
     $('phNote').textContent = myPick.hide ? 'あなたは この写真に写りません。ほかの人の写真は受けとれます。'
       : locked ? '選んだポーズで撮ります' : picking ? 'あと ' + Math.ceil(rem - PH.PICK_TO) + '秒 選べます' : 'あと ' + Math.ceil(rem - PH.PICK_FROM) + '秒で ポーズと表情を選べます。写りたくない人は「今回は写らない」を押してください';
-    withScene(function (s) { if (s.photoSet) s.photoSet(photoList()); });
+    withScene(function (s) { if (s.photoSet) s.photoSet(photoList(), PH.LAYOUT); });
     // 大将の声(みんなのスマホで、それぞれ同じ時に鳴らす)
     var say = function (id, when) { if (!phSaid[id] && rem <= when && rem > when - 2) { phSaid[id] = 1; var ph = SHOP.PHRASES.filter(function (p) { return p.id === id; })[0]; if (ph) playPhrase(ph); } };
     say('o_photo', PH.SEC - 0.3); say('o_cheese', 1.6);
