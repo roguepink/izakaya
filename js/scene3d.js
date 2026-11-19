@@ -871,21 +871,22 @@ function buildAvatar(raw, opt = {}) {
   const hdl = tm(new THREE.TorusGeometry(0.027, 0.008, 8, 14, Math.PI), '#e8eef2', 0, 0, -0.046, 0.002); hdl.rotation.z = -Math.PI / 2; hdl.rotation.y = Math.PI / 2; mugIn.add(hdl);
   cheerMug.visible = false; hands[1].add(cheerMug);
 
-  // 足(座っている形)
+  // 足(座っている形)。記念撮影のときは消せるように、体とは別のまとまり(legs)にする
+  const legs = new THREE.Group(); legs.add(legs);
   if (!opt.standing) {
     const pantsC = def.pants === 'same' ? cc : (a.top === 'work' ? cc : (f ? '#3a3a4a' : '#2a2c38'));
     const skirt = lower === 'skirt';
     const legC = skirt ? skinC : pantsC;
     [-1, 1].forEach((s) => {
       const x = (f ? 0.062 : 0.072) * s;
-      if (!skirt) { const th = tm(new THREE.CapsuleGeometry(f ? 0.055 : 0.06, 0.2, 6, 12), legC, x, 0.04, 0.13, LN); th.rotation.x = Math.PI / 2; body.add(th); }
-      body.add(tm(new THREE.SphereGeometry(f ? 0.048 : 0.054, 12, 10), legC, x, 0.035, 0.27, LN));   // ひざ
-      body.add(tm(new THREE.CapsuleGeometry(f ? 0.04 : 0.046, 0.24, 6, 12), legC, x, -0.13, 0.285, LN));
-      if (skirt) body.add(tm(new THREE.CylinderGeometry(0.035, 0.035, 0.07, 10), f ? '#f2ece4' : legC, x, -0.24, 0.285, 0));   // くつした
+      if (!skirt) { const th = tm(new THREE.CapsuleGeometry(f ? 0.055 : 0.06, 0.2, 6, 12), legC, x, 0.04, 0.13, LN); th.rotation.x = Math.PI / 2; legs.add(th); }
+      legs.add(tm(new THREE.SphereGeometry(f ? 0.048 : 0.054, 12, 10), legC, x, 0.035, 0.27, LN));   // ひざ
+      legs.add(tm(new THREE.CapsuleGeometry(f ? 0.04 : 0.046, 0.24, 6, 12), legC, x, -0.13, 0.285, LN));
+      if (skirt) legs.add(tm(new THREE.CylinderGeometry(0.035, 0.035, 0.07, 10), f ? '#f2ece4' : legC, x, -0.24, 0.285, 0));   // くつした
       // くつ(丸い つま先+底)
       const shoeC = f ? (skirt ? '#6a2a2a' : '#3a2a22') : '#1d1a18';
-      const toe = tm(new THREE.SphereGeometry(0.045, 14, 10), shoeC, x, -0.345, 0.32, LN); toe.scale.set(0.85, 0.6, 1.35); body.add(toe);
-      body.add(tm(new THREE.BoxGeometry(0.072, 0.012, 0.13), '#f2ece4', x, -0.372, 0.325, 0));
+      const toe = tm(new THREE.SphereGeometry(0.045, 14, 10), shoeC, x, -0.345, 0.32, LN); toe.scale.set(0.85, 0.6, 1.35); legs.add(toe);
+      legs.add(tm(new THREE.BoxGeometry(0.072, 0.012, 0.13), '#f2ece4', x, -0.372, 0.325, 0));
     });
     if (skirt) {   // ひざの上にかかる布 + 前に垂れる すそ
       const skc = a.top === 'office' ? '#2c2c36' : cc;
@@ -925,8 +926,8 @@ function buildAvatar(raw, opt = {}) {
   buildAcc(skull, body, a, R, f);
   tuckHair(skull, hairObjs);
   root.scale.setScalar(a.size);
-  root.userData = { body, head, arms, fores, hands, cheerMug, torso, t: Math.random() * 10, cheer: 0, talk: 0, face, faceA: a, skin: skinC };
-  if (!window.__nobake) bakeAvatar(root, [body, head, arms[0], arms[1], fores[0], fores[1]], new Set([cheerMug]));
+  root.userData = { body, head, arms, fores, hands, legs, cheerMug, torso, t: Math.random() * 10, cheer: 0, talk: 0, face, faceA: a, skin: skinC };
+  if (!window.__nobake) bakeAvatar(root, [body, head, arms[0], arms[1], fores[0], fores[1], legs], new Set([cheerMug]));
   return root;
 }
 
@@ -1173,18 +1174,21 @@ const PHOTO_FACES = [['smile', '😊 にっこり', { eyes: 'smile', mouth: 'gri
    slots: [横, 前後, 顔の高さ]。0番は大将(まん中で みんなに埋もれる。顔は少し出す)。1番から順に お客さんで埋める
    lean: まん中へ寄せる強さ / w,h: 写真の大きさ / bot: 写真の下のはし(足元を かくす高さ) / edge: 横のはしの余白 */
 const PHOTO_LAYOUTS = {
-  A: { name: 'A 最初の形(ふつう)', w: 1080, h: 1350, bot: 0.62, edge: 0.2, lean: 0.12,
-       slots: [[0, 1.36, 1.6], [-0.24, 1.58, 1.36], [0.24, 1.58, 1.36], [-0.5, 1.42, 1.5], [0.5, 1.42, 1.5], [-0.26, 1.18, 1.72], [0.26, 1.18, 1.72],
-               [-0.76, 1.3, 1.6], [0.76, 1.3, 1.6], [0, 1.04, 1.88], [-0.54, 1.06, 1.86], [0.54, 1.06, 1.86], [-0.72, 1.56, 1.3], [0.72, 1.56, 1.3]] },
-  B: { name: 'B ぎゅうぎゅう', w: 1080, h: 1350, bot: 0.66, edge: 0.18, lean: 0.22,
-       slots: [[0, 1.36, 1.6], [-0.2, 1.56, 1.37], [0.2, 1.56, 1.37], [-0.4, 1.42, 1.52], [0.4, 1.42, 1.52], [-0.2, 1.2, 1.74], [0.2, 1.2, 1.74],
-               [-0.6, 1.32, 1.62], [0.6, 1.32, 1.62], [0, 1.08, 1.9], [-0.42, 1.1, 1.88], [0.42, 1.1, 1.88], [-0.58, 1.55, 1.32], [0.58, 1.55, 1.32]] },
-  C: { name: 'C 3だん(上下に重なる)', w: 1080, h: 1350, bot: 0.62, edge: 0.2, lean: 0.14,
-       slots: [[0, 1.36, 1.62], [-0.26, 1.6, 1.3], [0.26, 1.6, 1.3], [-0.5, 1.44, 1.52], [0.5, 1.44, 1.52], [-0.16, 1.12, 1.9], [0.16, 1.12, 1.9],
-               [-0.46, 1.1, 1.86], [0.46, 1.1, 1.86], [-0.7, 1.58, 1.28], [0.7, 1.58, 1.28], [-0.74, 1.3, 1.66], [0.74, 1.3, 1.66], [0, 0.98, 2.08]] },
-  D: { name: 'D 正方形', w: 1080, h: 1080, bot: 0.78, edge: 0.3, lean: 0.14,
-       slots: [[0, 1.36, 1.6], [-0.24, 1.58, 1.36], [0.24, 1.58, 1.36], [-0.5, 1.42, 1.5], [0.5, 1.42, 1.5], [-0.26, 1.18, 1.72], [0.26, 1.18, 1.72],
-               [-0.76, 1.3, 1.6], [0.76, 1.3, 1.6], [0, 1.04, 1.88], [-0.54, 1.06, 1.86], [0.54, 1.06, 1.86], [-0.72, 1.56, 1.3], [0.72, 1.56, 1.3]] }
+  /* なかよし ぎゅうぎゅう(ノブさん 2026-11-20): 全員(大将も)の顔を見せる。髪どうしは重なってよい。前の列は胸から上。大将は まん中。
+     cam: カメラ(大将のスマホ)の高さ。高く持って見下ろすと、うしろの段が かくれにくい。under: 前の列の顔から どこまで下を写すか。
+     高さ・横は目安。実際は1人ずつ頭の大きさを測って、顔が かくれないように 横へずらす・上げる(photoSet) */
+  N1: { name: 'N1 なかよし3だん', w: 1080, h: 1350, edge: 0.22, lean: 0.18, tilt: 0.5, cam: 1.95, under: 0.42,
+        slots: [[0, 1.5, 1.4], [-0.25, 1.62, 1.3], [0.25, 1.62, 1.3], [-0.31, 1.38, 1.66], [0.31, 1.38, 1.66], [-0.17, 1.22, 2.0], [0.17, 1.22, 2.0],
+                [0, 1.36, 1.72], [-0.48, 1.2, 1.98], [0.48, 1.2, 1.98], [-0.6, 1.38, 1.64], [0.6, 1.38, 1.64], [-0.52, 1.62, 1.28], [0.52, 1.62, 1.28]] },
+  N2: { name: 'N2 ほっぺくっつけ', w: 1080, h: 1350, edge: 0.24, lean: 0.3, tilt: 0.8, cam: 1.95, under: 0.42,
+        slots: [[0, 1.5, 1.4], [-0.24, 1.62, 1.31], [0.24, 1.62, 1.31], [-0.3, 1.38, 1.65], [0.3, 1.38, 1.65], [-0.17, 1.22, 1.99], [0.17, 1.22, 1.99],
+                [0, 1.36, 1.72], [-0.47, 1.2, 1.97], [0.47, 1.2, 1.97], [-0.58, 1.38, 1.63], [0.58, 1.38, 1.63], [-0.51, 1.62, 1.29], [0.51, 1.62, 1.29]] },
+  N3: { name: 'N3 なかよし2だん', w: 1080, h: 1350, edge: 0.22, lean: 0.18, tilt: 0.5, cam: 1.95, under: 0.42,   // れんが積み2だん(まえ4人・うしろ 大将+4人)。人数が多いと3だん目
+        slots: [[0, 1.42, 1.6], [-0.15, 1.62, 1.31], [0.15, 1.62, 1.31], [-0.3, 1.42, 1.6], [0.3, 1.42, 1.6], [-0.45, 1.62, 1.31], [0.45, 1.62, 1.31],
+                [-0.6, 1.42, 1.6], [0.6, 1.42, 1.6], [-0.15, 1.22, 1.92], [0.15, 1.22, 1.92], [-0.45, 1.22, 1.92], [0.45, 1.22, 1.92], [-0.75, 1.62, 1.31]] },
+  N4: { name: 'N4 すき間に顔', w: 1080, h: 1350, edge: 0.22, lean: 0.16, tilt: 0.45, cam: 1.95, under: 0.42,   // れんが積み3だん。下の2人の頭の すき間に 上の人の顔
+        slots: [[0, 1.46, 1.56], [-0.28, 1.62, 1.3], [0.28, 1.62, 1.3], [-0.28, 1.26, 1.86], [0.28, 1.26, 1.86], [-0.56, 1.46, 1.56], [0.56, 1.46, 1.56],
+                [0, 1.1, 2.14], [-0.56, 1.1, 2.12], [0.56, 1.1, 2.12], [-0.84, 1.26, 1.84], [0.84, 1.26, 1.84], [-0.56, 1.62, 1.28], [0.56, 1.62, 1.28]] }
 };
 function photoAttach(av, list) {   // 指(ピースの2本・いいねの親指)を その時だけ手につける。list = [[種類, 手], ...]
   const u = av.userData;
@@ -1202,6 +1206,7 @@ function photoAttach(av, list) {   // 指(ピースの2本・いいねの親指)
 function photoPose(av, dt) {
   const u = av.userData, P = u.photo; u.t += dt;
   u.body.position.y = Math.sin(u.t * 2.1) * 0.004; u.body.rotation.set(0, 0, P.lean || 0);   // まん中へ寄りそう
+  if (u.legs) u.legs.visible = false;   // 座った足は写さない(うしろの段の足が 前へ突き出して見えるため)
   const pose = PHOTO_POSES.find((p) => p[0] === P.pose) || PHOTO_POSES[0], wave = pose[0] === 'wave';
   const setArm = (i, key, wv) => { const sd = i === 1 ? 1 : -1, A = ARM[key]; u.arms[i].rotation.set(A[0], 0, sd * A[1] + (wv ? Math.sin(u.t * 9) * 0.28 * sd : 0)); if (u.fores) u.fores[i].rotation.x = A[2]; };
   let main = 1;
@@ -1221,7 +1226,7 @@ function photoPose(av, dt) {
 }
 function photoClear(av) {   // 撮影が終わったら もとの形へ
   const u = av.userData; if (!u.photo) return;
-  u.photo = null; photoAttach(av, []);
+  u.photo = null; photoAttach(av, []); if (u.legs) u.legs.visible = true;
   u.attKey = null; u.faceKey = null; u.cheerMug.visible = false;
   if (u.face) { u.face.material.map = faceTexture(u.faceA); u.face.material.needsUpdate = true; }
   [0, 1].forEach((i) => { u.arms[i].rotation.set(-0.45, 0, 0.06 * (i ? 1 : -1)); if (u.fores) u.fores[i].rotation.x = -0.55; });
@@ -2028,9 +2033,11 @@ function createShop(canvas, opts) {
   function photoCam(cam, aspect, live) {
     const d = photo.cam.distanceTo(photo.look), vf = 2 * Math.atan((photo.top - photo.bot) / 2 / d), hf = 2 * Math.atan(photo.half / d);
     const fv = Math.max(vf, 2 * Math.atan(Math.tan(hf / 2) / aspect));
+    // 横に合わせて広くなったぶんは 上(背景)へ回し、下のはし(前の列の胸)は動かさない
+    const extra = d * Math.tan(fv / 2) - (photo.top - photo.bot) / 2;
     // 画面で見ている間(たて長のスマホ)は、下の「選ぶ」パネルに かくれないよう 集合を画面の上寄りに出す
     const up = live && aspect < 0.85 ? 0.24 * 2 * d * Math.tan(fv / 2) : 0;
-    cam.position.copy(photo.cam); cam.lookAt(photo.look.x, photo.look.y - up, photo.look.z);
+    cam.position.copy(photo.cam); cam.lookAt(photo.look.x, photo.look.y + Math.max(0, extra) - up, photo.look.z);
     cam.fov = THREE.MathUtils.radToDeg(fv); cam.aspect = aspect; cam.updateProjectionMatrix();
   }
   function headPos(obj) {
@@ -2138,22 +2145,57 @@ function createShop(canvas, opts) {
       seatAvatars.forEach((a, i) => { if (!a) return; a.visible = want.has(String(i)); if (!a.visible) photoClear(a); });
       if (owner) { owner.visible = want.has('owner'); if (!owner.visible) photoClear(owner); }
       // 席の順(左から)に並べる。大将がいれば まん中の前。顔が上下に重なるように 前後2〜3列
-      const LY = PHOTO_LAYOUTS[layoutId] || PHOTO_LAYOUTS.A, SL = LY.slots; photo.ly = LY;
+      const LY = PHOTO_LAYOUTS[layoutId] || PHOTO_LAYOUTS.N1, SL = LY.slots; photo.ly = LY; photo.cam.y = LY.cam || 1.66; photo.cam.z = LY.camZ || 3.4;   // 少し離れて撮ると、前とうしろの顔の大きさが そろう
       const own = list.find((p) => p.key === 'owner'), guests = list.filter((p) => p.key !== 'owner').sort((x, y) => x.key - y.key);
       const slots = (own ? SL.slice(1, 1 + guests.length) : SL.slice(0, guests.length)).slice().sort((x, y) => x[0] - y[0]);
-      const place = (a, p, sl, isOwner) => {
-        const u = a.userData;
-        if (u.headOff == null) { const r = a.rotation.y; a.rotation.y = 0; a.updateMatrixWorld(true); u.head.getWorldPosition(tmp); u.headOff = tmp.y - a.position.y; a.rotation.y = r; }
-        a.position.set(sl[0], sl[2] - u.headOff, sl[1]);
-        a.rotation.y = Math.atan2(photo.cam.x - sl[0], photo.cam.z - sl[1]);
-        u.lookT = 0; u.lw = 0;
-        u.photo = { pose: p.pose || 'normal', face: p.face || 'smile', owner: isOwner, tilt: Math.max(-0.3, Math.min(0.3, sl[0] * 0.4)), lean: Math.max(-0.25, Math.min(0.25, sl[0] * LY.lean * 2)) };   // 頭と体を まん中へ かたむける
+      // 1人ずつ 頭の大きさを測る(髪のてっぺん・あご)。帽子や ツンツン頭でも、うしろの人の顔が かくれないように
+      const measure = (a) => {
+        const u = a.userData; if (u.hm) return u.hm;
+        const r = a.rotation.y; a.rotation.y = 0; a.updateMatrixWorld(true);
+        const hw = new THREE.Vector3(); u.head.getWorldPosition(hw);
+        const box = new THREE.Box3().setFromObject(u.head); let chin = -0.19;
+        u.head.traverse((m) => { if (m.isMesh && m.material && m.material.color && u.skin && ('#' + m.material.color.getHexString()) === String(u.skin).toLowerCase()) { const bb = new THREE.Box3().setFromObject(m); chin = Math.max(chin, bb.min.y - hw.y); } });
+        u.headOff = hw.y - a.position.y; a.rotation.y = r;
+        return (u.hm = { top: box.max.y - hw.y, chin, hw: Math.max(0.15, (box.max.x - box.min.x) / 2) });
       };
-      if (own && owner) place(owner, own, SL[0], true);
-      guests.forEach((p, k) => { const a = seatAvatars[p.key]; if (a && slots[k]) place(a, p, slots[k], false); });
-      const used = (own ? [SL[0]] : []).concat(slots);
-      photo.half = Math.max(0.45, ...used.map((sl) => Math.abs(sl[0]) + LY.edge));   // 横のはしの人は 少し切れてもよい(自撮りらしく)
-      photo.top = Math.max(...used.map((sl) => sl[2])) + 0.28; photo.bot = Math.max(LY.bot, Math.min(...used.map((sl) => sl[2])) - 0.95);   // 足元は かくす
+      const E = [];
+      const add = (a, p, sl, isOwner) => { const hm = measure(a); E.push({ a, p, sl, isOwner, x: sl[0], z: sl[1], y: sl[2], hm }); };
+      if (own && owner) add(owner, own, SL[0], true);
+      guests.forEach((p, k) => { const a = seatAvatars[p.key]; if (a && slots[k]) add(a, p, slots[k], false); });
+      // 前の人から順に、全員(大将も)の顔が 見えるように並べる。
+      // うしろの人が前の人に かくれるときは、まず横の あいている所へ少し ずれる。それでも かくれるときだけ 上げる
+      const camY = photo.cam.y, camZ = photo.cam.z;
+      const needY = (e, x) => {   // その横の位置で、顔が見えるのに必要な高さ
+        let y = e.y0;
+        E.forEach((f) => {
+          if (f === e || !f.done || f.z <= e.z + 0.05 || Math.abs(f.x - x) >= f.hm.hw * 0.95 + 0.14) return;   // 髪どうしは重なってよい。顔(はば約0.28m)が かくれなければよい
+          const k = (f.z - e.z) / (camZ - e.z), chinNeed = (f.y + f.hm.top - camY * k) / (1 - k);
+          y = Math.max(y, chinNeed - e.hm.chin + 0.015);
+        });
+        return y;
+      };
+      const crowd = (e, x) => E.some((f) => f !== e && f.done && Math.abs(f.z - e.z) < 0.08 && Math.abs(f.x - x) < 0.3);   // 同じ列の となりと 顔が重なる
+      E.forEach((e) => { e.y0 = e.y; e.done = false; });
+      E.slice().sort((p, q) => q.z - p.z || Math.abs(p.x) - Math.abs(q.x)).forEach((e) => {
+        let best = { x: e.x, y: needY(e, e.x), cost: 0 };
+        if (best.y - e.y0 > 0.04) [-0.2, -0.13, -0.07, 0.07, 0.13, 0.2].forEach((dx) => {
+          const x = e.x + dx; if (crowd(e, x)) return;
+          const y = needY(e, x), cost = (y - e.y0) + Math.abs(dx) * 0.6;
+          if (cost < best.cost + (best.y - e.y0)) best = { x, y, cost: Math.abs(dx) * 0.6 };
+        });
+        e.x = best.x; e.y = best.y; e.done = true;
+      });
+      E.forEach((e) => {
+        const a = e.a, u = a.userData;
+        a.position.set(e.x, e.y - u.headOff, e.z);
+        a.rotation.y = Math.atan2(photo.cam.x - e.x, photo.cam.z - e.z);
+        u.lookT = 0; u.lw = 0;
+        u.photo = { pose: e.p.pose || 'normal', face: e.p.face || 'smile', owner: e.isOwner, tilt: Math.max(-0.35, Math.min(0.35, e.x * (LY.tilt || 0.4))), lean: Math.max(-0.25, Math.min(0.25, e.x * LY.lean * 2)) };   // 頭と体を まん中へ かたむける
+      });
+      const gs = E.filter((e) => !e.isOwner);
+      photo.half = Math.max(0.45, ...E.map((e) => Math.abs(e.x) + LY.edge));   // 横のはしの人は 少し切れてもよい(自撮りらしく)
+      photo.top = Math.max(...E.map((e) => e.y + e.hm.top)) + 0.12;
+      photo.bot = (gs.length ? Math.min(...gs.map((e) => e.y)) : 1.3) - (LY.under || 0.45);   // 前の列は胸から上
       photo.look.y = (photo.top + photo.bot) / 2;
     },
     photoEnd() {
