@@ -22,6 +22,169 @@ const MATS = {};
 function mat(color, o) { const k = color + JSON.stringify(o || {}); return MATS[k] || (MATS[k] = lam(color, o)); }
 
 function mesh(geo, material, x = 0, y = 0, z = 0) { const m = new THREE.Mesh(geo, material); m.position.set(x, y, z); return m; }
+/* =====================================================================
+   奥の棚の物 —— 1つずつ ちがう物(一升瓶・焼酎・ウイスキー・梅酒・ワイン・ビール・徳利・招き猫・ボトルキープの札)。
+   形は粗くていい(スマホでは小さい)。輪郭・色・ラベルで見分けがつくようにする。
+   銘柄はすべて架空(実在の商品名は使わない)。全部まとめて焼き固め、描く回数は2回だけ(重くしない)
+   ===================================================================== */
+function vcolor(geo, hex, o = {}) {   // 頂点に色をぬる。gloss: 左前からの光の すじ(ガラスのつや)、band: 高さで色を変える
+  geo.computeVertexNormals();
+  const g = geo.index ? geo.toNonIndexed() : geo, n = g.attributes.normal, p = g.attributes.position;
+  const c = new THREE.Color(hex), arr = new Float32Array(n.count * 3), tmp = new THREE.Color();
+  for (let i = 0; i < n.count; i++) {
+    let cc = c;
+    if (o.band) for (const [y0, y1, h2] of o.band) if (p.getY(i) >= y0 && p.getY(i) <= y1) { cc = tmp.set(h2); break; }
+    const hl = o.gloss ? Math.pow(Math.max(0, -n.getX(i) * 0.5 + n.getZ(i) * 0.87), 10) * o.gloss : 0;
+    arr[i * 3] = Math.min(1, cc.r + hl); arr[i * 3 + 1] = Math.min(1, cc.g + hl); arr[i * 3 + 2] = Math.min(1, cc.b + hl);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(arr, 3)); g.deleteAttribute('uv'); return g;
+}
+function lathe(pts, seg = 10, phi = 0) { const P = [new THREE.Vector2(0, pts[0][1])].concat(pts.map(([r, y]) => new THREE.Vector2(r, y)), [new THREE.Vector2(0, pts[pts.length - 1][1])]); return new THREE.LatheGeometry(P, seg, phi); }
+function mergeGeos(list, keys) {   // 同じ種類の属性をもつ形を1つに
+  const out = new THREE.BufferGeometry();
+  keys.forEach((k) => {
+    const size = list[0].attributes[k].itemSize, total = list.reduce((s, g) => s + g.attributes[k].count, 0), arr = new Float32Array(total * size);
+    let off = 0; list.forEach((g) => { arr.set(g.attributes[k].array, off); off += g.attributes[k].count * size; });
+    out.setAttribute(k, new THREE.BufferAttribute(arr, size));
+  });
+  return out;
+}
+const SHELF_LABELS = [   // [地の色, 字の色, 字(縦書き), 小さい字, はんこ色]
+  ['#f4efe2', '#1a1410', 'ノブ', '純米', '#c8261c'], ['#efe6cc', '#1a1410', '辛口', '本醸造', ''], ['#fbe8ee', '#5a1a2a', '夜桜', '吟醸', '#d84a7a'],
+  ['#d8e6f2', '#14284a', '吟醸', '四合', ''], ['#16120e', '#f4efe2', '芋', '本格焼酎', '#c8261c'], ['#d9c49a', '#2a1a10', '麦', '本格焼酎', ''],
+  ['#f2f2ee', '#1a1410', '米', '本格焼酎', '#2a6a3a'], ['#141414', '#d8b45a', 'WHISKY', '12', ''], ['#fbf8f0', '#c8261c', '梅', '梅酒', ''],
+  ['#efe4c8', '#5a1a2a', 'ROUGE', 'vin', ''], ['#f4e8c8', '#8a5a10', '生', 'BEER', ''],
+  ['#fffdf6', '#1a1410', 'ノブ', '', ''], ['#fffdf6', '#1a1410', 'げんさん', '', ''], ['#fffdf6', '#1a1410', 'たけし', '', ''], ['#fffdf6', '#1a1410', 'みゆき', '', ''],
+  ['#f4ead0', '#c8261c', '祝', '', '']
+];
+function shelfAtlas() {   // ラベルを1枚の絵にまとめる(8列×2段、1つ 128×256)
+  return canvasTex(1024, 512, (g) => {
+    SHELF_LABELS.forEach(([bg, fg, big, small, stamp], i) => {
+      const x = (i % 8) * 128, y = Math.floor(i / 8) * 256, tag = i >= 11 && i <= 14;
+      g.fillStyle = bg; g.fillRect(x, y, 128, 256);
+      if (!tag) { g.strokeStyle = fg; g.globalAlpha = 0.5; g.lineWidth = 4; g.strokeRect(x + 8, y + 8, 112, 240); g.globalAlpha = 1; }
+      g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+      if (/^[A-Z]/.test(big)) {   // 横文字は横に
+        g.font = 'bold 30px Georgia,serif'; g.fillText(big, x + 64, y + 110);
+        g.font = 'bold 44px Georgia,serif'; g.fillText(small, x + 64, y + 165);
+        g.strokeStyle = fg; g.lineWidth = 3; g.beginPath(); g.moveTo(x + 24, y + 70); g.lineTo(x + 104, y + 70); g.moveTo(x + 24, y + 200); g.lineTo(x + 104, y + 200); g.stroke();
+      } else {
+        const ch = Array.from(big), sz = tag ? (ch.length > 3 ? 46 : 60) : ch.length === 1 ? 110 : 76;
+        g.font = 'bold ' + sz + 'px ' + FONT_JP;
+        const y0 = y + (tag ? 128 : 112) - (ch.length - 1) * sz * 0.52;
+        ch.forEach((c, k) => g.fillText(c, x + 64, y0 + k * sz * 1.04));
+        if (small) { g.font = '22px ' + FONT_JP; Array.from(small).forEach((c, k) => g.fillText(c, x + 104, y + 40 + k * 24)); }
+        if (stamp) { g.fillStyle = stamp; g.fillRect(x + 18, y + 196, 34, 34); g.fillStyle = '#fff'; g.font = 'bold 22px ' + FONT_JP; g.fillText('印', x + 35, y + 214); }
+      }
+      if (tag) { g.fillStyle = '#c8261c'; g.beginPath(); g.arc(x + 64, y + 22, 8, 0, Math.PI * 2); g.fill(); }
+    });
+  });
+}
+function buildShelfStuff(scene, gap, len) {
+  const bodies = [], labels = [];
+  const put = (geo, x, y, z, ry = 0) => { if (ry) geo.rotateY(ry); geo.translate(x, y, z); return geo; };
+  const label = (cell, w, h, r, yc, x, y, z, flat) => {   // 体に巻くラベル(flat なら平らな札)
+    const g = flat ? new THREE.PlaneGeometry(w, h) : new THREE.CylinderGeometry(r, r, h, 6, 1, true, -w / r / 2, w / r);
+    if (flat) g.translate(0, 0, r);
+    const uv = g.attributes.uv, cx = (cell % 8) / 8, cy = 1 - (Math.floor(cell / 8) + 1) / 2;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, cx + uv.getX(i) / 8, cy + uv.getY(i) / 2);
+    g.computeVertexNormals();
+    labels.push(put(g.index ? g.toNonIndexed() : g, x, y + yc, z));
+  };
+  const keepTag = (cell, x, y, z, ry) => { const g = new THREE.PlaneGeometry(0.034, 0.05); g.rotateZ(0.12); const uv = g.attributes.uv, cx = (cell % 8) / 8, cy = 1 - (Math.floor(cell / 8) + 1) / 2; for (let i = 0; i < uv.count; i++) uv.setXY(i, cx + uv.getX(i) / 8, cy + uv.getY(i) / 2); labels.push(put(g.toNonIndexed(), x, y, z, ry)); };
+  const B = {   // 物の作り方 [幅, 作る関数(x, 床の y, z)]
+    issho: (col, cell) => [0.11, (x, y, z) => {   // 一升瓶(高さ40cm)
+      bodies.push(put(vcolor(lathe([[0.052, 0], [0.054, 0.012], [0.054, 0.25], [0.049, 0.285], [0.028, 0.325], [0.017, 0.35], [0.017, 0.385], [0.02, 0.39], [0.02, 0.4]], 8), col, { gloss: 0.5 }), x, y, z));
+      bodies.push(put(vcolor(lathe([[0.021, 0], [0.021, 0.025]], 8), '#c8b06a'), x, y + 0.385, z));   // 金の口
+      label(cell, 0.085, 0.15, 0.0555, 0.13, x, y, z);
+    }],
+    shigo: (col, cell) => [0.09, (x, y, z) => {   // 四合瓶
+      bodies.push(put(vcolor(lathe([[0.04, 0], [0.042, 0.01], [0.042, 0.19], [0.037, 0.215], [0.02, 0.245], [0.014, 0.265], [0.014, 0.29], [0.016, 0.3]], 8), col, { gloss: 0.5 }), x, y, z));
+      bodies.push(put(vcolor(lathe([[0.017, 0], [0.017, 0.02]], 8), '#1a1a1a'), x, y + 0.29, z));
+      label(cell, 0.066, 0.11, 0.0435, 0.1, x, y, z);
+    }],
+    shochu: (col, cell, keep) => [0.11, (x, y, z) => {   // 焼酎(ずんぐり)+ボトルキープの札
+      bodies.push(put(vcolor(lathe([[0.048, 0], [0.05, 0.01], [0.05, 0.2], [0.044, 0.232], [0.024, 0.258], [0.019, 0.27], [0.019, 0.29]], 8), col, { gloss: 0.45 }), x, y, z));
+      bodies.push(put(vcolor(lathe([[0.021, 0], [0.021, 0.03]], 8), '#1a1a1a'), x, y + 0.282, z));
+      label(cell, 0.075, 0.12, 0.0515, 0.105, x, y, z);
+      if (keep != null) keepTag(keep, x + 0.012, y + 0.215, z + 0.05, 0);
+    }],
+    whisky: (col, cell) => [0.11, (x, y, z) => {   // 四角いウイスキー(4角の回転体を45度まわす)
+      bodies.push(put(vcolor(lathe([[0.066, 0], [0.068, 0.01], [0.068, 0.17], [0.058, 0.195], [0.024, 0.212], [0.018, 0.22], [0.018, 0.255]], 4, Math.PI / 4), col, { gloss: 0.6 }), x, y, z));
+      bodies.push(put(vcolor(lathe([[0.022, 0], [0.022, 0.03]], 8), '#2a1a10'), x, y + 0.245, z));
+      label(cell, 0.07, 0.09, 0.0485, 0.09, x, y, z, true);
+    }],
+    ume: (cell) => [0.17, (x, y, z) => {   // 梅酒の びん(梅の実が見える)
+      bodies.push(put(vcolor(lathe([[0.075, 0], [0.078, 0.01], [0.078, 0.17], [0.07, 0.19], [0.05, 0.2], [0.05, 0.225]], 10), '#e0a840', { gloss: 0.6, band: [[0.13, 0.2, '#f2d9a0']] }), x, y, z));
+      bodies.push(put(vcolor(lathe([[0.054, 0], [0.054, 0.03], [0.04, 0.035]], 12), '#c8261c'), x, y + 0.222, z));
+      [[-0.04, 0.03], [0.035, 0.05], [-0.01, 0.08], [0.045, 0.1], [-0.05, 0.11], [0.01, 0.035]].forEach(([dx, dy]) => bodies.push(put(vcolor(new THREE.SphereGeometry(0.016, 6, 4), '#c9a02a'), x + dx, y + dy + 0.01, z + Math.sqrt(0.078 * 0.078 - dx * dx) - 0.006)));
+      label(cell, 0.06, 0.07, 0.0795, 0.09, x, y, z);
+    }],
+    wine: (col, cell) => [0.09, (x, y, z) => {
+      bodies.push(put(vcolor(lathe([[0.038, 0], [0.04, 0.01], [0.04, 0.19], [0.036, 0.215], [0.016, 0.245], [0.014, 0.3]], 8), col, { gloss: 0.55 }), x, y, z));
+      bodies.push(put(vcolor(lathe([[0.016, 0], [0.016, 0.05]], 8), '#7a1a2a'), x, y + 0.26, z));
+      label(cell, 0.062, 0.08, 0.0415, 0.09, x, y, z);
+    }],
+    beer: (cell) => [0.085, (x, y, z) => {
+      bodies.push(put(vcolor(lathe([[0.036, 0], [0.037, 0.01], [0.037, 0.16], [0.03, 0.19], [0.015, 0.222], [0.013, 0.25]], 8), '#5a2e10', { gloss: 0.55 }), x, y, z));
+      bodies.push(put(vcolor(lathe([[0.016, 0], [0.016, 0.012]], 8), '#d8b45a'), x, y + 0.247, z));
+      label(cell, 0.058, 0.07, 0.0385, 0.08, x, y, z);
+    }],
+    tokkuri: () => [0.1, (x, y, z) => {   // 徳利と おちょこ
+      bodies.push(put(vcolor(lathe([[0.03, 0], [0.045, 0.04], [0.05, 0.08], [0.04, 0.12], [0.018, 0.155], [0.016, 0.17], [0.024, 0.18]], 8), '#f2ece0', { gloss: 0.3, band: [[0.06, 0.09, '#2a4a8a']] }), x - 0.015, y, z));
+      bodies.push(put(vcolor(lathe([[0.012, 0], [0.024, 0.03]], 8), '#f2ece0', { band: [[0.02, 0.03, '#2a4a8a']] }), x + 0.035, y, z + 0.02));
+    }],
+    masu: () => [0.1, (x, y, z) => {   // 升を3つ重ねる(木の色を少しずつ変える)
+      [['#d9b67a', 0], ['#cfa96a', 0.055], ['#e3c48a', 0.11]].forEach(([c, dy], k) => { const g = new THREE.BoxGeometry(0.075, 0.052, 0.075); bodies.push(put(vcolor(g, c), x + (k === 1 ? 0.006 : 0), y + 0.026 + dy, z, k * 0.25)); });
+    }],
+    daruma: () => [0.1, (x, y, z) => {   // だるま(赤・白い顔・金の模様)
+      const g = new THREE.SphereGeometry(0.045, 8, 6); g.scale(1, 1.08, 0.95);
+      bodies.push(put(vcolor(g, '#c8261c', { gloss: 0.35 }), x, y + 0.048, z));
+      const f = new THREE.SphereGeometry(0.03, 8, 6, -0.9, 1.8, 0.7, 1.2); f.scale(1, 1, 0.6); bodies.push(put(vcolor(f, '#fbf4e6'), x, y + 0.058, z + 0.025));
+      [-1, 1].forEach((sd) => bodies.push(put(vcolor(new THREE.SphereGeometry(0.006, 4, 3), '#1a1a1a'), x + sd * 0.011, y + 0.066, z + 0.046)));
+      const gd = new THREE.TorusGeometry(0.03, 0.004, 3, 10, Math.PI); gd.rotateZ(Math.PI); gd.rotateX(0.35); bodies.push(put(vcolor(gd, '#e8c040'), x, y + 0.03, z + 0.03));
+    }],
+    taru: () => [0.13, (x, y, z) => {   // 小さな酒樽(こも巻き・赤い縄・「祝」)
+      bodies.push(put(vcolor(lathe([[0.05, 0], [0.056, 0.03], [0.058, 0.07], [0.056, 0.11], [0.05, 0.14]], 8), '#e8dcb8', { band: [[0.02, 0.03, '#c8261c'], [0.11, 0.12, '#c8261c']] }), x, y, z));
+      bodies.push(put(vcolor(lathe([[0.048, 0], [0.048, 0.008]], 8), '#a8844a'), x, y + 0.14, z));
+      label(15, 0.06, 0.06, 0.0585, 0.07, x, y, z);
+    }],
+    neko: () => [0.12, (x, y, z) => {   // 招き猫(右手を上げる)
+      const W = '#fbf8f2';
+      bodies.push(put(vcolor(lathe([[0.045, 0], [0.05, 0.03], [0.045, 0.07], [0.03, 0.09]], 8), W), x, y, z));
+      const hd = new THREE.SphereGeometry(0.042, 8, 6); hd.scale(1.1, 0.95, 1); bodies.push(put(vcolor(hd, W), x, y + 0.115, z));
+      [-1, 1].forEach((sd) => { const e = new THREE.ConeGeometry(0.014, 0.025, 4); e.rotateZ(-sd * 0.3); bodies.push(put(vcolor(e, sd > 0 ? '#2a2a2a' : '#e88a2a'), x + sd * 0.028, y + 0.155, z)); });
+      bodies.push(put(vcolor(new THREE.SphereGeometry(0.014, 6, 4), W), x + 0.045, y + 0.13, z + 0.01));   // 上げた手
+      { const cl = new THREE.TorusGeometry(0.033, 0.006, 4, 12); cl.rotateX(Math.PI / 2); bodies.push(put(vcolor(cl, '#c8261c'), x, y + 0.085, z)); }   // 赤い首輪
+      const bell = new THREE.SphereGeometry(0.009, 6, 4); bodies.push(put(vcolor(bell, '#e8c040'), x, y + 0.078, z + 0.035));
+      [-1, 1].forEach((sd) => bodies.push(put(vcolor(new THREE.SphereGeometry(0.005, 4, 3), '#1a1a1a'), x + sd * 0.016, y + 0.12, z + 0.04)));   // 目
+      const coin = new THREE.CylinderGeometry(0.018, 0.018, 0.004, 8); coin.rotateX(Math.PI / 2); coin.scale(1.4, 1, 1); bodies.push(put(vcolor(coin, '#e8c040'), x - 0.01, y + 0.04, z + 0.05));   // 小判
+    }]
+  };
+  const G = '#2d5a2d', BR = '#5a2e10', BL = '#1a3a6a', CL = '#cfe0d0', DK = '#2a1a20';
+  // 棚ごとの並び(となりが同じにならないように)。足りなければ くり返す
+  // 下の段は背の高い一升瓶も。上の段は背の低い物だけ(うしろの品書きの木札を隠さない)
+  const ROWS = {
+    '-1,0': [B.issho(G, 0), B.issho(BR, 1), B.shigo(BL, 3), B.tokkuri(), B.ume(8), B.issho(G, 2), B.neko(), B.shigo(CL, 3), B.issho(BR, 0), B.taru(), B.issho(G, 1), B.shigo(BL, 3)],
+    '1,0': [B.shochu('#3a2a1a', 4, 11), B.shochu('#8a6a3a', 5, 12), B.shochu(CL, 6, 13), B.whisky('#a8641a', 7), B.shochu('#1a1a1a', 4, 14), B.shochu('#6a4a2a', 5), B.masu(), B.shochu(CL, 6), B.whisky('#6a3010', 7), B.shochu('#3a2a1a', 4, 12), B.shochu('#8a6a3a', 5)],
+    '-1,1': [B.wine(DK, 9), B.beer(10), B.daruma(), B.wine('#2a3a1a', 9), B.tokkuri(), B.beer(10), B.masu(), B.wine(DK, 9), B.taru(), B.beer(10)],
+    '1,1': [B.whisky('#a8641a', 7), B.tokkuri(), B.whisky('#6a3010', 7), B.daruma(), B.shigo(BL, 3), B.masu(), B.wine(DK, 9), B.neko(), B.shigo(G, 3), B.beer(10)]
+  };
+  for (let r = 0; r < 2; r++) [-1, 1].forEach((sd) => {
+    const list = ROWS[sd + ',' + r], y = 1.47 + r * 0.45, z = -1.94;
+    let pos = 0.06, i = 0;
+    while (true) {
+      const [w, make] = list[i % list.length];
+      if (pos + w > len - 0.04) break;
+      const x = sd * (gap + 0.06 + pos + w / 2);
+      make(x, y, z); pos += w + 0.02 + ((i * 7 + r * 3) % 4) * 0.008; i++;   // すき間を少しずつ変える(きっちり並びすぎないように)
+      if (i > 40) break;
+    }
+  });
+  const bm = new THREE.Mesh(mergeGeos(bodies, ['position', 'normal', 'color']), new THREE.MeshLambertMaterial({ vertexColors: true }));
+  const lm = new THREE.Mesh(mergeGeos(labels, ['position', 'normal', 'uv']), new THREE.MeshLambertMaterial({ map: shelfAtlas() }));
+  scene.add(bm, lm);
+}
 function canvasTex(w, h, draw) {
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   draw(c.getContext('2d'), w, h);
@@ -959,6 +1122,43 @@ function buildAcc(head, body, a, R, f) {
   }
 }
 
+/* ---------- 見えない所を描かない ----------
+   大将の体(胴と前掛け)のうち、高さ y より下の三角を消す。腕・頭・ジョッキは動くので消さない。
+   y は、すべての目線で「消す前と後が1点もちがわない」ことを確かめて決めた(scratchpad t40.py) */
+const OWNER_HIDE_Y = window.__hideY || 0.86;
+function cullBelow(root, yCut) {
+  const u = root.userData, moving = new Set([u.head, ...(u.arms || []), ...(u.fores || []), u.cheerMug].filter(Boolean));
+  const v = new THREE.Vector3(), stats = { before: 0, after: 0 };
+  root.traverse((m) => {
+    if (!m.isMesh || !m.geometry || !m.geometry.attributes.position) return;
+    for (let q = m; q && q !== root; q = q.parent) if (moving.has(q)) return;
+    const g = m.geometry, pa = g.attributes.position, idx = g.index, keep = [];
+    const n = idx ? idx.count : pa.count;
+    const y = (k) => v.fromBufferAttribute(pa, idx ? idx.getX(k) : k).applyMatrix4(m.matrixWorld).y;
+    for (let k = 0; k < n; k += 3) if (y(k) >= yCut || y(k + 1) >= yCut || y(k + 2) >= yCut) keep.push(k);
+    stats.before += n / 3; stats.after += keep.length;
+    if (keep.length === n / 3) return;
+    if (window.__cullProbe) {   // 確認用: 消すはずの三角を 赤むらさきで上にぬる(写ったら 見えている)
+      const keepSet = new Set(keep), pos = [];
+      for (let k = 0; k < n; k += 3) if (!keepSet.has(k)) for (let c = 0; c < 3; c++) { v.fromBufferAttribute(pa, idx ? idx.getX(k + c) : k + c); pos.push(v.x, v.y, v.z); }
+      const pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      m.add(new THREE.Mesh(pg, new THREE.MeshBasicMaterial({ color: '#ff00ff', side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8 })));
+      return;
+    }
+    if (!keep.length) { m.visible = false; return; }
+    if (idx) { const ni = []; keep.forEach((k) => ni.push(idx.getX(k), idx.getX(k + 1), idx.getX(k + 2))); g.setIndex(ni); }
+    else {
+      const ng = new THREE.BufferGeometry();
+      Object.keys(g.attributes).forEach((name) => {
+        const at = g.attributes[name], sz = at.itemSize, arr = new Float32Array(keep.length * 3 * sz);
+        keep.forEach((k, j) => { for (let c = 0; c < 3; c++) for (let d = 0; d < sz; d++) arr[(j * 3 + c) * sz + d] = at.array[(k + c) * sz + d]; });
+        ng.setAttribute(name, new THREE.BufferAttribute(arr, sz));
+      });
+      m.geometry = ng; g.dispose();
+    }
+  });
+  window.__cullStats = stats;
+}
 function disposeAvatar(o) { if (!o) return; o.traverse((m) => { if (m.isMesh && m.geometry) m.geometry.dispose(); }); }
 function animateAvatar(av, dt) {
   const u = av.userData; u.t += dt;
@@ -1441,16 +1641,8 @@ function createShop(canvas, opts) {
   const shelfLen = L / 2 - 0.2 - TV_GAP;
   for (let r = 0; r < 2; r++) {
     [-1, 1].forEach((sd) => scene.add(mesh(new THREE.BoxGeometry(shelfLen, 0.04, 0.3), mat('#6b4728'), sd * (TV_GAP + shelfLen / 2), 1.45 + r * 0.45, -1.95)));
-    for (let k = 0; k < Math.floor(L * 4); k++) {
-      const x = -L / 2 + 0.4 + k * 0.26 + (r ? 0.12 : 0);
-      if (x > L / 2 - 0.4) break;
-      if (Math.abs(x) < TV_GAP + 0.06) continue;
-      const tall = 0.22 + ((k * 7 + r * 3) % 5) * 0.03;
-      const color = ['#2d5a2d', '#6a2a1a', '#e8e0c8', '#1a2a4a', '#8a6a2a', '#3a3a3a'][(k + r * 2) % 6];
-      const b = mesh(new THREE.CylinderGeometry(0.045, 0.05, tall, 10), mat(color), x, 1.47 + r * 0.45 + tall / 2, -1.92); scene.add(b);
-      scene.add(mesh(new THREE.CylinderGeometry(0.016, 0.02, 0.07, 8), mat(color), x, 1.47 + r * 0.45 + tall + 0.035, -1.92));
-    }
   }
+  buildShelfStuff(scene, TV_GAP, shelfLen);
   // 品書き(壁の木札) — MENU から自動で作る
   const tagList = [];
   // 壁に入る数だけ(名物が先、つぎに料理、飲み物はあと)
@@ -1723,6 +1915,7 @@ function createShop(canvas, opts) {
     const k = 1 - Math.pow(0.002, dt);
     camPos.lerp(wantPos, k); camLook.lerp(wantLook, k);
     camera.position.copy(camPos); camera.lookAt(camLook);
+    if (window.__cam) { camera.position.set(...window.__cam[0]); camera.lookAt(...window.__cam[1]); camera.fov = window.__cam[2] || camera.fov; camera.updateProjectionMatrix(); }   // 確認用(棚などを近くで撮る)
     { const zf = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(wantFov / 2)) / view.zoom));   // アップ = 見る広さをせまく
       if (Math.abs(camera.fov - zf) > 0.05) { camera.fov += (zf - camera.fov) * Math.min(1, k * 2.5); camera.updateProjectionMatrix(); } }
     { const sh = view.mode === 'owner' ? viewShift : 0;   // 絵の中心を 画面の横 sh の位置へ(ゆがまないように、広い絵の左側を切りとる)
@@ -1802,6 +1995,7 @@ function createShop(canvas, opts) {
         owner.userData.body.add(apron);
         scene.add(owner);
         owner.updateMatrixWorld(true);
+        if (!window.__noCull) cullBelow(owner, OWNER_HIDE_Y);   // カウンターで どの目線からも見えない所は 描かない
         const hd = owner.userData.head, inv = hd.matrixWorld.clone().invert(), all = [], v = new THREE.Vector3();
         hd.traverse((o) => { if (o.isMesh && o.geometry && o.geometry.attributes.position) { const pa = o.geometry.attributes.position; const step = Math.max(1, Math.floor(pa.count / 120)); for (let k = 0; k < pa.count; k += step) { v.fromBufferAttribute(pa, k).applyMatrix4(o.matrixWorld).applyMatrix4(inv); all.push(v.clone()); } } });
         ownerHeadPts = all.length > 600 ? all.filter((_, k) => k % Math.ceil(all.length / 600) === 0) : all;
