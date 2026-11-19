@@ -502,7 +502,7 @@ function torsoGeo(f) {
 function shapeGeo(pts, depth = 0.005, bevel = 0.0015) {
   const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]); s.closePath();
   const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 6 });
-  g.translate(0, 0, -depth / 2); return tessellate(g.index ? g.toNonIndexed() : g, 0.014);
+  g.translate(0, 0, -depth / 2); return tessellate(g.index ? g.toNonIndexed() : g, window.__tessLen || 0.014);
 }
 /* 長い三角形を こまかく分ける(曲げたとき 板の中が沈まないように) */
 function tessellate(geo, maxLen) {
