@@ -2044,9 +2044,9 @@ function createShop(canvas, opts) {
     while (yaw > Math.PI) yaw -= Math.PI * 2; while (yaw < -Math.PI) yaw += Math.PI * 2;
     a.userData.lookYaw = Math.max(-1.75, Math.min(1.75, yaw)); a.userData.lookT = secs; a.userData.lookTo = target;
   }
-  function lookNext(a) {   // 向き終わって 顔が少し戻ったら、順番待ちの次の人へ
-    const u = a && a.userData; if (!u || !u.lookQ || !u.lookQ.length || u.lookT > 0 || (u.lw || 0) > 0.45) return;
-    const q = u.lookQ.shift(); lookStart(a, q.target, Math.min(q.secs, 3));   // 待っていたぶん 少し短く
+  function lookNext(a) {   // 向き終わったら、順番待ちの次の人へ(正面に戻らず そのまま向きかえる)
+    const u = a && a.userData; if (!u || !u.lookQ || !u.lookQ.length || u.lookT > 0) return;
+    const q = u.lookQ.shift(); lookStart(a, q.target, q.secs);
   }
   /* 記念撮影のカメラ(大将のスマホの位置)。みんなの顔が横いっぱいに入る広さ */
   let photo = null;
@@ -2257,7 +2257,9 @@ function createShop(canvas, opts) {
       const u = a.userData;
       if (u.lookT > 0.2 || (u.lookQ && u.lookQ.length)) {
         if (u.lookTo === target && u.lookT > 0) { u.lookT = Math.max(u.lookT, secs); return; }   // 同じ人に また話しかけられたら のばすだけ
-        (u.lookQ = u.lookQ || []).push({ target, secs }); if (u.lookQ.length > 2) u.lookQ.shift();
+        // 話しかけが集中したときだけ 1秒ずつ(待たせると会話が成り立たない。ノブさん 2026-11-20)
+        u.lookT = Math.min(u.lookT, 1);
+        (u.lookQ = u.lookQ || []).push({ target, secs: 1 }); if (u.lookQ.length > 2) u.lookQ.shift();
         return;
       }
       lookStart(a, target, secs);
