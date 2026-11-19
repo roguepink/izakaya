@@ -814,13 +814,22 @@
     if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return; }
     if (Date.now() - lastSent < 1500) { toast('少し間をあけて送ってください', 1500); return; }
     lastSent = Date.now();
-    net.push('chat', { uid: ME.uid, name: currentName(), seat: OWNER_MODE ? 'owner' : mySeat, owner: OWNER_MODE, text: t, at: TS });
+    var msg = { uid: ME.uid, name: currentName(), seat: OWNER_MODE ? 'owner' : mySeat, owner: OWNER_MODE, text: t, at: TS }, to = addressee(t);
+    if (to !== null && to !== msg.seat) msg.to = to;
+    net.push('chat', msg);
     $('chatInput').value = ''; growInput();
   });
   /* その人あてに書く: 入力欄の頭に「〇〇さん、」を入れる(前に別の人あてが入っていれば入れかえる)。みんなにも だれあてか分かる */
   function nameOfSeat(k) {
     if (k === 'owner') return ownerPresent() ? ((tree.state || {}).ownerName || SHOP.OWNER_NAME) : '';
     var u = seatUid(+k), m = u && members()[u]; return m && fresh(m) ? m.name : '';
+  }
+  /* だれあてか(文の頭の「〇〇さん、」「大将、」「マスター、」)。席の番号か 'owner'。だれでもなければ null */
+  function addressee(t) {
+    if (/^(大将|マスター)[、,]/.test(t)) return ownerPresent() ? 'owner' : null;
+    var mm = /^(.{1,16}?)さん[、,]/.exec(t); if (!mm) return null;
+    for (var i = 0; i < N; i++) { if (i === mySeat && !OWNER_MODE) continue; if (nameOfSeat(i) === mm[1]) return i; }
+    return null;
   }
   function replyTo(name, isOwner) {
     if (!name || !inside) return;
@@ -858,7 +867,11 @@
       if (seenChat[k]) return; seenChat[k] = 1;
       var m = c[k]; if (m.sys || (m.at || 0) < joinAt - 5000) return;
       bubble(m.seat, m.text, false);
-      withScene(function (s) { s.talk(m.seat); }); if (!ownerPresent()) ownerTo(m.seat, false);
+      withScene(function (s) {
+        s.talk(m.seat);
+        // 話しかけられた人が、話しかけた人のほうを数秒向く(話した人も相手を見る)
+        if ((okSeat(m.to) || m.to === 'owner') && (okSeat(m.seat) || m.seat === 'owner') && m.to !== m.seat) { s.lookAt(m.to, m.seat, 4); s.lookAt(m.seat, m.to, 2.5); }
+      }); if (!ownerPresent()) ownerTo(m.seat, false);
     });
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]; }); }

@@ -966,7 +966,14 @@ function animateAvatar(av, dt) {
   u.body.position.y = breath;
   let hx = Math.sin(u.t * 0.7) * 0.035, hy = Math.sin(u.t * 0.43) * 0.12;
   if (u.talk > 0) hx += Math.sin(u.t * 14) * 0.06;
-  u.head.rotation.set(hx, hy, Math.sin(u.t * 0.5) * 0.03);
+  /* 話しかけられたら 相手のほうを向く(体を少しひねって、残りは首で)。ゆっくり向いて、ゆっくり戻る */
+  u.lookT = Math.max(0, (u.lookT || 0) - dt);
+  u.lw = (u.lw || 0) + ((u.lookT > 0 ? 1 : 0) - (u.lw || 0)) * Math.min(1, dt * (u.lookT > 0 ? 5 : 3));
+  const ly = u.lookYaw || 0, ld = u.lw * u.lw * (3 - 2 * u.lw);
+  const bodyY = Math.max(-0.85, Math.min(0.85, ly * 0.45)), headY = Math.max(-1.0, Math.min(1.0, ly - bodyY));
+  hy = hy * (1 - ld) + headY * ld; hx += 0.05 * ld;
+  u.body.rotation.y = bodyY * ld;
+  u.head.rotation.set(hx, hy, Math.sin(u.t * 0.5) * 0.03 * (1 - ld));
   /* 乾杯(2.2秒): 持ち上げる → 前へ出して カチン → 掲げる → 口へ運んで ひと口 → 下ろす */
   const e = u.cheer > 0 ? CHEER_T - u.cheer : -1;
   const P = e < 0 ? CHEER_KEYS[0] : cheerPose(e);
@@ -1832,6 +1839,14 @@ function createShop(canvas, opts) {
     cheerAt(seat, e) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.cheer = Math.max(0.001, CHEER_T - e); },   // 確認用: 乾杯の途中の形
     cheerAll() { seatAvatars.forEach((a) => a && (a.userData.cheer = 2.2)); if (owner) owner.userData.cheer = 2.2; },
     talk(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.talk = 1.6; },
+    /* seat の人が target の人のほうを secs 秒 向く(target は 席の番号か 'owner') */
+    lookAt(seat, target, secs) {
+      const a = seat === 'owner' ? owner : seatAvatars[seat], t = target === 'owner' ? owner : seatAvatars[target];
+      if (!a || !t) return;
+      let yaw = Math.atan2(t.position.x - a.position.x, t.position.z - a.position.z) - a.rotation.y;
+      while (yaw > Math.PI) yaw -= Math.PI * 2; while (yaw < -Math.PI) yaw += Math.PI * 2;
+      a.userData.lookYaw = Math.max(-1.75, Math.min(1.75, yaw)); a.userData.lookT = secs;
+    },
     /* 吹き出しを出す位置(画面の点) */
     anchors() { return { seats: seatAvatars.map((a, i) => (a && a.visible ? headPos(a) : null)), owner: headPos(owner), empty: stools.map((s, i) => { tmp.set(seatX(i, N), STOOL_Y + 0.25, GUEST_Z); const v = tmp.clone().project(camera); if (v.z > 1) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }) }; },
     name: SHOPNAME,
