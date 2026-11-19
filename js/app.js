@@ -1068,11 +1068,13 @@
         var who = ph.who === 'owner' ? 'owner' : e.seat;
         bubble(who, (ph.emoji ? ph.emoji + ' ' : '') + ph.say, true);
         var isK = ph.id === 'kanpai' || ph.id === 'o_kanpai';
-        withScene(function (s) { if (isK) { s.cheerAll(); } else s.talk(who); });
+        withScene(function (s) { if (isK) s.cheer(who); else s.talk(who); });
         if (ph.who === 'owner') ownerTo(e.seat, true);
-        if (isK) { for (var i = 0; i < N; i++) if (seatUid(i)) floater(i, '🍻'); floater('owner', '🍻'); }
+        if (isK) { floater(who, '🍻'); kpStart(k, e, who); }   // 乾杯の連鎖: 声をかけた人だけ先に。ほかの人は「一緒に乾杯」で続く
         else if (ph.emoji) floater(who, ph.emoji);
         playPhrase(ph, e.voice);
+      } else if (e.type === 'kanpaiJoin') {
+        kpJoined(e);
       } else if (e.type === 'photoReq') {
         if (OWNER_MODE && e.by !== ME.uid) toast('📸 ' + (e.name ? honor(e.name) : 'お客さん') + 'から 記念撮影のリクエスト', 9000, '📸 撮影する', startPhoto);
       } else if (e.type === 'clear') {
@@ -1524,6 +1526,62 @@
     var s = SHOP.SONGS.filter(function (x) { return x.id === id; })[0]; if (!s) return;
     pushQueue({ kind: 'file', id: s.id, src: s.src, title: s.title });
   }
+  /* ---------------- 乾杯の連鎖 ----------------
+     だれかが「かんぱーい」→ その人だけ ジョッキを上げる。ほかの人の画面に「🍻 一緒に乾杯！」が KP_WIN ミリ秒 出る。
+     押した人から順に ジョッキが上がって「カチン」(そろうほど大きく)。おわりに「🍻 ◯人で かんぱーい！」と 大きなカチーン */
+  var KP_WIN = 3000, kp = null, kpT = null;
+  function clink(n, big) {
+    if (!actx) return;
+    try {
+      var t = actx.currentTime, fs = big ? [2093, 2637, 3136, 4186] : [2350 + Math.random() * 500, 3500 + Math.random() * 500];
+      fs.forEach(function (f, i) {
+        var o = actx.createOscillator(), g = actx.createGain(), v = (0.06 + Math.min(n, 10) * 0.025) * vol + 0.02, len = big ? 1.1 : 0.35;
+        o.type = 'sine'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t + i * (big ? 0.02 : 0)); g.gain.exponentialRampToValueAtTime(v, t + 0.006 + i * (big ? 0.02 : 0)); g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+        o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + len + 0.05);
+      });
+    } catch (e) {}
+  }
+  function kpMine() { return OWNER_MODE ? 'owner' : mySeat; }
+  function kpStart(key, e, who) {
+    var rem = KP_WIN - (now() - (e.at || now()));
+    if (rem < 600) return;
+    if (kp) kpEnd(true);
+    kp = { key: key, by: e.by, joined: {}, n: 1 }; kp.joined[who] = 1;
+    var canJoin = e.by !== ME.uid && (OWNER_MODE || mySeat >= 0) && !document.body.classList.contains('photo-mode');
+    $('kpJoin').classList.toggle('hidden', !canJoin);
+    $('kpUi').classList.remove('hidden'); kpCount();
+    clearTimeout(kpT); kpT = setTimeout(function () { kpEnd(false); }, rem);
+    // おためし客は 少しずつ続く
+    if (LOCAL) Object.keys(bots).forEach(function (u) { var b = bots[u]; if (u === e.by || Math.random() < 0.15) return; setTimeout(function () { if (kp && kp.key === key) net.push('events', { type: 'kanpaiJoin', ref: key, seat: b.seat, at: TS, by: u }); }, 400 + Math.random() * 2000); });
+  }
+  function kpCount() { if (!kp) return; $('kpCount').textContent = '🍻 ' + kp.n + '人'; }
+  $('kpJoin').onclick = function () {
+    if (!kp) return;
+    var me = kpMine(); if (me === -1 || kp.joined[me]) return;
+    $('kpJoin').classList.add('hidden');
+    event({ type: 'kanpaiJoin', ref: kp.key, seat: me });
+  };
+  function kpJoined(e) {
+    if (!kp || e.ref !== kp.key) return;
+    var seat = e.seat === 'owner' ? 'owner' : e.seat;
+    if (seat !== 'owner' && !okSeat(seat)) return;
+    if (kp.joined[seat]) return;
+    kp.joined[seat] = 1; kp.n++;
+    withScene(function (s) { s.cheer(seat); });
+    floater(seat, '🍻'); clink(kp.n, false); kpCount();
+    if (seat === kpMine()) $('kpJoin').classList.add('hidden');
+  }
+  function kpEnd(quiet) {
+    clearTimeout(kpT);
+    var r = kp; kp = null; $('kpUi').classList.add('hidden');
+    if (!r || quiet || r.n < 2) return;
+    var bn = $('kpBanner'); bn.textContent = '🍻 ' + r.n + '人で かんぱーい！'; bn.classList.remove('hidden'); bn.classList.remove('go'); void bn.offsetWidth; bn.classList.add('go');
+    setTimeout(function () { bn.classList.add('hidden'); }, 1900);
+    clink(r.n, true);
+    Object.keys(r.joined).forEach(function (s) { floater(s === 'owner' ? 'owner' : +s, '✨'); });
+  }
+
   /* ---------------- 記念撮影(大将の自撮り風) ----------------
      お客さんが「📸 撮影」でリクエスト → 大将が「撮影する」→ 全員の画面でカウントダウン。
      残り PICK_FROM〜PICK_TO 秒のあいだに ポーズと表情を選ぶ(「今回は写らない」も選べる)。0秒で 全員が同じ絵を それぞれのスマホで写真にする。
