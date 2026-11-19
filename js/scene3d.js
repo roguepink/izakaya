@@ -872,7 +872,7 @@ function buildAvatar(raw, opt = {}) {
   cheerMug.visible = false; hands[1].add(cheerMug);
 
   // 足(座っている形)。記念撮影のときは消せるように、体とは別のまとまり(legs)にする
-  const legs = new THREE.Group(); legs.add(legs);
+  const legs = new THREE.Group(); body.add(legs);
   if (!opt.standing) {
     const pantsC = def.pants === 'same' ? cc : (a.top === 'work' ? cc : (f ? '#3a3a4a' : '#2a2c38'));
     const skirt = lower === 'skirt';
