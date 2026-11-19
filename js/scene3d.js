@@ -1394,7 +1394,7 @@ function createShop(canvas, opts) {
   const HIT_MAT = new THREE.MeshBasicMaterial({ visible: false });
 
   // カメラ
-  const view = { mode: 'overview', seat: -1, yaw: 0, pitch: 0 };
+  const view = { mode: 'overview', seat: -1, yaw: 0, pitch: 0, zoom: 1 };
   const camPos = new THREE.Vector3(0, 2.4, 4.4), camLook = new THREE.Vector3(0, 1.1, -0.5);
   const wantPos = new THREE.Vector3(), wantLook = new THREE.Vector3();
   /* カメラの置き場所。縦向き(スマホを立てて持つ)は横に7人が入らないので、カウンターの端から斜めに見る。
@@ -1445,7 +1445,7 @@ function createShop(canvas, opts) {
     const portrait = baseAspect < 1;
     wantFov = portrait ? 70 : 55;
     switch (view.mode) {
-      case 'first': wantPos.set(x, 1.5, GUEST_Z + 0.22); wantLook.set(x + THREE.MathUtils.clamp((ownerTargetX - x) * 0.6, -1.0, 1.0), portrait ? 1.08 : 1.24, -0.95); break;   // 横向きは少し上を見る(モニターが入るように)   // 向きすぎると となりの頭でふさがる
+      case 'first': wantPos.set(x, 1.5, GUEST_Z + 0.22); wantLook.set(x, portrait ? 1.08 : 1.24, -0.95); break;   // 勝手に動かさない(大将がほかの席へ行っても まっすぐ前のまま)   // 横向きは少し上を見る(モニターが入るように)   // 向きすぎると となりの頭でふさがる
       case 'back': wantPos.set(x * 0.85, 2.3, GUEST_Z + 1.35); wantLook.set(x * 0.75, 1.0, -0.45); break;   // 頭ごしに 自分の料理が見える高さ
       case 'owner': ownerFrame(portrait); break;
       default:
@@ -1464,16 +1464,32 @@ function createShop(canvas, opts) {
   let drag = null;
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   canvas.addEventListener('touchend', (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false });   // 指で押したあとの「おまけのクリック」が、開いたばかりの画面に当たって閉じてしまうのを防ぐ
-  canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, yaw: view.yaw, pitch: view.pitch, moved: false }; });
+  /* 2本の指: 広げるとアップ、すぼめると ふつうの大きさまで戻る(パソコンはホイール) */
+  const fingers = new Map(); let pinch = null;
+  const fdist = () => { const p = [...fingers.values()]; return Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y); };
+  canvas.addEventListener('pointerdown', (e) => {
+    fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (fingers.size === 2) { pinch = { d: fdist(), z: view.zoom }; drag = null; return; }
+    if (fingers.size > 2) return;
+    drag = { x: e.clientX, y: e.clientY, yaw: view.yaw, pitch: view.pitch, moved: false };
+  });
+  const fingerUp = (e) => { fingers.delete(e.pointerId); if (fingers.size < 2 && pinch) { pinch = null; drag = null; } };
+  window.addEventListener('pointercancel', fingerUp);
+  canvas.addEventListener('wheel', (e) => { e.preventDefault(); view.zoom = THREE.MathUtils.clamp(view.zoom * Math.exp(-e.deltaY * 0.0015), 1, 2.6); }, { passive: false });
   window.addEventListener('pointermove', (e) => {
+    if (fingers.has(e.pointerId)) fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && fingers.size === 2) { view.zoom = THREE.MathUtils.clamp(pinch.z * fdist() / Math.max(1, pinch.d), 1, 2.6); return; }
     if (!drag) return;
     const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
     if (Math.abs(dx) + Math.abs(dy) > 14) drag.moved = true;   // 指が少しずれても「押した」にする
-    const lim = view.mode === 'first' ? 1.1 : 0.6;
-    view.yaw = THREE.MathUtils.clamp(drag.yaw - dx * 0.004, -lim, lim);
-    view.pitch = THREE.MathUtils.clamp(drag.pitch + dy * 0.003, -0.45, 0.35);
+    const lim = view.mode === 'first' ? 1.65 : view.mode === 'back' ? 1.2 : 0.75;   // 目線は 横の奥の席まで見回せる
+    const sp = 0.004 / view.zoom;   // アップのときは ゆっくり
+    view.yaw = THREE.MathUtils.clamp(drag.yaw - dx * sp, -lim, lim);
+    view.pitch = THREE.MathUtils.clamp(drag.pitch + dy * 0.003 / view.zoom, -0.45, 0.35);
   });
   window.addEventListener('pointerup', (e) => {
+    const wasPinch = !!pinch || fingers.size > 1; fingerUp(e);
+    if (wasPinch) { drag = null; return; }
     if (drag && !drag.moved && api.onTap) {
       const r = canvas.getBoundingClientRect();
       ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
@@ -1524,7 +1540,8 @@ function createShop(canvas, opts) {
     const k = 1 - Math.pow(0.002, dt);
     camPos.lerp(wantPos, k); camLook.lerp(wantLook, k);
     camera.position.copy(camPos); camera.lookAt(camLook);
-    if (Math.abs(camera.fov - wantFov) > 0.05) { camera.fov += (wantFov - camera.fov) * k; camera.updateProjectionMatrix(); }
+    { const zf = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(wantFov / 2)) / view.zoom));   // アップ = 見る広さをせまく
+      if (Math.abs(camera.fov - zf) > 0.05) { camera.fov += (zf - camera.fov) * Math.min(1, k * 2.5); camera.updateProjectionMatrix(); } }
     { const sh = view.mode === 'owner' ? viewShift : 0;   // 絵の中心を 画面の横 sh の位置へ(ゆがまないように、広い絵の左側を切りとる)
       if (sh !== viewApplied) { viewApplied = sh; const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
         if (sh) { camera.aspect = baseAspect * sh * 2; camera.setViewOffset(w * sh * 2, h, 0, 0, w, h); } else { camera.aspect = baseAspect; camera.clearViewOffset(); } } }
@@ -1632,7 +1649,7 @@ function createShop(canvas, opts) {
       }
     },
     setView(mode, seat) {
-      if (mode !== view.mode) { view.yaw = 0; view.pitch = 0; }
+      if (mode !== view.mode) { view.yaw = 0; view.pitch = 0; view.zoom = 1; }
       view.mode = mode; view.seat = seat; api._hideMine();
     },
     _hideMine() { seatAvatars.forEach((a, i) => { if (a) a.visible = !(view.mode === 'first' && i === view.seat); }); if (owner) owner.visible = view.mode !== 'owner'; },

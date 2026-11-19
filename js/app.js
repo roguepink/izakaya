@@ -484,6 +484,8 @@
   function onTree(t) { tree = t || {}; applyTree(); }
   function members() { return tree.members || {}; }
   function fresh(m) { return m && now() - (m.seen || 0) < 50000; }
+  var AWAY_MS = 3 * MIN;   // 自分で「帰る」を押さずに画面を閉じた人は、3分は席を取っておく(戻ればそのまま座れる)
+  function away(m) { return m && !m.bot && !fresh(m) && now() - (m.seen || 0) < AWAY_MS; }
   function seatUid(i) { var s = tree.seats || {}; return s[i] || null; }
   function amLeader() {
     if (!inside) return false;
@@ -506,7 +508,7 @@
     var seats = [];
     for (var i = 0; i < N; i++) {
       var uid = seatUid(i), m = uid && ms[uid];
-      seats.push(m && fresh(m) ? { key: uid, avatar: m.avatar, name: m.name, me: uid === ME.uid } : null);
+      seats.push(m && (fresh(m) || away(m)) ? { key: uid, avatar: m.avatar, name: m.name, me: uid === ME.uid } : null);
     }
     scene.setSeats(seats);
     var st = tree.state || {};
@@ -654,10 +656,12 @@
     $('entrance').classList.add('hidden');
     $('shop').classList.remove('hidden');
     $('bBot').classList.toggle('hidden', !LOCAL);
-    setView(OWNER_MODE ? 'owner' : 'overview');
+    setView(OWNER_MODE ? 'owner' : (mySeat >= 0 ? 'first' : 'overview'));   // もとの席に戻ったときは 目線で
     buildPhrases();
     hbTimer = setInterval(function () { if (inside && members()[ME.uid]) net.update('members/' + ME.uid, { seen: TS }); botTick(); }, 15000);
-    if (!OWNER_MODE) {
+    var back = -1; for (var bi = 0; bi < N; bi++) if (seatUid(bi) === ME.uid) back = bi;
+    if (back >= 0 && !OWNER_MODE) setTimeout(function () { toast('おかえりなさい。もとの席にもどりました'); }, 600);
+    if (!OWNER_MODE && back < 0) {
       var r = myReservation();
       if (r >= 0 && !seatUid(r)) setTimeout(function () { sit(r); toast('ご予約の席にご案内しました'); }, 400);
     }
@@ -678,10 +682,11 @@
     $('shop').classList.add('hidden'); $('entrance').classList.remove('hidden');
     setView('overview');
   }
+  /* 「帰る」を押さずに画面を閉じた: すぐには帰さず「席を外しています」にする(3分は席と料理が残る。戻ればそのまま座れる) */
   window.addEventListener('pagehide', function () {
     if (!inside || !net) return;
-    if (mySeat >= 0) net.leaveBeacon('seats/' + mySeat);
-    net.leaveBeacon('members/' + ME.uid);
+    if (OWNER_MODE || mySeat < 0) { if (mySeat >= 0) net.leaveBeacon('seats/' + mySeat); net.leaveBeacon('members/' + ME.uid); return; }
+    if (net.patchBeacon) net.patchBeacon('members/' + ME.uid, { seen: now() - 51000 });
   });
   function currentName() { var m = members()[ME.uid]; return (m && m.name) || ME.name; }
   $('bLeave').onclick = function () {
@@ -706,7 +711,7 @@
     var uid = seatUid(i), m = uid && members()[uid];
     if (OWNER_MODE) { if (m && fresh(m)) openSheet('seat', i); return; }
     if (mySeat >= 0) return;
-    if (m && fresh(m)) { toast('その席は ふさがっています'); return; }
+    if (m && (fresh(m) || away(m))) { toast(away(m) ? 'その席の人は、少し席を外しています' : 'その席は ふさがっています'); return; }
     var r = reservationsNow()[i];
     if (r && r.uid !== ME.uid) { toast('その席は ' + r.name + 'さまのご予約です'); return; }
     sit(i);
@@ -867,6 +872,7 @@
       var resv = reservationsNow();
       for (var i = 0; i < N; i++) {
         var uid = seatUid(i), m = uid && ms[uid];
+        if (m && away(m)) { put('s' + i, 'away', m.name + '(席を外しています)', a.seats[i]); var tw = tagEls['s' + i]; if (tw) tw.removeAttribute('data-seat'); continue; }
         if (m && fresh(m)) { put('s' + i, uid === ME.uid ? 'me' : 'tap', m.name + (uid === ME.uid ? '(あなた)' : ''), a.seats[i]); var tg = tagEls['s' + i]; if (tg) { if (uid === ME.uid) tg.removeAttribute('data-seat'); else tg.setAttribute('data-seat', i); } continue; }
         var r = resv[i];
         if (r) {   // 予約済みの席は、だれにでも名前が見える
@@ -1107,7 +1113,7 @@
     var n = now(), ms = members(), st = tree.state || {};
     // いなくなった人の片づけ
     Object.keys(ms).forEach(function (uid) {
-      if (fresh(ms[uid]) || (ms[uid].bot && bots[uid])) return;
+      if (fresh(ms[uid]) || away(ms[uid]) || (ms[uid].bot && bots[uid])) return;
       net.remove('members/' + uid);
       for (var i = 0; i < N; i++) if (seatUid(i) === uid) { net.remove('seats/' + i); net.remove('tables/' + i); }
     });

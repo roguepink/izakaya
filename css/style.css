@@ -174,6 +174,7 @@ body:not(.is-owner) .owner-only { display: none; }
 .tag.owner { background: rgba(200,38,28,.85); }
 .tag.me { background: rgba(232,163,61,.9); color: var(--ink); }
 .tag.free { pointer-events: auto; background: rgba(243,230,204,.95); color: var(--ink); font-size: 13px; padding: 7px 12px; border: 2px solid var(--wood); cursor: pointer; }
+.tag.away { background: rgba(60,60,70,.85); color: #ddd; font-size: 11px; }
 .tag.reserved { background: rgba(80,60,40,.92); color: #ffe7b8; font-size: 12px; padding: 4px 10px; border: 1px solid rgba(232,163,61,.6); }
 .bubble { position: absolute; transform: translate(-50%, calc(-100% - 22px)); width: max-content; max-width: min(62vw, 260px); white-space: pre-wrap; box-sizing: border-box; background: #fffaf0; color: var(--ink);
   border-radius: 14px; padding: 7px 11px; font-size: 14px; line-height: 1.4; box-shadow: 0 3px 10px rgba(0,0,0,.4); word-break: break-word; transition: opacity .4s; }

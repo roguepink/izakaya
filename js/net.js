@@ -107,6 +107,7 @@ var Net = (function () {
   };
   LocalNet.prototype.remove = function (path) { return this.set(path, null); };
   LocalNet.prototype.leaveBeacon = function (path) { this.set(path, null); };
+  LocalNet.prototype.patchBeacon = function (path, obj) { this.update(path, obj); };
 
   /* ---------- 本番: Firebase Realtime Database(部品なし・REST と EventSource) ---------- */
   function FireNet(dbURL, room) {
@@ -170,6 +171,9 @@ var Net = (function () {
   FireNet.prototype.remove = function (path) { return this._req('DELETE', path); };
   FireNet.prototype.leaveBeacon = function (path) {   // 画面を閉じるときでも届くように
     try { fetch(this._url(path), { method: 'DELETE', keepalive: true }); } catch (e) {}
+  };
+  FireNet.prototype.patchBeacon = function (path, obj) {   // 画面を閉じるときでも届く「書きかえ」
+    try { fetch(this._url(path), { method: 'PATCH', body: JSON.stringify(obj), keepalive: true }); } catch (e) {}
   };
 
   /* ---------- 合言葉 → 指紋 ---------- */
