@@ -5,7 +5,8 @@
    ・営業日   → SCHEDULE(曜日と時間。いくつでも足せる)
    ・メニュー → MENU(1行足せば1品増える)
    ・曲       → SONGS(1行足せば1曲増える)
-   ・決まり文句の声 → PHRASES(声のファイルを置けば、その声で鳴る。なければ仮の読み上げ)
+   ・決まり文句 → GUEST_PHRASES(お客さん用)と OWNER_PHRASES(大将用)。2つは混ぜない。
+     言葉を足したら tools/make-voices.py で声を作る(声がないあいだは、スマホの読み上げで代わりに読む)
    ===================================================================== */
 var SHOP = {
   NAME: '居酒屋ノブ',
@@ -150,16 +151,62 @@ var SHOP = {
      who: 'owner'(大将が言う)/ 'all'(その人が言う)
      voice: 声のファイル。置いてなければ、say の文を 仮の読み上げで言う
      btn: true なら お客さんのボタンに出る */
-  PHRASES: [
-    { id: 'irasshai', who: 'owner', say: 'いらっしゃい！',         voice: 'voice/irasshai.mp3' },
-    { id: 'mataokoshi', who: 'owner', say: 'またお越しください！', voice: 'voice/mataokoshi.mp3' },
-    { id: 'oyasumi', who: 'owner', say: 'おやすみなさい！',        voice: 'voice/oyasumi.mp3' },
-    { id: 'lastcall', who: 'owner', say: 'そろそろ閉店です。ラストオーダー、どうぞ！', voice: 'voice/lastcall.mp3' },
-    { id: 'omachi', who: 'owner', say: 'はい、お待ち！',           voice: 'voice/omachi.mp3' },
-    { id: 'haiyo', who: 'owner', say: 'はいよ！',                 voice: 'voice/haiyo.mp3' },
-    { id: 'kanpai', who: 'all', say: 'かんぱーい！',  voice: 'voice/kanpai.mp3', btn: true, emoji: '🍻' },
-    { id: 'okawari', who: 'all', say: 'おかわり！',   voice: 'voice/okawari.mp3', btn: true, emoji: '🙋' },
-    { id: 'umai', who: 'all', say: 'うまい！',        voice: 'voice/umai.mp3', btn: true, emoji: '😋' },
-    { id: 'gochisou', who: 'all', say: 'ごちそうさま！', voice: 'voice/gochisou.mp3', btn: true, emoji: '🙏' }
-  ]
+  /* お客さん用の決まり文句。main: true は 入力らんの上にいつも並ぶ。ほかは「💬 もっと」から。
+     id を変えると声のファイルが使われなくなるので、言葉を変えたら声も作り直す */
+  GUEST_PHRASES: [
+    { id: 'kanpai',      cat: 'のむ',     say: 'かんぱーい！',       emoji: '🍻', main: true },
+    { id: 'okawari',     cat: 'のむ',     say: 'おかわり！',         emoji: '🙋', main: true },
+    { id: 'umai',        cat: 'のむ',     say: 'うまい！',           emoji: '😋', main: true },
+    { id: 'g_oishii',    cat: 'のむ',     say: 'おいしい〜！',       emoji: '🤤' },
+    { id: 'gochisou',    cat: 'のむ',     say: 'ごちそうさま！',     emoji: '🙏' },
+    { id: 'g_otsukare',  cat: 'あいさつ', say: 'おつかれー！',       emoji: '🙌', main: true },
+    { id: 'g_yaho',      cat: 'あいさつ', say: 'やっほー！',         emoji: '👋' },
+    { id: 'g_hisashi',   cat: 'あいさつ', say: 'ひさしぶり！',       emoji: '😆' },
+    { id: 'g_yoroshiku', cat: 'あいさつ', say: 'よろしくね！',       emoji: '🤝' },
+    { id: 'g_tadaima',   cat: 'あいさつ', say: 'ただいま！',         emoji: '🏠' },
+    { id: 'g_okaeri',    cat: 'あいさつ', say: 'おかえり！',         emoji: '🤗' },
+    { id: 'g_sorena',    cat: 'あいづち', say: 'それな！',           emoji: '👉', main: true },
+    { id: 'g_wakaru',    cat: 'あいづち', say: 'わかる〜！',         emoji: '🙆' },
+    { id: 'g_iine',      cat: 'あいづち', say: 'いいね！',           emoji: '👍', main: true },
+    { id: 'g_ukeru',     cat: 'あいづち', say: 'ウケる！',           emoji: '🤣', main: true },
+    { id: 'g_maji',      cat: 'あいづち', say: 'え、まじで！？',     emoji: '😲' },
+    { id: 'g_naruhodo',  cat: 'あいづち', say: 'なるほど〜',         emoji: '🤔' },
+    { id: 'g_sugoi',     cat: 'あいづち', say: 'すごい！',           emoji: '✨' },
+    { id: 'g_hakushu',   cat: 'あいづち', say: 'パチパチパチ！',     emoji: '👏' },
+    { id: 'g_omedeto',   cat: 'あいづち', say: 'おめでとう！',       emoji: '🎉' },
+    { id: 'g_arigato',   cat: 'あいづち', say: 'ありがとう！',       emoji: '😊' },
+    { id: 'g_gomen',     cat: 'あいづち', say: 'ごめんね！',         emoji: '🙇' },
+    { id: 'g_hazusu',    cat: 'かえる',   say: 'ちょっと席はずすね', emoji: '🚶' },
+    { id: 'g_mata',      cat: 'かえる',   say: 'また来るね！',       emoji: '👋' },
+    { id: 'g_oyasumi',   cat: 'かえる',   say: 'おやすみ〜',         emoji: '🌙' }
+  ],
+  /* 大将用の決まり文句(大将の画面にだけ出る)。auto: 店が自動で言うもの(ボタンにも出る) */
+  OWNER_PHRASES: [
+    { id: 'irasshai',   cat: 'むかえる', say: 'いらっしゃい！',               main: true },
+    { id: 'o_okaeri',   cat: 'むかえる', say: 'おかえりなさい！' },
+    { id: 'o_nani',     cat: 'むかえる', say: '何にします？',                 main: true },
+    { id: 'haiyo',      cat: 'だす',     say: 'はいよ！',                     main: true },
+    { id: 'omachi',     cat: 'だす',     say: 'はい、お待ち！' },
+    { id: 'o_shosho',   cat: 'だす',     say: '少々お待ちを！' },
+    { id: 'o_atsui',    cat: 'だす',     say: '熱いから気をつけてね' },
+    { id: 'o_kanpai',   cat: 'もりあげ', say: 'かんぱーい！',  emoji: '🍻',   main: true },
+    { id: 'o_iine',     cat: 'もりあげ', say: 'いいねえ！' },
+    { id: 'o_moriagari',cat: 'もりあげ', say: '盛り上がってるねえ！' },
+    { id: 'o_omedeto',  cat: 'もりあげ', say: 'おめでとうございます！' },
+    { id: 'o_okawari',  cat: 'もりあげ', say: 'おかわり、どうですか？' },
+    { id: 'o_arigato',  cat: 'もりあげ', say: 'ありがとうございます！',      main: true },
+    { id: 'o_maido',    cat: 'もりあげ', say: '毎度！' },
+    { id: 'o_goyukkuri',cat: 'もりあげ', say: 'ごゆっくりどうぞ' },
+    { id: 'lastcall',   cat: 'おくる',   say: 'そろそろ閉店です。ラストオーダー、どうぞ！' },
+    { id: 'mataokoshi', cat: 'おくる',   say: 'またお越しください！',        main: true },
+    { id: 'o_kiwotsukete', cat: 'おくる', say: '気をつけて帰ってね！' },
+    { id: 'oyasumi',    cat: 'おくる',   say: 'おやすみなさい！' }
+  ],
+
+  /* ノブさんの声を録音してある言葉の id(大将の声「ノブの声(録音)」で使う)。録音ページ rec.html で録って、voice/nobu/ に置く。
+     ここにない言葉は、代わりの声(落ち着いた男性)で読む */
+  NOBU_VOICE: []
 };
+SHOP.GUEST_PHRASES.forEach(function (p) { p.who = 'guest'; });
+SHOP.OWNER_PHRASES.forEach(function (p) { p.who = 'owner'; });
+SHOP.PHRASES = SHOP.GUEST_PHRASES.concat(SHOP.OWNER_PHRASES);   // id で探す用(2つの表の id は重ねない)

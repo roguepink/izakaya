@@ -18,15 +18,18 @@
   /* ---------------- 自分(この端末)の情報 ---------------- */
   function lsGet(k, d) { try { var v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-  var ME = lsGet('iz-me', null);
+  /* 自分の記録。大将用とお客さん用は分ける(Android だと 2つのアプリが同じ記録を見てしまい、同じ人あつかいになるため) */
+  var ME_KEY = OWNER_MODE ? 'iz-me-owner' : 'iz-me';
+  var ME = lsGet(ME_KEY, null);
+  if (!ME && OWNER_MODE) { var g0 = lsGet('iz-me', null); if (g0) ME = { uid: '', name: g0.name || '', avatar: null }; }   // 名前だけ引きつぐ
   if (!ME || !ME.uid) {
-    ME = { uid: 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), name: '', avatar: null };
-    lsSet('iz-me', ME);
+    ME = { uid: (OWNER_MODE ? 'o' : 'u') + Date.now().toString(36) + Math.random().toString(36).slice(2, 8), name: (ME && ME.name) || '', avatar: null };
+    lsSet(ME_KEY, ME);
   }
   ME.avatar = AVATAR.fix(ME.avatar);   // 古い形(1代目)なら null → 女性/男性 から作りなおしてもらう
   var ownerAvatar = AVATAR.fix(lsGet('iz-owner-avatar', null)) || AVATAR.fix(AVATAR.OWNER);
   function myAvatar() { return OWNER_MODE ? ownerAvatar : ME.avatar; }
-  function saveMe() { lsSet('iz-me', ME); }
+  function saveMe() { lsSet(ME_KEY, ME); }
 
   /* ---------------- 時間(日本時間で計算する) ---------------- */
   function jst(ts) { var d = new Date(ts + JST); return { y: d.getUTCFullYear(), m: d.getUTCMonth(), d: d.getUTCDate(), w: d.getUTCDay(), hh: d.getUTCHours(), mi: d.getUTCMinutes() }; }
@@ -204,6 +207,7 @@
     try { audio.muted = true; var p = audio.play(); if (p && p.then) p.then(function () { audio.pause(); audio.muted = false; }).catch(function () { audio.muted = false; }); } catch (e) {}
     try { if (window.speechSynthesis) { var u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } } catch (e) {}
     try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {}
+    voicePool();
   }
   var actx = null;
   function ding() {
@@ -219,11 +223,20 @@
       });
     } catch (e) {}
   }
-  var voiceMissing = {};
-  function speak(text, voiceIdx) {
+  /* 決まり文句の声。voice/<声のid>/<言葉のid>.m4a を鳴らす。ない言葉はスマホの読み上げで代わりに読む。
+     音を鳴らす入れ物は、入店のときに(指でさわったときに)音を出せる状態にしておく(iPhone は そうしないと鳴らない) */
+  var voiceMissing = {}, vpool = [], vpoolI = 0;
+  function voicePool() {
+    if (vpool.length) return;
+    for (var i = 0; i < 3; i++) {
+      var a = new Audio(); a.preload = 'auto'; vpool.push(a);
+      try { a.muted = true; a.src = 'data:audio/mp4;base64,'; var p = a.play(); if (p && p.catch) p.catch(function () {}); a.pause(); a.muted = false; } catch (e) {}
+    }
+  }
+  function speak(text, voiceId, owner) {
     if (!window.speechSynthesis) return;
     try {
-      var v = AVATAR.VOICES[voiceIdx] || AVATAR.VOICES[1];
+      var v = AVATAR.voiceOf(voiceId, owner);
       var u = new SpeechSynthesisUtterance(text);
       u.lang = 'ja-JP'; u.pitch = v.pitch; u.rate = v.rate; u.volume = Math.min(1, vol + 0.3);
       var jv = speechSynthesis.getVoices().filter(function (x) { return /ja/i.test(x.lang); })[0];
@@ -231,18 +244,41 @@
       speechSynthesis.speak(u);
     } catch (e) {}
   }
-  function playPhrase(ph, voiceIdx) {
+  /* 大将の声: 大将の画面なら自分の、お客さんなら店にいる大将(またはマスター)の選んだ声 */
+  function ownerVoiceId() {
+    if (OWNER_MODE) return ownerAvatar.voice;
+    var oa = (tree.state || {}).ownerAvatar; if (oa && oa.voice) return oa.voice;
+    return AVATAR.fix(AVATAR.OWNER).voice;
+  }
+  function voiceFiles(ph, voiceId) {   // 鳴らす順の候補
+    var owner = ph.who === 'owner', v = AVATAR.voiceOf(voiceId, owner), L = [];
+    if (v.rec) { if ((SHOP.NOBU_VOICE || []).indexOf(ph.id) >= 0) L.push('voice/' + v.id + '/' + ph.id + '.m4a'); v = AVATAR.voiceOf(v.fallback, owner); }
+    if (v.tts) L.push('voice/' + v.id + '/' + ph.id + '.m4a');
+    return { files: L, v: v };
+  }
+  function playPhrase(ph, voiceId) {
     if (!inside) return;
+    var owner = ph.who === 'owner';
+    if (owner) voiceId = ownerVoiceId();
     duck = 0.35; setVol();
     setTimeout(function () { duck = 1; setVol(); }, 2200);
-    if (ph.voice && !voiceMissing[ph.voice]) {
-      var a = new Audio(ph.voice);
-      a.volume = Math.min(1, vol + 0.3);
-      a.onerror = function () { voiceMissing[ph.voice] = 1; speak(ph.say, ph.who === 'owner' ? 0 : voiceIdx); };
+    var c = voiceFiles(ph, voiceId), files = c.files.filter(function (f) { return !voiceMissing[f]; });
+    (function next(i) {
+      if (i >= files.length) { speak(ph.say, c.v.id, owner); return; }
+      voicePool();
+      var a = vpool[vpoolI++ % vpool.length];
+      a.onerror = function () { a.onerror = null; voiceMissing[files[i]] = 1; next(i + 1); };
+      a.src = files[i]; a.volume = Math.min(1, vol + 0.3);
       var p = a.play(); if (p && p.catch) p.catch(function () {});
-      return;
-    }
-    speak(ph.say, ph.who === 'owner' ? 0 : voiceIdx);
+    })(0);
+  }
+  function previewVoice(voiceId, owner) {   // アバター作りで 声を選んだとき
+    var ph = owner ? SHOP.OWNER_PHRASES.filter(function (p) { return p.id === 'irasshai'; })[0] : SHOP.GUEST_PHRASES[0];
+    var c = voiceFiles(ph, voiceId), f = c.files.filter(function (x) { return !voiceMissing[x]; })[0];
+    if (!f) { speak(ph.say, c.v.id, owner); return; }
+    voicePool(); var a = vpool[vpoolI++ % vpool.length];
+    a.onerror = function () { a.onerror = null; voiceMissing[f] = 1; speak(ph.say, c.v.id, owner); };
+    a.src = f; a.volume = Math.min(1, vol + 0.3); var p = a.play(); if (p && p.catch) p.catch(function () {});
   }
 
   /* ---------------- 曲を みんなで そろえる ---------------- */
@@ -649,7 +685,7 @@
     seenChat = {}; seenEvt = {};
     Object.keys(tree.chat || {}).forEach(function (k) { seenChat[k] = 1; });
     Object.keys(tree.events || {}).forEach(function (k) { seenEvt[k] = 1; });
-    net.set('members/' + ME.uid, { name: name, avatar: myAvatar(), owner: OWNER_MODE, at: TS, seen: TS, voice: myAvatar().voice || 0 });
+    net.set('members/' + ME.uid, { name: name, avatar: myAvatar(), owner: OWNER_MODE, at: TS, seen: TS, voice: myAvatar().voice || '' });
     if (OWNER_MODE) {
       net.update('state', { ownerAvatar: ownerAvatar, ownerName: name, ownerRole: ROLE });
       sys(ROLE === 'master' ? '🏮 今回のマスター ' + name + 'さんが店に立ちました' : '🏮 大将の' + name + 'が店に立ちました');
@@ -977,19 +1013,33 @@
   }
 
   /* ---------------- 決まり文句・乾杯などの合図 ---------------- */
-  function event(e) { e.at = TS; e.by = ME.uid; e.voice = myAvatar().voice || 0; net.push('events', e); }
+  function event(e) { e.at = TS; e.by = ME.uid; e.voice = myAvatar().voice || ''; net.push('events', e); }
+  function myPhrases() { return OWNER_MODE ? SHOP.OWNER_PHRASES : SHOP.GUEST_PHRASES; }   // 大将とお客さんで まったく別
+  function sayPhrase(id) {
+    if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return false; }
+    event({ type: 'phrase', id: id, seat: OWNER_MODE ? 'owner' : mySeat });
+    return true;
+  }
+  function phraseLabel(p) { return (p.emoji ? p.emoji + ' ' : '') + p.say.replace(/[！!]$/, ''); }
   function buildPhrases() {
     var box = $('phrases'); box.innerHTML = '';
-    var list = SHOP.PHRASES.filter(function (p) { return p.btn || (OWNER_MODE && p.who === 'owner'); });
-    list.forEach(function (p) {
+    myPhrases().filter(function (p) { return p.main; }).forEach(function (p) {
       var b = document.createElement('button');
-      b.textContent = (p.emoji ? p.emoji + ' ' : '') + p.say.replace(/！$/, '');
-      b.onclick = function () {
-        if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return; }
-        event({ type: 'phrase', id: p.id, seat: OWNER_MODE ? 'owner' : mySeat });
-      };
+      b.textContent = phraseLabel(p);
+      b.onclick = function () { sayPhrase(p.id); };
       box.appendChild(b);
     });
+    var m = document.createElement('button'); m.className = 'more'; m.textContent = '💬 もっと';
+    m.onclick = function () { openSheet('phrases'); };
+    box.appendChild(m);
+  }
+  function phrasesHTML() {
+    var h = '', cat = '';
+    myPhrases().forEach(function (p) {
+      if (p.cat !== cat) { h += (cat ? '</div>' : '') + '<div class="sh-sec">' + esc(p.cat) + '</div><div class="ph-grid">'; cat = p.cat; }
+      h += '<button data-ph="' + esc(p.id) + '">' + esc(phraseLabel(p)) + '</button>';
+    });
+    return h + '</div><p class="small-note">押すと、みんなに声と吹き出しで届きます。' + (OWNER_MODE ? '声は「アバター」の「大きさと声」で選べます。' : '声は「アバター」の「大きさと声」で、男性3つ・女性3つから選べます。') + '</p>';
   }
   function processEvents() {
     var ev = tree.events || {};
@@ -1000,9 +1050,10 @@
         var ph = SHOP.PHRASES.filter(function (p) { return p.id === e.id; })[0]; if (!ph) return;
         var who = ph.who === 'owner' ? 'owner' : e.seat;
         bubble(who, (ph.emoji ? ph.emoji + ' ' : '') + ph.say, true);
-        withScene(function (s) { if (ph.id === 'kanpai') { s.cheerAll(); } else s.talk(who); });
+        var isK = ph.id === 'kanpai' || ph.id === 'o_kanpai';
+        withScene(function (s) { if (isK) { s.cheerAll(); } else s.talk(who); });
         if (ph.who === 'owner') ownerTo(e.seat, true);
-        if (ph.id === 'kanpai') { for (var i = 0; i < N; i++) if (seatUid(i)) floater(i, '🍻'); floater('owner', '🍻'); }
+        if (isK) { for (var i = 0; i < N; i++) if (seatUid(i)) floater(i, '🍻'); floater('owner', '🍻'); }
         else if (ph.emoji) floater(who, ph.emoji);
         playPhrase(ph, e.voice);
       } else if (e.type === 'clear') {
@@ -1010,12 +1061,12 @@
       } else if (e.type === 'order') {
         ownerTo(e.seat, true);
         var it0 = menuItem(e.item), ph3 = SHOP.PHRASES.filter(function (p) { return p.id === 'haiyo'; })[0];
-        if (ph3) { bubble('owner', ph3.say + (it0 ? ' ' + it0.emoji + ' ' + it0.name + 'ね' : ''), true); playPhrase(ph3, 0); }
+        if (ph3) { bubble('owner', ph3.say + (it0 ? ' ' + it0.emoji + ' ' + it0.name + 'ね' : ''), true); playPhrase(ph3); }
       } else if (e.type === 'serve') {
         var it = menuItem(e.item);
         ownerTo(e.seat, true);
         var ph2 = SHOP.PHRASES.filter(function (p) { return p.id === 'omachi'; })[0];
-        if (ph2) { bubble('owner', ph2.say + ' ' + (it ? it.emoji + ' ' + it.name + (it.pun && it.real ? '(中身は' + it.real + 'です)' : '') : ''), true); playPhrase(ph2, 0); }
+        if (ph2) { bubble('owner', ph2.say + ' ' + (it ? it.emoji + ' ' + it.name + (it.pun && it.real ? '(中身は' + it.real + 'です)' : '') : ''), true); playPhrase(ph2); }
       }
     });
   }
@@ -1251,6 +1302,10 @@
       SHOP.SONGS.forEach(function (s) { html += '<div class="li"><div class="t">' + esc(s.title) + '</div><button data-req="' + esc(s.id) + '">リクエスト</button></div>'; });
       html += '</div>';
       if (!force && body._h === html) return;
+    } else if (sheetKind === 'phrases') {
+      title = OWNER_MODE ? '大将のひとこと' : 'ひとこと';
+      html = phrasesHTML();
+      if (!force && body._h === html) return;
     } else if (sheetKind === 'orders') {
       title = '注文票';
       var o = tree.orders || {}, ok = Object.keys(o).sort();
@@ -1311,6 +1366,8 @@
         else { toast('リンクが読めませんでした(YouTube か、mp4 などの動画のリンク)'); return; }
         q('#ytIn').value = '';
       };
+    } else if (sheetKind === 'phrases') {
+      body.querySelectorAll('[data-ph]').forEach(function (b) { b.onclick = function () { if (sayPhrase(b.getAttribute('data-ph'))) closeSheet(); }; });
     } else if (sheetKind === 'orders') {
       body.querySelectorAll('[data-serve]').forEach(function (b) { b.onclick = function () { var k = b.getAttribute('data-serve'), o = (tree.orders || {})[k]; if (o) serve(o.seat, o.item, k); }; });
     } else if (sheetKind === 'owner') {
@@ -1381,7 +1438,7 @@
       '<div class="pl-lbl">マスター(カウンターの中に立つ人)</div><div class="opts pl-opts"><button data-master="me" class="' + (other ? '' : 'on') + '">ノブさん(自分)</button><button data-master="other" class="' + (other ? 'on' : '') + '">ほかの人</button></div>' +
       '<div id="peOther" class="' + (other ? '' : 'hidden') + '"><label>マスターの名前<input id="peMaster" maxlength="12" value="' + esc(p.master || '') + '" placeholder="例: さくら"></label>' +
       '<label>マスターの合言葉<input id="pePass" maxlength="40" placeholder="' + (p.masterHash ? '(決めてあります。変えるときだけ入れる)' : 'その人にだけ教える合言葉') + '" autocomplete="off"></label>' +
-      '<p class="small-note">マスターになる人は、大将用のアプリ(owner.html)を開いて、この合言葉で入ります。合言葉は この回だけ使えます。ノブさんは、お客さん用のアプリから お客さんとして入れます。</p></div>' +
+      '<p class="small-note">マスターになる人は、大将用のアプリ(…/izakaya/owner/)を開いて、この合言葉で入ります。合言葉は この回だけ使えます。ノブさんは、お客さん用のアプリから お客さんとして入れます。</p></div>' +
       '<label>席の数<select id="peSeats">' + opts + '</select></label>' +
       '<label>ひとこと(お知らせ)<textarea id="peMsg" maxlength="120" placeholder="例: さくらさんの誕生日会です！">' + esc(p.message || '') + '</textarea></label>' +
       '<label class="pl-check"><input type="checkbox" id="peCancel"' + (p.cancel ? ' checked' : '') + '> この回はお休みにする</label>' +
@@ -1491,7 +1548,7 @@
       var r = Math.random();
       if (r < 0.62) net.push('chat', { uid: uid, name: b.name, seat: b.seat, text: BOT_LINES[Math.floor(Math.random() * BOT_LINES.length)], at: TS });
       else if (r < 0.82) { var it = SHOP.MENU[Math.floor(Math.random() * SHOP.MENU.length)]; if (whyNot(b.seat, it.id)) return; net.push('orders', { uid: uid, name: b.name, seat: b.seat, item: it.id, at: TS }); net.push('events', { type: 'order', seat: b.seat, item: it.id, at: TS, by: uid }); }
-      else net.push('events', { type: 'phrase', id: Math.random() < 0.6 ? 'kanpai' : 'umai', seat: b.seat, at: TS, by: uid, voice: 2 });
+      else net.push('events', { type: 'phrase', id: Math.random() < 0.6 ? 'kanpai' : 'umai', seat: b.seat, at: TS, by: uid, voice: (members()[uid] && members()[uid].voice) || '' });
     });
   }, 1000);
   function botsLeave() {
@@ -1604,8 +1661,8 @@
   function sizeVoice() {
     var h = '<div class="mk-sec">体の大きさ</div><input type="range" id="mkSize" min="' + AVATAR.SIZE_MIN + '" max="' + AVATAR.SIZE_MAX + '" step="0.01" value="' + draft.size + '">';
     h += '<div class="mk-sec">「乾杯」などの声</div><div class="opts">';
-    AVATAR.VOICES.forEach(function (v, i) { h += '<button data-n="voice" data-v="' + i + '" class="' + (draft.voice === i ? 'on' : '') + '">' + esc(v.name) + '</button>'; });
-    return h + '</div><div class="mk-sec">いまは仮の読み上げの声です。あとで本物の声に差しかえられます。</div>';
+    AVATAR.voiceList(OWNER_MODE).forEach(function (v) { h += '<button data-voice="' + v.id + '" class="' + (draft.voice === v.id ? 'on' : '') + '">' + esc(v.name) + '</button>'; });
+    return h + '</div><div class="mk-sec">押すと声が聞けます。' + (OWNER_MODE ? '大将の声は、大将用の言葉だけを話します。「ノブの声(録音)」は、録音してある言葉だけノブさんの声で、ほかは落ち着いた男性の声になります。' : 'お客さんの声は、お客さん用の言葉だけを話します。') + '</div>';
   }
   function opts(label, key) {   // 形を選ぶ(値は id)
     var h = '<div class="mk-sec">' + label + '</div><div class="opts">';
@@ -1625,8 +1682,8 @@
   }
   function chooseSex(sx) {
     var keep = draft ? { voice: draft.voice, size: draft.size } : {};
-    if (OWNER_MODE) { var o = JSON.parse(JSON.stringify(AVATAR.OWNER)); o.sex = sx; if (sx === 'f') { var fp = OWNER_PRESETS_F[0]; o.hair = 'bun'; o.bangs = 'seethrough'; o.eyes = 'big'; o.brows = 'soft'; o.mouth = 'smile'; o.face = 'egg'; o.skin = 1; o.hairColor = 1; o.lip = 1; o.cheek = 2; o.size = 1; o.voice = 2; o.top = fp.top; o.topColor = fp.topColor; o.head = fp.head; o.apron = fp.apron; } draft = AVATAR.fix(o); }
-    else { var p = JSON.parse(JSON.stringify(AVATAR.PRESETS[sx][0])); p.sex = sx; p.voice = sx === 'f' ? 2 : 1; draft = AVATAR.fix(p); }
+    if (OWNER_MODE) { var o = JSON.parse(JSON.stringify(AVATAR.OWNER)); o.sex = sx; if (sx === 'f') { var fp = OWNER_PRESETS_F[0]; o.hair = 'bun'; o.bangs = 'seethrough'; o.eyes = 'big'; o.brows = 'soft'; o.mouth = 'smile'; o.face = 'egg'; o.skin = 1; o.hairColor = 1; o.lip = 1; o.cheek = 2; o.size = 1; o.voice = 'of1'; o.top = fp.top; o.topColor = fp.topColor; o.head = fp.head; o.apron = fp.apron; } draft = AVATAR.fix(o); }
+    else { var p = JSON.parse(JSON.stringify(AVATAR.PRESETS[sx][0])); p.sex = sx; p.voice = sx === 'f' ? 'f1' : 'm1'; draft = AVATAR.fix(p); }
     if (keep.size) draft.size = keep.size;
     mkTab = 0; sexStep = false; updateDraft(); renderMaker();
   }
@@ -1669,10 +1726,12 @@
     body.innerHTML = T[mkTab].build();
     body.scrollTop = keep;
     body.querySelectorAll('[data-k]').forEach(function (b) { b.onclick = function () { var kk = b.getAttribute('data-k'); draft[kk] = b.getAttribute('data-v'); if (kk === 'hair' && draft.sex === 'm' && AVATAR.HAIR_BANGS.m[draft.hair]) draft.bangs = AVATAR.HAIR_BANGS.m[draft.hair]; draft = AVATAR.fix(draft); updateDraft(); renderMaker(); }; });
+    body.querySelectorAll('[data-voice]').forEach(function (b) {
+      b.onclick = function () { draft.voice = b.getAttribute('data-voice'); draft = AVATAR.fix(draft); previewVoice(draft.voice, OWNER_MODE); updateDraft(); renderMaker(); };
+    });
     body.querySelectorAll('[data-n]').forEach(function (b) {
       b.onclick = function () {
         var k = b.getAttribute('data-n'); draft[k] = +b.getAttribute('data-v'); draft = AVATAR.fix(draft);
-        if (k === 'voice') speak('かんぱーい！', draft.voice);
         updateDraft(); renderMaker();
       };
     });

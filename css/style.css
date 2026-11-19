@@ -145,6 +145,10 @@ body:not(.is-owner) .owner-only { display: none; }
 .mine button:active { transform: translateY(2px); box-shadow: none; }
 .phrases { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .phrases::-webkit-scrollbar { display: none; }
+.phrases button.more { background: rgba(255,210,122,.95); }
+.ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+.ph-grid button { background: #f3e6cc; color: var(--ink); border-radius: 12px; padding: 11px 8px; font-weight: 800; font-size: 15px; text-align: left; line-height: 1.25; }
+.ph-grid button:active { transform: scale(.97); }
 .phrases button { flex: none; background: rgba(243,230,204,.92); color: var(--ink); border-radius: 999px; padding: 7px 12px; font-weight: 800; font-size: 14px; }
 .log-wrap { position: relative; }
 .log { max-height: 16vh; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; line-height: 1.45;

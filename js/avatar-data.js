@@ -69,12 +69,30 @@ var AVATAR = {
   },
   ACC_COLOR: ['cap', 'beanie', 'beret', 'band', 'ribbon'],   // 色を選べる小物
   SIZE_MIN: 0.88, SIZE_MAX: 1.12,
-  VOICES: [
-    { name: '男性・低め', pitch: 0.75, rate: 1.0 },
-    { name: '男性・ふつう', pitch: 0.95, rate: 1.05 },
-    { name: '女性・ふつう', pitch: 1.25, rate: 1.05 },
-    { name: '女性・高め', pitch: 1.5, rate: 1.1 }
+  /* 決まり文句の声。お客さん用と大将用は まったく別(混ぜない)。
+     tts: Google(Gemini)の声の名前。voice/<id>/<言葉のid>.m4a に置いてある(tools/make-voices.py で作る)。
+     ファイルがないときは、スマホの読み上げ(pitch・rate)で代わりに読む */
+  GUEST_VOICES: [
+    { id: 'm1', name: '男性・明るい',   sex: 'm', tts: 'Puck',    pitch: 1.0,  rate: 1.08, style: '20〜30代の男性。友だちと居酒屋で飲んでいる。明るく、ノリがよく、楽しそう。自然な日本語の話し言葉。' },
+    { id: 'm2', name: '男性・やさしい', sex: 'm', tts: 'Achird',  pitch: 0.92, rate: 1.0,  style: '20〜30代の男性。友だちと居酒屋で飲んでいる。やさしく、おだやかで、人なつっこい。自然な日本語の話し言葉。' },
+    { id: 'm3', name: '男性・低め',     sex: 'm', tts: 'Charon',  pitch: 0.75, rate: 0.98, style: '30〜40代の男性。友だちと居酒屋で飲んでいる。低めで落ち着いた声。気さくで、少し渋い。自然な日本語の話し言葉。' },
+    { id: 'f1', name: '女性・明るい',   sex: 'f', tts: 'Leda',    pitch: 1.4,  rate: 1.1,  style: '20代の女性。友だちと居酒屋で飲んでいる。明るく、元気で、よく笑う。自然な日本語の話し言葉。' },
+    { id: 'f2', name: '女性・さわやか', sex: 'f', tts: 'Aoede',   pitch: 1.25, rate: 1.05, style: '20〜30代の女性。友だちと居酒屋で飲んでいる。さわやかで、ほがらか。自然な日本語の話し言葉。' },
+    { id: 'f3', name: '女性・落ち着き', sex: 'f', tts: 'Sulafat', pitch: 1.1,  rate: 1.0,  style: '30代の女性。友だちと居酒屋で飲んでいる。落ち着いた、あたたかい声。やわらかく話す。自然な日本語の話し言葉。' }
   ],
+  OWNER_VOICES: [
+    { id: 'nobu', name: 'ノブの声(録音)', sex: 'm', rec: true, fallback: 'om2', pitch: 0.85, rate: 1.0 },
+    { id: 'om1', name: '男性・威勢がいい', sex: 'm', tts: 'Fenrir',  pitch: 0.9,  rate: 1.08, style: '40代の男性。小さな居酒屋の大将。威勢がよく、元気で、あたたかい。お客さんに声をかける。自然な日本語の話し言葉。' },
+    { id: 'om2', name: '男性・落ち着き',   sex: 'm', tts: 'Alnilam', pitch: 0.8,  rate: 1.0,  style: '40代の男性。小さな居酒屋の大将。落ち着いていて、やさしく、人がいい。お客さんに声をかける。自然な日本語の話し言葉。' },
+    { id: 'of1', name: '女性・元気',       sex: 'f', tts: 'Kore',    pitch: 1.3,  rate: 1.08, style: '30代の女性。小さな居酒屋の女将。明るく、元気で、気さく。お客さんに声をかける。自然な日本語の話し言葉。' },
+    { id: 'of2', name: '女性・やわらか',   sex: 'f', tts: 'Despina', pitch: 1.15, rate: 1.0,  style: '30〜40代の女性。小さな居酒屋の女将。やわらかく、おっとりして、あたたかい。お客さんに声をかける。自然な日本語の話し言葉。' }
+  ],
+  voiceList: function (owner) { return owner ? AVATAR.OWNER_VOICES : AVATAR.GUEST_VOICES; },
+  voiceOf: function (id, owner) {
+    var L = AVATAR.voiceList(owner);
+    for (var i = 0; i < L.length; i++) if (L[i].id === id) return L[i];
+    return L[owner ? 1 : 0];
+  },
 
   /* はじめから用意してあるアバター(「おまかせ」で選べる)。値は id で書く */
   PRESETS: {
@@ -115,7 +133,7 @@ var AVATAR = {
     p.sex = sex; p.hair = pick(S.hair)[0]; p.bangs = pick(S.bangs)[0]; p.ahoge = sex === 'f' && Math.random() < 0.3 ? 'on' : 'off'; p.hairColor = Math.floor(Math.random() * 6); p.eyes = pick(S.eyes)[0];
     p.top = pick(S.top)[0]; p.topColor = Math.floor(Math.random() * AVATAR.CLOTH_COLOR.length);
     p.acc = Math.random() < 0.5 ? 'none' : pick(S.acc)[0]; p.skin = Math.floor(Math.random() * 4);
-    p.voice = sex === 'f' ? 2 + Math.floor(Math.random() * 2) : Math.floor(Math.random() * 2);
+    var vs = AVATAR.GUEST_VOICES.filter(function (v) { return v.sex === sex; }); p.voice = pick(vs).id;
     p.size = Math.round((0.94 + Math.random() * 0.12) * 100) / 100;
     return AVATAR.fix(p);
   },
@@ -139,7 +157,8 @@ var AVATAR = {
       var AC = { cap: a.topColor >= 0 ? a.topColor : 0, beanie: 5, beret: 3, band: 3, ribbon: 8 };   // 色を選べる小物と、はじめの色
       if (o.acc in AC) o.accColor = c(a.accColor, AVATAR.CLOTH_COLOR, typeof AC[o.acc] === 'number' ? AC[o.acc] : 0);
     }
-    o.voice = a.voice >= 0 && a.voice < AVATAR.VOICES.length ? Math.floor(a.voice) : (o.sex === 'f' ? 2 : 1);
+    var VL = AVATAR.voiceList(o.owner), vOld = typeof a.voice === 'number' ? (o.owner ? (o.sex === 'f' ? 'of1' : 'om1') : ['m1', 'm2', 'f1', 'f2'][a.voice]) : a.voice;   // 古いデータは番号だった
+    o.voice = VL.some(function (v) { return v.id === vOld; }) ? vOld : (o.owner ? (o.sex === 'f' ? 'of1' : (SHOP.NOBU_VOICE && SHOP.NOBU_VOICE.length ? 'nobu' : 'om1')) : (o.sex === 'f' ? 'f1' : 'm1'));
     var s = +a.size; o.size = s >= AVATAR.SIZE_MIN && s <= AVATAR.SIZE_MAX ? s : 1;
     return o;
   },

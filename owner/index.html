@@ -1,0 +1,175 @@
+<!-- このファイルは tools/make-owner.py が index.html から作る。直接直さない -->
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#140c08">
+<base href="../">
+<title>居酒屋ノブ 大将</title>
+<meta name="description" content="週に1回だけ開く、スマホの中の居酒屋。カウンター7席で、なんでも話せる1時間。">
+<link rel="manifest" href="owner/manifest.webmanifest">
+<link rel="apple-touch-icon" href="owner/apple-touch-icon.png">
+<link rel="icon" href="owner/icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ノブ大将">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta property="og:type" content="website">
+<meta property="og:title" content="居酒屋ノブ">
+<meta property="og:description" content="週に1回だけ開く、スマホの中の居酒屋。カウンター7席で、なんでも話せる1時間。">
+<meta property="og:image" content="https://roguepink.github.io/izakaya/ogp.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div id="strip2d" class="hidden"></div>
+<div id="tags"></div>
+<div id="bubbles"></div>
+<div id="floaters"></div>
+
+<!-- ============ 入口 ============ -->
+<section id="entrance" class="screen">
+  <div class="sign">
+    <div class="sign-sub">週に一度の</div>
+    <h1 id="shopName">居酒屋ノブ</h1>
+    <div id="openState" class="open-state"></div>
+    <div id="masterNote" class="master-note hidden"></div>
+    <div id="schedule" class="schedule"></div>
+    <div class="free">すべて無料です</div>
+  </div>
+  <div class="card">
+    <div class="me-row">
+      <canvas id="meFace" width="96" height="96"></canvas>
+      <div class="me-info">
+        <label class="lbl" for="nameInput">お名前(呼び名)</label>
+        <input id="nameInput" maxlength="12" placeholder="例: たろう" autocomplete="off">
+      </div>
+    </div>
+    <div id="passRow" class="hidden">
+      <label class="lbl" for="passInput">お店の合言葉</label>
+      <input id="passInput" type="password" maxlength="40" autocomplete="off" placeholder="大将から聞いた合言葉">
+    </div>
+    <div id="ownerRow" class="hidden">
+      <label class="lbl" for="ownerPass">大将の合言葉</label>
+      <input id="ownerPass" type="password" maxlength="40" autocomplete="off">
+    </div>
+    <button id="enterBtn" class="big">🏮 のれんをくぐる</button>
+    <div class="row2">
+      <button id="makerBtn" class="sub">🎨 アバターを作る</button>
+      <button id="reserveBtn" class="sub">📅 席を予約</button>
+    </div>
+    <div id="entMsg" class="msg"></div>
+    <div id="modeNote" class="note"></div>
+  </div>
+</section>
+
+<!-- ============ アバターを作る ============ -->
+<section id="maker" class="screen hidden">
+  <div class="mk-top">
+    <button id="mkBack" class="ghost">← もどる</button>
+    <div class="mk-title">アバターを作る</div>
+    <button id="mkSave" class="ok">決定</button>
+  </div>
+  <div class="mk-preview">
+    <canvas id="preview"></canvas>
+    <div class="mk-tools">
+      <button id="mkZoom" class="chip">🔍 顔を大きく</button>
+      <button id="mkRandom" class="chip">🎲 おまかせ</button>
+      <button id="mkCheer" class="chip">🍻 乾杯</button>
+    </div>
+    <div class="mk-hint">指で左右にうごかすと回ります</div>
+  </div>
+  <div class="mk-tabs" id="mkTabs"></div>
+  <div class="mk-body" id="mkBody"></div>
+</section>
+
+<!-- ============ 予約 ============ -->
+<section id="reserve" class="screen hidden">
+  <div class="mk-top">
+    <button id="rsBack" class="ghost">← もどる</button>
+    <div class="mk-title">席を予約</div>
+    <span></span>
+  </div>
+  <p class="rs-help"><b class="free" style="margin:0 0 6px">すべて無料です</b><br>予約は<b>開店の3時間前から</b>できます。空いている席を押すと予約、もう一度押すと取り消し。<br>予約の席は、開店から <b id="holdMin">15</b> 分まで取っておきます。</p>
+  <div id="rsList"></div>
+</section>
+
+<!-- ============ お店の中 ============ -->
+<!-- 大将のうしろのモニター(3D の画面に重ねる) -->
+<div id="tvBack" class="hidden"></div>
+<div id="tv" class="hidden"><div id="tvHolder"></div><div id="tvCatch"></div><div id="tvBadge" class="hidden">🔇 さわると音が出ます</div></div>
+<button id="tvClose" class="hidden">✕ モニターにもどす</button>
+
+<section id="shop" class="hidden">
+  <div class="topbar">
+    <div class="tb-left"><b id="tbName">居酒屋ノブ</b><span id="tbState"></span></div>
+    <div class="tb-right"><span id="tbCount"></span></div>
+  </div>
+  <div class="np-row"><button id="nowPlaying" class="np">🎵 <span id="npTitle">—</span></button><button id="npSkip" class="np-skip owner-only">⏭ 次へ</button></div>
+  <div class="side">
+    <button id="bMore" class="sbtn owner-only"><span>☰</span><small id="bMoreLbl">メニュー</small></button>
+    <button id="bView" class="sbtn" title="視点"><span>👁</span><small id="bViewLbl">目線</small></button>
+    <button id="bMusic" class="sbtn"><span>🎵</span><small>曲</small></button>
+    <button id="bMenu" class="sbtn"><span>🍺</span><small>注文</small></button>
+    <button id="bOrders" class="sbtn owner-only"><span>📋</span><small>注文票</small><i id="ordBadge" class="badge hidden">0</i></button>
+    <button id="bOwner" class="sbtn owner-only"><span>🏮</span><small>店主</small></button>
+    <button id="bBot" class="sbtn hidden"><span>🤖</span><small>おためし客</small></button>
+    <button id="bLeave" class="sbtn"><span>🚪</span><small>帰る</small></button>
+  </div>
+  <div class="bottom">
+    <div id="pickHint" class="pick-hint">空いている席を押して座ってください</div>
+    <div id="mine" class="mine hidden"></div>
+    <div id="phrases" class="phrases"></div>
+    <div class="log-wrap"><div id="log" class="log"></div><button id="logBtn" class="log-btn" type="button">全部見る ▲</button></div>
+    <form id="chatForm" class="chat">
+      <textarea id="chatInput" rows="1" maxlength="500" placeholder="話しかける…" autocomplete="off"></textarea>
+      <button type="submit" id="sendBtn">送る</button>
+    </form>
+  </div>
+</section>
+
+<!-- ============ 下から出る板 ============ -->
+<div id="sheetBack" class="hidden"></div>
+<div id="sheet" class="sheet hidden">
+  <div class="sh-head"><b id="shTitle"></b><button id="shClose" class="mini">✕</button></div>
+  <div id="shBody" class="sh-body"></div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+<div id="closing" class="screen hidden">
+  <div class="closing-box">
+    <div class="closing-moon">🌙</div>
+    <h2 id="closingTitle">本日は閉店です</h2>
+    <p id="closingText">ありがとうございました。またお越しください。</p>
+    <button id="closingOk" class="big">入口にもどる</button>
+  </div>
+</div>
+
+<script>window.IZ_OWNER = true;</script>
+<script src="js/config.js"></script>
+<script src="js/avatar-data.js"></script>
+<script src="js/net.js"></script>
+<script type="module" src="js/scene3d.js" onerror="window.IZ3D_FAIL=1"></script>
+<script nomodule>window.IZ3D_FAIL = 1;</script>
+<script src="js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator && location.protocol === 'https:') {
+    window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  }
+</script>
+<script>
+  window.INSTALL_GATE = { id: 'izakaya-owner', name: '居酒屋ノブ 大将', icon: 'owner/icon-192.png',
+    tagline: '大将の店に立つためのアプリ',
+    desc: 'すべて無料です。居酒屋ノブの大将(お店の人)と、その回のマスター用です。お客さん用とは別のアプリとしてホーム画面に入ります。注文票・料理を出す・開け閉めができます。',
+    points: ['注文票と ベルの音で 注文が分かる', 'お客さんの席を押して 料理を出せる', '臨時の開店・閉店ができる'],
+    shots: ['shots/1.jpg', 'shots/2.jpg', 'shots/3.jpg'], badges: ['無料', '広告なし', '登録なし'], color: '#c8261c', playLabel: '▶ このまま店に立つ',
+    note: 'すべて無料です ・ お話にはインターネットが必要です' };
+</script>
+<script src="install.js"></script>
+</body>
+</html>
