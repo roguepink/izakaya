@@ -28,6 +28,8 @@ RAW = Path(os.environ.get("IZ_VOICE_RAW", os.path.expanduser("~/claude-work/izak
 RAW.mkdir(parents=True, exist_ok=True)
 SEP = "\n\n"
 HITO = os.path.expanduser("~/.claude/scripts/hito-pace.py")
+CHUNK = int(sys.argv[sys.argv.index("--chunk") + 1]) if "--chunk" in sys.argv else 0   # 1回に読ませる数
+FORCE_WHISPER = "--whisper" in sys.argv   # 間が短い声は 聞き起こしの時刻で切る(無音で切ると ずれる)
 
 
 def js_list(src, name):
@@ -131,7 +133,7 @@ def split_points(pcm, texts, wav_path):
     # 端の無音は切れ目ではない
     gaps = [g for g in gaps if g[0] > 0.15 and g[1] < total - 0.15]
     need = len(texts) - 1
-    if len(gaps) >= need:
+    if len(gaps) >= need and not FORCE_WHISPER:
         cuts = sorted((a + b) / 2 for a, b in gaps[:need])
         return [0.0] + cuts, total, "無音"
     # 無音が足りないときは、聞き起こしの時刻で
@@ -193,28 +195,40 @@ def main():
         if not todo: continue
         if not force and not resplit and len(todo) < len(phrases):
             print(f"{v['id']}: 足りない {len(todo)} 個だけ作ります")
-        texts = [spoken(p["say"]) for p in todo]
-        raw = RAW / f"{v['id']}-{abs(hash(tuple(texts))) % 10**8}.wav"
-        if resplit:
-            cands = sorted(RAW.glob(f"{v['id']}-*.wav"), key=lambda x: x.stat().st_mtime)
-            raw = cands[-1] if cands else raw
-        if not raw.exists():
-            if os.path.exists(HITO):
-                subprocess.run(["python3", HITO, "--wait"], check=False)
-            style = v["style"] + " これは一行ずつ別々の場面のひとことです。行と行のあいだは、たっぷり一秒ほど間をあけてください。番号や記号は読まないでください。"
-            print(f"{v['id']} ({v['tts']}): {len(texts)} 個を注文中…", flush=True)
-            raw.write_bytes(request(SEP.join(texts), v["tts"], style, v.get("model")))
-            calls += 1; chars += sum(len(t) for t in texts)
-        pcm = pcm_of(raw.read_bytes())
-        starts, total, how = split_points(pcm, texts, raw)
-        print(f"{v['id']}: 全体 {total:.1f}秒・切り方 {how}")
-        for i, p in enumerate(todo):
-            a = starts[i]; b = starts[i + 1] if i + 1 < len(todo) else total
-            out = outdir / f"{p['id']}.m4a"
-            encode(pcm, a, b, out)
-            heard = transcribe(out)["text"].strip()
-            sim = difflib.SequenceMatcher(None, norm(p["say"]), norm(heard)).ratio()
-            report.append((v["id"], p["id"], p["say"], heard, round(sim, 2), round(seconds(out), 2), out.stat().st_size))
+        # 1回に読ませる まとまり。--chunk N で N個ずつ。1〜3個だけ作り直すときは 前後の言葉も読ませて まん中だけ使う(1言だけだと くずれやすい)
+        groups = []   # [(読ませる言葉の並び, 保存する印の並び)]
+        if CHUNK and not resplit:
+            for k in range(0, len(todo), CHUNK): groups.append((todo[k:k + CHUNK], [True] * len(todo[k:k + CHUNK])))
+        elif len(todo) <= 3 and len(todo) < len(phrases) and not resplit:
+            for p in todo:
+                i = phrases.index(p); ctx = phrases[max(0, i - 1):i + 2]
+                groups.append((ctx, [q is p for q in ctx]))
+        else:
+            groups.append((todo, [True] * len(todo)))
+        for gi, (items, keep) in enumerate(groups):
+            texts = [spoken(p["say"]) for p in items]
+            raw = RAW / f"{v['id']}-{abs(hash(tuple(texts))) % 10**8}.wav"
+            if resplit:
+                cands = sorted(RAW.glob(f"{v['id']}-*.wav"), key=lambda x: x.stat().st_mtime)
+                raw = cands[-1] if cands else raw
+            if not raw.exists():
+                if os.path.exists(HITO):
+                    subprocess.run(["python3", HITO, "--wait"], check=False)
+                style = v["style"] + " これは一行ずつ別々の場面のひとことです。行と行のあいだは、たっぷり一秒ほど間をあけてください。番号や記号は読まないでください。"
+                print(f"{v['id']} ({v['tts']}): {len(texts)} 個を注文中…", flush=True)
+                raw.write_bytes(request(SEP.join(texts), v["tts"], style, v.get("model")))
+                calls += 1; chars += sum(len(t) for t in texts)
+            pcm = pcm_of(raw.read_bytes())
+            starts, total, how = split_points(pcm, texts, raw)
+            print(f"{v['id']}: 全体 {total:.1f}秒・切り方 {how}")
+            for i, p in enumerate(items):
+                if not keep[i]: continue
+                a = starts[i]; b = starts[i + 1] if i + 1 < len(items) else total
+                out = outdir / f"{p['id']}.m4a"
+                encode(pcm, a, b, out)
+                heard = transcribe(out)["text"].strip()
+                sim = difflib.SequenceMatcher(None, norm(p["say"]), norm(heard)).ratio()
+                report.append((v["id"], p["id"], p["say"], heard, round(sim, 2), round(seconds(out), 2), out.stat().st_size))
     rp = RAW / "report.json"
     old = json.loads(rp.read_text()) if rp.exists() else {}
     for r in report: old[r[0] + "/" + r[1]] = r
