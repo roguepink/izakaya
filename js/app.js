@@ -285,7 +285,7 @@
     document.addEventListener('pointerdown', f, true);
   }
   audio.addEventListener('ended', function () { if (amLeader()) advance(curKey); });
-  audio.addEventListener('error', function () { if (amLeader()) setTimeout(function () { advance(curKey); }, 3000); });
+  audio.addEventListener('error', function () { var k = curKey; if (amLeader()) setTimeout(function () { advance(k); }, 3000); });   // 3秒のあいだに次の曲に変わっていたら、それは飛ばさない
   function advance(fromKey) {
     var st = tree.state || {};
     if (musicKey(st.music) !== fromKey) return;
@@ -319,7 +319,8 @@
   function tvShow(on) { $('tv').classList.toggle('hidden', !on); if (!on) tvBig(false); }
   function showYT(m) {
     var id = ytId(m.src); if (!id) return;
-    ytOn = true; ytState = -1; ytLoadedAt = Date.now(); ytMuted = false; ytReady = false;
+    if (m.dur > 0 && elapsed(m) > m.dur - 1) return;   // もう終わっている動画は流さない(次へ進むのを待つ)
+    ytOn = true; ytState = -1; ytLoadedAt = Date.now(); ytMuted = false; ytReady = false; ytDur = 0; ytLastCT = 0;
     var f = document.createElement('iframe');
     f.allow = 'autoplay; encrypted-media; fullscreen'; f.allowFullscreen = true;
     f.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&playsinline=1&enablejsapi=1&controls=1&rel=0&iv_load_policy=3&fs=1&cc_load_policy=0&start=' + Math.floor(elapsed(m)) + '&origin=' + encodeURIComponent(location.origin);
@@ -327,14 +328,14 @@
     $('tvHolder').innerHTML = ''; $('tvHolder').appendChild(f);
     tvShow(true);
     // 音つきで始まらないスマホでは、音を消して絵だけ先に動かす(モニターを押すと音が出る)
-    setTimeout(function () { if (ytOn && ytState !== 1 && $('tvHolder').firstChild === f) { ytCmd('mute'); ytCmd('playVideo'); ytMuted = true; tvBadge(); } }, 5000);
+    setTimeout(function () { if (ytOn && ytState !== 1 && ytState !== 0 && ytState !== 2 && $('tvHolder').firstChild === f) { ytCmd('mute'); ytCmd('playVideo'); ytMuted = true; tvBadge(); } }, 5000);
   }
   function showVideo(m) {
     var v = document.createElement('video');
     v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto'; v.src = m.src;
     v.addEventListener('ended', function () { if (amLeader()) advance(curKey); });
-    v.addEventListener('error', function () { if (amLeader()) setTimeout(function () { advance(curKey); }, 3000); });
-    v.addEventListener('loadedmetadata', function () { if (tvVideo === v) tvShape(v.videoHeight > v.videoWidth); });
+    v.addEventListener('error', function () { var k = curKey; if (amLeader()) setTimeout(function () { advance(k); }, 3000); });
+    v.addEventListener('loadedmetadata', function () { if (tvVideo === v) { tvShape(v.videoHeight > v.videoWidth); var mm = tree.state && tree.state.music; if (mm && musicKey(mm) === curKey && !(mm.dur > 0) && isFinite(v.duration) && v.duration > 1) net.update('state/music', { dur: Math.round(v.duration) }); } });
     var go = function () { try { v.currentTime = elapsed(m); } catch (e) {} setVol(); var p = v.play(); if (p && p.catch) p.catch(function () { v.muted = true; v.play().catch(function () {}); tvBadge(); }); };
     if (v.readyState >= 1) go(); else v.addEventListener('loadedmetadata', go, { once: true });
     tvVideo = v;
@@ -348,7 +349,7 @@
   }
   function tvBadge() { $('tvBadge').classList.toggle('hidden', !(ytMuted || (tvVideo && tvVideo.muted)) || tvMode === 'big'); }
   function tvUnmute() {
-    if (ytOn) { ytCmd('unMute'); ytCmd('playVideo'); ytMuted = false; setVol(); }
+    if (ytOn) { ytCmd('unMute'); if (ytState !== 0) ytCmd('playVideo'); ytMuted = false; setVol(); }
     if (tvVideo) { tvVideo.muted = false; var p = tvVideo.play(); if (p && p.catch) p.catch(function () {}); }
     tvBadge();
   }
@@ -445,7 +446,7 @@
   $('tvClose').onclick = function () { tvBig(false); };
   $('tvBack').onclick = function () { if (Date.now() - tvBigAt > 450) tvBig(false); };
   /* YouTube の字幕(CC)はいつも消す。見る人の YouTube の設定で勝手に出ることがあるので、始まり・切りかえのたびに消す合図を送る */
-  var ytReady = false;
+  var ytReady = false, ytDur = 0, ytLastCT = 0;
   function ytNoCaptions() { if (!ytReady) return; ytCmd('unloadModule', ['captions']); ytCmd('unloadModule', ['cc']); ytCmd('setOption', ['captions', 'track', {}]); }
   function ytCmd(func, args) {
     var f = $('tvHolder').firstChild; if (!f || !f.contentWindow || f.tagName !== 'IFRAME') return;
@@ -456,15 +457,23 @@
     var d; try { d = JSON.parse(e.data); } catch (x) { return; }
     if (!d || !d.info) return;
     if (!ytReady) { ytReady = true; ytNoCaptions(); }
+    var m = tree.state && tree.state.music, isYT = ytOn && m && m.kind === 'yt' && musicKey(m) === curKey;
+    if (typeof d.info.duration === 'number' && d.info.duration > 1) { ytDur = d.info.duration; if (isYT && !(m.dur > 0)) net.update('state/music', { dur: Math.round(ytDur) }); }   // 動画の長さを みんなに知らせる
     if (typeof d.info.playerState === 'number') {
       if (d.info.playerState !== ytState) ytNoCaptions();
       ytState = d.info.playerState;
-      if (ytState === 0 && amLeader()) advance(curKey);
+      if (ytState === 0 && isYT) { if (amLeader()) advance(curKey); else if (!m.ended) net.update('state/music', { ended: true }); }   // 終わった → 次へ(まとめ役でなければ「終わった」と知らせる)
     }
     if (typeof d.info.muted === 'boolean' && ytOn) { ytMuted = d.info.muted; tvBadge(); }
-    // みんなと同じ所を見る(4秒以上ずれたら合わせる)
-    var m = tree.state && tree.state.music;
-    if (ytOn && m && m.kind === 'yt' && typeof d.info.currentTime === 'number' && ytState === 1 && Date.now() - ytLoadedAt > 8000 && Date.now() - ytSeekAt > 10000) {
+    var dur = (m && m.dur > 0) ? m.dur : ytDur;
+    if (isYT && dur > 0 && elapsed(m) > dur + 0.5 && ytState === 1) { ytCmd('pauseVideo'); return; }   // 時間が過ぎたら止めて待つ(最初からくり返さない)
+    // 戻った(ショート動画などが勝手に最初からくり返した) → 終わったことにする
+    if (isYT && typeof d.info.currentTime === 'number') {
+      if (ytLastCT - d.info.currentTime > 5 && Date.now() - ytSeekAt > 3000 && dur > 0 && elapsed(m) > dur - 8) { ytCmd('pauseVideo'); if (amLeader()) advance(curKey); else if (!m.ended) net.update('state/music', { ended: true }); }
+      ytLastCT = d.info.currentTime;
+    }
+    // みんなと同じ所を見る(4秒以上ずれたら合わせる)。終わりの近く・終わったあとは合わせない
+    if (isYT && typeof d.info.currentTime === 'number' && ytState === 1 && Date.now() - ytLoadedAt > 8000 && Date.now() - ytSeekAt > 10000 && !(dur > 0 && elapsed(m) > dur - 3)) {
       if (Math.abs(d.info.currentTime - elapsed(m)) > 4) { ytSeekAt = Date.now(); ytCmd('seekTo', [elapsed(m), true]); }
     }
   });
@@ -1122,6 +1131,8 @@
     // 曲
     var m = st.music;
     if (!m) advance('');
+    else if ((m.kind === 'yt' || m.kind === 'video') && m.dur > 0 && elapsed(m) > m.dur + 3) advance(musicKey(m));   // 動画の長さが過ぎた(どの画面で流れていても)
+    else if (m.kind === 'yt' && m.ended && elapsed(m) > 5) advance(musicKey(m));   // だれかの画面で「終わった」
     else if (m.kind === 'yt' && elapsed(m) > 12 * 60) advance(musicKey(m));
     else if (m.kind === 'video') { if (tvVideo && isFinite(tvVideo.duration) && tvVideo.duration > 0 && elapsed(m) > tvVideo.duration + 4) advance(musicKey(m)); else if (elapsed(m) > 30 * 60) advance(musicKey(m)); }
     else if (m.kind !== 'yt' && audio.src && isFinite(audio.duration) && audio.duration > 0 && elapsed(m) > audio.duration + 4) advance(musicKey(m));
