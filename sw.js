@@ -1,10 +1,10 @@
 'use strict';
 /* ホーム画面に入れたあと、すぐ開けるようにする(お店の中身は毎回ネットで最新を取りにいく)。
    FILES(覚えるファイル)を変えたときだけ VERSION を 1つ上げる。 */
-const VERSION = 'izakaya-v2';
+const VERSION = 'izakaya-v3';
 const FILES = ['./', 'index.html', 'install.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png',
   'css/style.css', 'js/config.js', 'js/avatar-data.js', 'js/net.js', 'js/scene3d.js', 'js/app.js',
-  'vendor/three/build/three.module.js', 'vendor/three/build/three.core.js', 'shots/1.jpg', 'shots/2.jpg', 'shots/3.jpg'];
+  'vendor/three/build/three.module.js', 'vendor/three/build/three.core.js', 'owner.html', 'owner/manifest.webmanifest', 'owner/icon-192.png', 'owner/apple-touch-icon.png', 'shots/1.jpg', 'shots/2.jpg', 'shots/3.jpg'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()));

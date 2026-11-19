@@ -6,7 +6,7 @@
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var LOCAL = !(SHOP.FIREBASE && SHOP.FIREBASE.databaseURL) || /[#&]local\b/.test(location.hash);
-  var OWNER_MODE = /[#&]owner\b/.test(location.hash);
+  var OWNER_MODE = !!window.IZ_OWNER || /[#&]owner\b/.test(location.hash);   // 大将用のページ(owner.html)か、アドレスの最後に #owner
   var N = Math.max(1, Math.min(20, SHOP.SEATS | 0));
   var JST = 9 * 3600e3, MIN = 60e3, DAY = 86400e3;
   var WEEK = ['日', '月', '火', '水', '木', '金', '土'];

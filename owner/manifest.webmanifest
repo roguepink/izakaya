@@ -1,0 +1,53 @@
+{
+  "name": "居酒屋ノブ 大将",
+  "short_name": "ノブ大将",
+  "description": "居酒屋ノブの大将(お店の人)用のアプリ",
+  "lang": "ja",
+  "start_url": "../owner.html",
+  "scope": "../",
+  "id": "../owner.html?app=izakaya-owner",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#140c08",
+  "theme_color": "#c8261c",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "../shots/1.jpg",
+      "sizes": "360x779",
+      "type": "image/jpeg",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "../shots/2.jpg",
+      "sizes": "360x779",
+      "type": "image/jpeg",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "../shots/3.jpg",
+      "sizes": "360x779",
+      "type": "image/jpeg",
+      "form_factor": "narrow"
+    }
+  ]
+}
