@@ -1220,11 +1220,14 @@ function createShop(canvas, opts) {
   nabe.position.set(-L / 2 + 0.6, 0.9, -0.62); scene.add(nabe);
 
   // 奥の棚とお酒
+  const TV_GAP = 0.72;   // 真ん中はモニターの場所(棚も木札も置かない)
+  const shelfLen = L / 2 - 0.2 - TV_GAP;
   for (let r = 0; r < 2; r++) {
-    scene.add(mesh(new THREE.BoxGeometry(L - 0.4, 0.04, 0.3), mat('#6b4728'), 0, 1.45 + r * 0.45, -1.95));
+    [-1, 1].forEach((sd) => scene.add(mesh(new THREE.BoxGeometry(shelfLen, 0.04, 0.3), mat('#6b4728'), sd * (TV_GAP + shelfLen / 2), 1.45 + r * 0.45, -1.95)));
     for (let k = 0; k < Math.floor(L * 4); k++) {
       const x = -L / 2 + 0.4 + k * 0.26 + (r ? 0.12 : 0);
       if (x > L / 2 - 0.4) break;
+      if (Math.abs(x) < TV_GAP + 0.06) continue;
       const tall = 0.22 + ((k * 7 + r * 3) % 5) * 0.03;
       const color = ['#2d5a2d', '#6a2a1a', '#e8e0c8', '#1a2a4a', '#8a6a2a', '#3a3a3a'][(k + r * 2) % 6];
       const b = mesh(new THREE.CylinderGeometry(0.045, 0.05, tall, 10), mat(color), x, 1.47 + r * 0.45 + tall / 2, -1.92); scene.add(b);
@@ -1234,10 +1237,10 @@ function createShop(canvas, opts) {
   // 品書き(壁の木札) — MENU から自動で作る
   const tagList = [];
   // 壁に入る数だけ(名物が先、つぎに料理、飲み物はあと)
-  const tagFit = Math.floor((L - 0.4) / 0.2);
-  const items = SHOP.MENU.filter((m) => m.pun).concat(SHOP.MENU.filter((m) => !m.pun && m.kind !== 'drink'), SHOP.MENU.filter((m) => m.kind === 'drink')).slice(0, tagFit);
   const tagW = 0.17, tagH = 0.5;
-  const tagsX0 = -((items.length - 1) * (tagW + 0.03)) / 2;
+  const tagXs = [];
+  for (let x = TV_GAP + 0.06 + tagW / 2; x < L / 2 - 0.2 - tagW / 2 + 0.001; x += tagW + 0.03) tagXs.push(x, -x);
+  const items = SHOP.MENU.filter((m) => m.pun).concat(SHOP.MENU.filter((m) => !m.pun && m.kind !== 'drink'), SHOP.MENU.filter((m) => m.kind === 'drink')).slice(0, tagXs.length);
   items.forEach((it, i) => {
     const t = canvasTex(64, 200, (g) => {
       g.fillStyle = '#e8d3a6'; g.fillRect(0, 0, 64, 200);
@@ -1247,10 +1250,36 @@ function createShop(canvas, opts) {
       const sz = chars.length > 5 ? 26 : 30; g.font = sz + 'px ' + FONT_JP;
       chars.forEach((ch, k) => { if (ch === 'ー') { g.save(); g.translate(32, 14 + k * (sz + 2) + sz / 2); g.rotate(Math.PI / 2); g.fillText(ch, 0, -sz / 2); g.restore(); } else g.fillText(ch, 32, 12 + k * (sz + 2)); });
     });
-    const tag = mesh(new THREE.PlaneGeometry(tagW, tagH), new THREE.MeshLambertMaterial({ map: t }), tagsX0 + i * (tagW + 0.03), 2.45, -2.08);
+    const tag = mesh(new THREE.PlaneGeometry(tagW, tagH), new THREE.MeshLambertMaterial({ map: t }), tagXs[i], 2.45, -2.08);
     tag.userData.menuId = it.id; tagList.push(tag);   // 押すと注文できる
     scene.add(tag);
   });
+
+  // 大将のうしろのモニター(動画はこの画面の上に重ねて流す。何もない時は店の名前と曲名)
+  const TV_W = 1.1, TV_H = 0.62;
+  const tv = new THREE.Group(); tv.position.set(0, 2.16, -2.0); tv.rotation.x = -0.12;   // 少し下向き=座っている人に見やすい
+  tv.add(mesh(new THREE.BoxGeometry(TV_W + 0.08, TV_H + 0.08, 0.05), mat('#141210'), 0, 0, 0));
+  tv.add(mesh(new THREE.BoxGeometry(0.06, 0.06, 0.12), mat('#2a2622'), 0, 0, -0.07));   // 壁の金具
+  let tvInfo = { title: '', sub: '', playing: false };
+  const tvCanvas = document.createElement('canvas'); tvCanvas.width = 640; tvCanvas.height = 360;
+  const tvTex = new THREE.CanvasTexture(tvCanvas); tvTex.colorSpace = THREE.SRGBColorSpace;
+  function drawTV() {
+    const g = tvCanvas.getContext('2d');
+    if (tvInfo.playing) { g.fillStyle = '#000'; g.fillRect(0, 0, 640, 360); tvTex.needsUpdate = true; return; }
+    const gr = g.createLinearGradient(0, 0, 0, 360); gr.addColorStop(0, '#1c2a3a'); gr.addColorStop(1, '#0b0f16');
+    g.fillStyle = gr; g.fillRect(0, 0, 640, 360);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = '#ffcf8a'; g.font = 'bold 64px ' + FONT_JP; g.fillText(SHOPNAME.slice(0, 8), 320, 120);
+    g.fillStyle = '#f3efe6'; g.font = '30px ' + FONT_JP;
+    const t = tvInfo.title ? '♪ ' + tvInfo.title : '';
+    g.fillText(Array.from(t).slice(0, 18).join(''), 320, 215);
+    g.fillStyle = '#9fb3c8'; g.font = '24px ' + FONT_JP; g.fillText(tvInfo.sub || '動画のリクエスト受付中', 320, 280);
+    tvTex.needsUpdate = true;
+  }
+  drawTV();
+  const tvScreen = mesh(new THREE.PlaneGeometry(TV_W, TV_H), new THREE.MeshBasicMaterial({ map: tvTex, toneMapped: false }), 0, 0, 0.027);
+  tv.add(tvScreen); scene.add(tv);
+  const tvCorner = [[-TV_W / 2, TV_H / 2], [TV_W / 2, TV_H / 2], [TV_W / 2, -TV_H / 2], [-TV_W / 2, -TV_H / 2]].map((c) => new THREE.Vector3(c[0], c[1], 0.028));
 
   // ちょうちん
   const lanternTex = canvasTex(256, 256, (g) => {
@@ -1307,7 +1336,7 @@ function createShop(canvas, opts) {
   const seatAvatars = new Array(N).fill(null), seatKeys = new Array(N).fill('');
   const tableGroups = [], tableKeys = new Array(N).fill('');
   for (let i = 0; i < N; i++) { const t = new THREE.Group(); t.position.set(seatX(i, N), COUNTER_Y, 0.08); scene.add(t); tableGroups.push(t); }
-  let owner = null, ownerKey = '', ownerTargetX = 0;
+  let owner = null, ownerKey = '', ownerTargetX = 0, ownerHeadPts = null;
   let itemHitList = [], bumpKey = '', bumpAt = 0;
   const HIT_MAT = new THREE.MeshBasicMaterial({ visible: false });
 
@@ -1328,7 +1357,7 @@ function createShop(canvas, opts) {
     const portrait = camera.aspect < 1;
     wantFov = portrait ? 70 : 55;
     switch (view.mode) {
-      case 'first': wantPos.set(x, 1.5, GUEST_Z + 0.22); wantLook.set(x + THREE.MathUtils.clamp((ownerTargetX - x) * 0.6, -1.0, 1.0), 1.08, -0.95); break;   // 向きすぎると となりの頭でふさがる
+      case 'first': wantPos.set(x, 1.5, GUEST_Z + 0.22); wantLook.set(x + THREE.MathUtils.clamp((ownerTargetX - x) * 0.6, -1.0, 1.0), portrait ? 1.08 : 1.24, -0.95); break;   // 横向きは少し上を見る(モニターが入るように)   // 向きすぎると となりの頭でふさがる
       case 'back': wantPos.set(x * 0.85, 2.3, GUEST_Z + 1.35); wantLook.set(x * 0.75, 1.0, -0.45); break;   // 頭ごしに 自分の料理が見える高さ
       case 'owner':
         if (portrait) { const ex = Math.max(0, N - 7) * 0.22; wantPos.set(-L / 2 - 0.1 - ex * 0.5, 2.1 + ex * 0.4, -1.25 - ex * 0.3); wantLook.set(L * 0.12, 0.95, 1.45); wantFov = 64 + Math.max(0, N - 7) * 1.5; }
@@ -1366,6 +1395,7 @@ function createShop(canvas, opts) {
       // 先に料理・飲み物(押すと食べる・飲む)、なければ いす
       const tagHits = ray.intersectObjects(tagList, false);
       if (!running) { drag = null; return; }
+      if (api.onMonitorTap && ray.intersectObject(tvScreen, false).length) { api.onMonitorTap(); drag = null; return; }
       if (tagHits.length && api.onTagTap) { const tg = tagHits[0].object; tg.userData.flash = performance.now(); api.onTagTap(tg.userData.menuId); drag = null; return; }
       const itemHits = ray.intersectObjects(itemHitList, false);
       if (itemHits.length && api.onItemTap) { const u = itemHits[0].object.userData; api.onItemTap(u.seat, u.key); drag = null; return; }
@@ -1451,7 +1481,7 @@ function createShop(canvas, opts) {
       const key = avatar ? JSON.stringify(avatar) : '';
       if (key === ownerKey) return;
       ownerKey = key;
-      if (owner) { scene.remove(owner); owner = null; }
+      if (owner) { scene.remove(owner); owner = null; ownerHeadPts = null; }
       if (avatar) {
         owner = buildAvatar(avatar, { standing: true });
         owner.position.set(ownerTargetX, 0.88, OWNER_Z);
@@ -1459,6 +1489,10 @@ function createShop(canvas, opts) {
         const apron = mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.5, 16), mat('#1f2a4a'), 0, -0.2, 0);
         owner.userData.body.add(apron);
         scene.add(owner);
+        owner.updateMatrixWorld(true);
+        const hd = owner.userData.head, inv = hd.matrixWorld.clone().invert(), all = [], v = new THREE.Vector3();
+        hd.traverse((o) => { if (o.isMesh && o.geometry && o.geometry.attributes.position) { const pa = o.geometry.attributes.position; const step = Math.max(1, Math.floor(pa.count / 120)); for (let k = 0; k < pa.count; k += step) { v.fromBufferAttribute(pa, k).applyMatrix4(o.matrixWorld).applyMatrix4(inv); all.push(v.clone()); } } });
+        ownerHeadPts = all.length > 600 ? all.filter((_, k) => k % Math.ceil(all.length / 600) === 0) : all;
         api._hideMine();
       }
     },
@@ -1502,7 +1536,43 @@ function createShop(canvas, opts) {
     /* 吹き出しを出す位置(画面の点) */
     anchors() { return { seats: seatAvatars.map((a, i) => (a && a.visible ? headPos(a) : null)), owner: headPos(owner), empty: stools.map((s, i) => { tmp.set(seatX(i, N), STOOL_Y + 0.25, GUEST_Z); const v = tmp.clone().project(camera); if (v.z > 1) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }) }; },
     name: SHOPNAME,
-    stop() { running = false; api.onTap = api.onItemTap = api.onTagTap = api.onFrame = null; window.removeEventListener('resize', resize); renderer.dispose(); }
+    // モニターの画面の四すみ(左上・右上・右下・左下)。見えていなければ null
+    monitorQuad() {
+      if (!tv.visible) return null;
+      const r = canvas.getBoundingClientRect(), pts = [];
+      tvScreen.updateWorldMatrix(true, false);
+      const c = new THREE.Vector3(0, 0, 0.03), nrm = new THREE.Vector3(0, 0, 1);
+      tvScreen.localToWorld(c); nrm.transformDirection(tvScreen.matrixWorld);
+      if (nrm.dot(camera.position.clone().sub(c)) <= 0) return null;   // うしろ向き
+      for (const p of tvCorner) {
+        const w = tvScreen.localToWorld(p.clone());
+        const v = w.clone().applyMatrix4(camera.matrixWorldInverse);
+        if (v.z > -0.1) return null;   // カメラのうしろ
+        w.project(camera);
+        pts.push({ x: r.left + (w.x + 1) / 2 * r.width, y: r.top + (1 - w.y) / 2 * r.height });
+      }
+      return pts;
+    },
+    setMonitor(info) { const t = info.title || '', u = info.sub || '', pl = !!info.playing; if (t === tvInfo.title && u === tvInfo.sub && pl === tvInfo.playing) return; tvInfo = { title: t, sub: u, playing: pl }; drawTV(); },
+    // 大将の頭の形(画面の上の輪郭)。モニターの動画を頭の形に切りぬいて、頭が手前に見えるようにする
+    ownerHeadHull() {
+      if (!owner || !owner.visible || !ownerHeadPts) return null;
+      const hd = owner.userData.head; hd.updateWorldMatrix(true, false);
+      const r = canvas.getBoundingClientRect(), pts = [], v = new THREE.Vector3();
+      for (const p of ownerHeadPts) {
+        v.copy(p).applyMatrix4(hd.matrixWorld).project(camera);
+        if (v.z > 1) return null;
+        pts.push([r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height]);
+      }
+      pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+      const lo = [], up = [];
+      for (const p of pts) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+      for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cross(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+      up.pop(); lo.pop();
+      return lo.concat(up).map((p) => ({ x: p[0], y: p[1] }));
+    },
+    stop() { running = false; api.onMonitorTap = api.onTap = api.onItemTap = api.onTagTap = api.onFrame = null; window.removeEventListener('resize', resize); renderer.dispose(); }
   };
   return api;
 }

@@ -98,13 +98,17 @@
 </section>
 
 <!-- ============ お店の中 ============ -->
+<!-- 大将のうしろのモニター(3D の画面に重ねる) -->
+<div id="tvBack" class="hidden"></div>
+<div id="tv" class="hidden"><div id="tvHolder"></div><div id="tvCatch"></div><div id="tvBadge" class="hidden">🔇 さわると音が出ます</div></div>
+<button id="tvClose" class="hidden">✕ モニターにもどす</button>
+
 <section id="shop" class="hidden">
   <div class="topbar">
     <div class="tb-left"><b id="tbName">居酒屋ノブ</b><span id="tbState"></span></div>
     <div class="tb-right"><span id="tbCount"></span></div>
   </div>
   <button id="nowPlaying" class="np">🎵 <span id="npTitle">—</span></button>
-  <div id="ytBox" class="hidden"><div class="yt-head"><span>📺 リクエストの動画</span><button id="ytMin" class="mini">ー</button></div><div id="ytHolder"></div></div>
   <div class="side">
     <button id="bView" class="sbtn" title="視点"><span>👁</span><small id="bViewLbl">目線</small></button>
     <button id="bMusic" class="sbtn"><span>🎵</span><small>曲</small></button>

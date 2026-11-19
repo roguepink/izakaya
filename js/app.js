@@ -157,7 +157,8 @@
       if (!inside || OWNER_MODE) return;
       order(id);
     };
-    scene.onFrame = placeOverlays;
+    scene.onFrame = function () { placeOverlays(); placeTV(); };
+    scene.onMonitorTap = function () { tvBig(true); };
     sceneWait.forEach(function (fn) { fn(scene); }); sceneWait = [];
     applyTree();
   }
@@ -195,7 +196,7 @@
   var vol = lsGet('iz-vol', 0.6);
   var audio = new Audio(); audio.preload = 'auto'; audio.crossOrigin = null;
   var audioUnlocked = false, duck = 1;
-  function setVol() { audio.volume = Math.max(0, Math.min(1, vol * duck)); ytCmd('setVolume', [Math.round(vol * duck * 100)]); }
+  function setVol() { var v = Math.max(0, Math.min(1, vol * duck)); audio.volume = v; if (tvVideo) tvVideo.volume = v; ytCmd('setVolume', [Math.round(v * 100)]); }
   function unlockAudio() {
     if (audioUnlocked) return; audioUnlocked = true;
     try { audio.muted = true; var p = audio.play(); if (p && p.then) p.then(function () { audio.pause(); audio.muted = false; }).catch(function () { audio.muted = false; }); } catch (e) {}
@@ -253,9 +254,11 @@
     if (k !== curKey) {
       curKey = k;
       audio.pause(); hideYT();
-      if (!m) { $('npTitle').textContent = '—'; return; }
+      if (!m) { $('npTitle').textContent = '—'; tvInfo('', '', false); return; }
       $('npTitle').textContent = m.title + (m.byName ? '(' + m.byName + 'さんのリクエスト)' : '');
+      tvInfo(m.kind === 'file' || !m.kind ? m.title : '', m.byName ? m.byName + 'さんのリクエスト' : '', m.kind === 'yt' || m.kind === 'video');
       if (m.kind === 'yt') { showYT(m); }
+      else if (m.kind === 'video') { showVideo(m); }
       else {
         audio.src = m.src;
         var go = function () { try { audio.currentTime = elapsed(m); } catch (e) {} setVol(); var p = audio.play(); if (p && p.catch) p.catch(needTap); };
@@ -264,11 +267,13 @@
       return;
     }
     if (!m) return;
-    if (m.kind !== 'yt' && audio.src && !audio.paused && isFinite(audio.duration)) {
+    var el = m.kind === 'video' ? tvVideo : m.kind === 'yt' ? null : audio;
+    if (el && el.src && !el.paused && isFinite(el.duration)) {
       var want = elapsed(m);
-      if (want < audio.duration - 1 && Math.abs(audio.currentTime - want) > 1.5) { try { audio.currentTime = want; } catch (e) {} }
+      if (want < el.duration - 1 && Math.abs(el.currentTime - want) > 1.5) { try { el.currentTime = want; } catch (e) {} }
     }
   }
+  function tvInfo(title, sub, playing) { withScene(function (sc) { if (sc.setMonitor) sc.setMonitor({ title: title, sub: sub, playing: !!playing }); }); }
   var tapAsked = false;
   function needTap() {
     if (tapAsked) return; tapAsked = true;
@@ -298,30 +303,140 @@
     var m = String(url).match(/(?:youtu\.be\/|v=|\/shorts\/|\/embed\/|\/live\/)([A-Za-z0-9_-]{11})/);
     return m ? m[1] : (/^[A-Za-z0-9_-]{11}$/.test(url) ? url : '');
   }
+  /* 動画は「大将のうしろのモニター」に重ねて流す。
+     モニターが見えない向き(大将の目線など)では左上の小窓、モニターを押すと大きく */
+  var tvMode = 'monitor', tvVideo = null, ytMuted = false, ytSeekAt = 0, tvCss = '';
+  var TVW = 640, TVH = 360;
+  function tvShow(on) { $('tv').classList.toggle('hidden', !on); if (!on) tvBig(false); }
   function showYT(m) {
     var id = ytId(m.src); if (!id) return;
-    ytOn = true; ytState = -1; ytLoadedAt = Date.now();
+    ytOn = true; ytState = -1; ytLoadedAt = Date.now(); ytMuted = false;
     var f = document.createElement('iframe');
     f.allow = 'autoplay; encrypted-media';
-    f.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&playsinline=1&enablejsapi=1&controls=1&start=' + Math.floor(elapsed(m)) + '&origin=' + encodeURIComponent(location.origin);
+    f.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&playsinline=1&enablejsapi=1&controls=1&rel=0&iv_load_policy=3&fs=0&start=' + Math.floor(elapsed(m)) + '&origin=' + encodeURIComponent(location.origin);
     f.onload = function () { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*'); } catch (e) {} setVol(); };
-    $('ytHolder').innerHTML = ''; $('ytHolder').appendChild(f);
-    $('ytBox').classList.remove('hidden');
+    $('tvHolder').innerHTML = ''; $('tvHolder').appendChild(f);
+    tvShow(true);
+    // 音つきで始まらないスマホでは、音を消して絵だけ先に動かす(モニターを押すと音が出る)
+    setTimeout(function () { if (ytOn && ytState !== 1 && $('tvHolder').firstChild === f) { ytCmd('mute'); ytCmd('playVideo'); ytMuted = true; tvBadge(); } }, 5000);
   }
-  function hideYT() { ytOn = false; $('ytHolder').innerHTML = ''; $('ytBox').classList.add('hidden'); }
+  function showVideo(m) {
+    var v = document.createElement('video');
+    v.playsInline = true; v.setAttribute('playsinline', ''); v.preload = 'auto'; v.src = m.src;
+    v.addEventListener('ended', function () { if (amLeader()) advance(curKey); });
+    v.addEventListener('error', function () { if (amLeader()) setTimeout(function () { advance(curKey); }, 3000); });
+    var go = function () { try { v.currentTime = elapsed(m); } catch (e) {} setVol(); var p = v.play(); if (p && p.catch) p.catch(function () { v.muted = true; v.play().catch(function () {}); tvBadge(); }); };
+    if (v.readyState >= 1) go(); else v.addEventListener('loadedmetadata', go, { once: true });
+    tvVideo = v;
+    $('tvHolder').innerHTML = ''; $('tvHolder').appendChild(v);
+    tvShow(true);
+  }
+  function hideYT() {
+    ytOn = false; ytMuted = false;
+    if (tvVideo) { try { tvVideo.pause(); } catch (e) {} tvVideo.removeAttribute('src'); tvVideo = null; }
+    $('tvHolder').innerHTML = ''; tvShow(false); tvBadge();
+  }
+  function tvBadge() { $('tvBadge').classList.toggle('hidden', !(ytMuted || (tvVideo && tvVideo.muted)) || tvMode === 'big'); }
+  function tvUnmute() {
+    if (ytOn) { ytCmd('unMute'); ytCmd('playVideo'); ytMuted = false; setVol(); }
+    if (tvVideo) { tvVideo.muted = false; var p = tvVideo.play(); if (p && p.catch) p.catch(function () {}); }
+    tvBadge();
+  }
+  function tvBig(on) {
+    if (on && $('tv').classList.contains('hidden')) return;
+    var was = tvMode === 'big';
+    if (on === was) return;
+    tvMode = on ? 'big' : 'monitor';
+    $('tv').classList.add('anim'); setTimeout(function () { $('tv').classList.remove('anim'); }, 380);
+    $('tv').classList.toggle('big', on); $('tvBack').classList.toggle('hidden', !on); $('tvClose').classList.toggle('hidden', !on);
+    if (on) tvUnmute();
+    tvBadge(); tvCss = ''; placeTV();
+  }
+  /* 640×360 の箱を、画面の上の4つの点にぴったり合わせる(遠近もつける) */
+  function quadMatrix(q) {
+    var x0 = q[0].x, y0 = q[0].y, x1 = q[1].x, y1 = q[1].y, x2 = q[2].x, y2 = q[2].y, x3 = q[3].x, y3 = q[3].y;
+    var dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3, dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+    var a, b, c = x0, d, e, f = y0, g = 0, h = 0;
+    var den = dx1 * dy2 - dx2 * dy1;
+    if (Math.abs(den) > 1e-9 && (Math.abs(dx3) > 1e-6 || Math.abs(dy3) > 1e-6)) { g = (dx3 * dy2 - dx2 * dy3) / den; h = (dx1 * dy3 - dx3 * dy1) / den; }
+    a = x1 - x0 + g * x1; b = x3 - x0 + h * x3; d = y1 - y0 + g * y1; e = y3 - y0 + h * y3;
+    var r = function (n) { return Math.round(n * 1e6) / 1e6; };
+    return 'matrix3d(' + [a / TVW, d / TVW, 0, g / TVW, b / TVH, e / TVH, 0, h / TVH, 0, 0, 1, 0, c, f, 0, 1].map(r).join(',') + ')';
+  }
+  function placeTV() {
+    var box = $('tv'); if (box.classList.contains('hidden')) return;
+    var css, mode;
+    if (tvMode === 'big') {
+      var vw = window.innerWidth, vh = window.innerHeight;
+      var w = Math.min(vw - 24, (vh - 140) * 16 / 9), hh = w * 9 / 16;
+      css = 'translate(' + Math.round((vw - w) / 2) + 'px,' + Math.round((vh - hh) / 2) + 'px) scale(' + (w / TVW).toFixed(4) + ')'; mode = 'big';
+    } else {
+      var q = scene && scene.monitorQuad ? scene.monitorQuad() : null;
+      var wpx = q ? Math.hypot(q[1].x - q[0].x, q[1].y - q[0].y) : 0;
+      if (q && wpx > 56 && shownPart(q) > 0.72) { css = quadMatrix(q); mode = 'monitor'; }
+      else {   // モニターが見えない向きは左上の小窓
+        var sat = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
+        css = 'translate(10px,' + Math.round(sat + 92) + 'px) scale(' + (168 / TVW).toFixed(4) + ')'; mode = 'pip';
+      }
+    }
+    box.classList.toggle('pip', mode === 'pip');
+    if (css !== tvCss) { tvCss = css; box.style.transform = css; }
+    // 大将の頭がモニターの前にあるときは、動画を頭の形に切りぬく
+    var clip = 'none';
+    if (mode === 'monitor' && scene.ownerHeadHull) {
+      var hull = scene.ownerHeadHull();
+      if (hull && hull.length > 2) {
+        var inv = quadInverse(q), loc = [], hit = false;
+        hull.forEach(function (p) {
+          var w = inv[6] * p.x + inv[7] * p.y + inv[8], u = (inv[0] * p.x + inv[1] * p.y + inv[2]) / w, v = (inv[3] * p.x + inv[4] * p.y + inv[5]) / w;
+          if (u > -40 && u < TVW + 40 && v > -40 && v < TVH + 40) hit = true;
+          loc.push(Math.round(u) + 'px ' + Math.round(v) + 'px');
+        });
+        if (hit) clip = 'polygon(evenodd, 0 0, ' + TVW + 'px 0, ' + TVW + 'px ' + TVH + 'px, 0 ' + TVH + 'px, 0 0, ' + loc.join(', ') + ', ' + loc[0] + ', 0 0)';
+      }
+    }
+    if (clip !== tvClip) { tvClip = clip; box.style.clipPath = clip; box.style.webkitClipPath = clip; }
+  }
+  var tvClip = 'none';
+  function shownPart(q) {   // モニターが画面に入っている割合(だいたい)
+    var xs = q.map(function (p) { return p.x; }), ys = q.map(function (p) { return p.y; });
+    var x0 = Math.min.apply(0, xs), x1 = Math.max.apply(0, xs), y0 = Math.min.apply(0, ys), y1 = Math.max.apply(0, ys);
+    var a = (x1 - x0) * (y1 - y0); if (a <= 0) return 0;
+    var ix = Math.max(0, Math.min(x1, window.innerWidth) - Math.max(x0, 0)), iy = Math.max(0, Math.min(y1, window.innerHeight) - Math.max(y0, 0));
+    return ix * iy / a;
+  }
+  function quadInverse(q) {   // 画面の点 → 640×360 の箱の中の点
+    var x0 = q[0].x, y0 = q[0].y, x1 = q[1].x, y1 = q[1].y, x2 = q[2].x, y2 = q[2].y, x3 = q[3].x, y3 = q[3].y;
+    var dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3, dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+    var g = 0, h = 0, den = dx1 * dy2 - dx2 * dy1;
+    if (Math.abs(den) > 1e-9 && (Math.abs(dx3) > 1e-6 || Math.abs(dy3) > 1e-6)) { g = (dx3 * dy2 - dx2 * dy3) / den; h = (dx1 * dy3 - dx3 * dy1) / den; }
+    var A = (x1 - x0 + g * x1) / TVW, B = (x3 - x0 + h * x3) / TVH, C = x0, D = (y1 - y0 + g * y1) / TVW, E = (y3 - y0 + h * y3) / TVH, F = y0, G = g / TVW, H = h / TVH;
+    // [A B C; D E F; G H 1] の逆
+    var i0 = E - F * H, i1 = C * H - B, i2 = B * F - C * E, i3 = F * G - D, i4 = A - C * G, i5 = C * D - A * F, i6 = D * H - E * G, i7 = B * G - A * H, i8 = A * E - B * D;
+    return [i0, i1, i2, i3, i4, i5, i6, i7, i8];
+  }
+  $('tvCatch').onclick = function () { tvBig(true); };
+  $('tvClose').onclick = function () { tvBig(false); };
+  $('tvBack').onclick = function () { tvBig(false); };
   function ytCmd(func, args) {
-    var f = $('ytHolder').firstChild; if (!f || !f.contentWindow) return;
+    var f = $('tvHolder').firstChild; if (!f || !f.contentWindow || f.tagName !== 'IFRAME') return;
     try { f.contentWindow.postMessage(JSON.stringify({ event: 'command', func: func, args: args || [] }), '*'); } catch (e) {}
   }
   window.addEventListener('message', function (e) {
     if (!/youtube/.test(e.origin)) return;
     var d; try { d = JSON.parse(e.data); } catch (x) { return; }
-    if (d && d.info && typeof d.info.playerState === 'number') {
+    if (!d || !d.info) return;
+    if (typeof d.info.playerState === 'number') {
       ytState = d.info.playerState;
       if (ytState === 0 && amLeader()) advance(curKey);
     }
+    if (typeof d.info.muted === 'boolean' && ytOn) { ytMuted = d.info.muted; tvBadge(); }
+    // みんなと同じ所を見る(4秒以上ずれたら合わせる)
+    var m = tree.state && tree.state.music;
+    if (ytOn && m && m.kind === 'yt' && typeof d.info.currentTime === 'number' && ytState === 1 && Date.now() - ytLoadedAt > 8000 && Date.now() - ytSeekAt > 10000) {
+      if (Math.abs(d.info.currentTime - elapsed(m)) > 4) { ytSeekAt = Date.now(); ytCmd('seekTo', [elapsed(m), true]); }
+    }
   });
-  $('ytMin').onclick = function () { $('ytBox').classList.toggle('min'); this.textContent = $('ytBox').classList.contains('min') ? '＋' : 'ー'; };
 
   /* ---------------- お店の様子が変わったら ---------------- */
   var inside = false, mySeat = -1, joinAt = 0, seenMine = false, seenChat = {}, seenEvt = {}, lastOrders = 0;
@@ -933,6 +1048,7 @@
     var m = st.music;
     if (!m) advance('');
     else if (m.kind === 'yt' && elapsed(m) > 12 * 60) advance(musicKey(m));
+    else if (m.kind === 'video') { if (tvVideo && isFinite(tvVideo.duration) && tvVideo.duration > 0 && elapsed(m) > tvVideo.duration + 4) advance(musicKey(m)); else if (elapsed(m) > 30 * 60) advance(musicKey(m)); }
     else if (m.kind !== 'yt' && audio.src && isFinite(audio.duration) && audio.duration > 0 && elapsed(m) > audio.duration + 4) advance(musicKey(m));
     // ラストオーダーと閉店(おためしモードでは時間で閉めない)
     if (LOCAL) return;
@@ -1015,7 +1131,7 @@
       return;
     }
     if (sheetKind === 'music') {
-      title = '曲';
+      title = '曲・動画';
       var st = tree.state || {}, m = st.music, q = tree.queue || {}, qk = Object.keys(q).sort();
       html += '<div class="sh-sec">いま流れている曲</div><div class="li now"><div class="t">🎵 ' + (m ? esc(m.title) + (m.byName ? '<small>' + esc(m.byName) + 'さんのリクエスト</small>' : '') : '—') + '</div>' + (OWNER_MODE ? '<button id="skipBtn" class="gray">次へ</button>' : '') + '</div>';
       html += '<div class="vol" style="margin-top:10px">🔈<input id="volIn" type="range" min="0" max="1" step="0.05" value="' + vol + '">🔊</div>';
@@ -1024,7 +1140,7 @@
       if (!qk.length) html += '<div class="li"><div class="t"><small>まだありません。下の一覧からリクエストできます。</small></div></div>';
       qk.forEach(function (k, i) { var it = q[k]; html += '<div class="li"><div class="t">' + (i + 1) + '. ' + esc(it.title) + '<small>' + esc(it.byName || '') + 'さん</small></div>' + ((it.by === ME.uid || OWNER_MODE) ? '<button class="gray" data-del="' + k + '">取り消し</button>' : '') + '</div>'; });
       html += '</div>';
-      if (SHOP.ALLOW_YOUTUBE) html += '<div class="sh-sec">YouTube のリンクを貼ってリクエスト</div><div class="yt-row"><input id="ytIn" placeholder="https://youtu.be/…" inputmode="url"><button id="ytAdd">追加</button></div><p class="small-note">YouTube の公式の埋めこみで流します。広告が入ることがあります。</p>';
+      if (SHOP.ALLOW_YOUTUBE) html += '<div class="sh-sec">📺 動画のリンクを貼ってリクエスト</div><div class="yt-row"><input id="ytIn" placeholder="YouTube などのリンク" inputmode="url"><button id="ytAdd">追加</button></div><p class="small-note">大将のうしろのモニターに、みんな同じ場面で映ります。モニターを押すと大きく見られます。YouTube は公式の埋めこみで流すので、広告が入ることがあります。</p>';
       html += '<div class="sh-sec">お店の曲</div><div class="list">';
       SHOP.SONGS.forEach(function (s) { html += '<div class="li"><div class="t">' + esc(s.title) + '</div><button data-req="' + esc(s.id) + '">リクエスト</button></div>'; });
       html += '</div>';
@@ -1077,9 +1193,10 @@
       body.querySelectorAll('[data-req]').forEach(function (b) { b.onclick = function () { requestSong(b.getAttribute('data-req')); }; });
       body.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { net.remove('queue/' + b.getAttribute('data-del')); }; });
       var ya = q('#ytAdd'); if (ya) ya.onclick = function () {
-        var id = ytId(q('#ytIn').value.trim());
-        if (!id) { toast('YouTube のリンクが読めませんでした'); return; }
-        pushQueue({ kind: 'yt', id: 'yt-' + id, src: 'https://youtu.be/' + id, title: 'YouTube の動画' });
+        var url = q('#ytIn').value.trim(), id = ytId(url);
+        if (id) pushQueue({ kind: 'yt', id: 'yt-' + id, src: 'https://youtu.be/' + id, title: 'YouTube の動画' });
+        else if (/^https:\/\/[^\s]+\.(mp4|webm|m4v|mov)(\?[^\s]*)?$/i.test(url)) pushQueue({ kind: 'video', id: 'v' + Date.now(), src: url, title: '動画' });
+        else { toast('リンクが読めませんでした(YouTube か、mp4 などの動画のリンク)'); return; }
         q('#ytIn').value = '';
       };
     } else if (sheetKind === 'orders') {
