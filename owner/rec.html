@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#140c08">
+<meta name="robots" content="noindex">
+<title>ノブの声の録音</title>
+<link rel="icon" href="icon-192.png">
+<style>
+  :root { --bg: #140c08; --card: #f3e6cc; --ink: #2a1a10; --red: #c8261c; --gold: #ffd27a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: #f3e6cc; font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; padding: 16px 16px calc(120px + env(safe-area-inset-bottom)); }
+  h1 { font-size: 22px; margin: 6px 0 4px; }
+  .lead { font-size: 15px; line-height: 1.6; margin: 0 0 12px; color: #e8d7b6; }
+  .tips { background: rgba(255,255,255,.06); border-radius: 12px; padding: 10px 14px; font-size: 14px; line-height: 1.7; margin-bottom: 14px; }
+  .prog { font-weight: 800; color: var(--gold); margin: 8px 0 12px; font-size: 16px; }
+  .sec { font-size: 14px; color: #c9b48e; margin: 18px 0 6px; font-weight: 800; }
+  .card { background: var(--card); color: var(--ink); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+  .card .t { flex: 1; font-size: 19px; font-weight: 800; line-height: 1.35; }
+  .card .t small { display: block; font-size: 12px; font-weight: 600; color: #7a6248; margin-top: 2px; }
+  .card.done { box-shadow: inset 6px 0 0 #3aa35a; }
+  .card.rec { background: #ffe1dc; box-shadow: inset 6px 0 0 var(--red); }
+  button { font: inherit; border: 0; border-radius: 999px; font-weight: 800; cursor: pointer; }
+  .rb { background: var(--red); color: #fff; padding: 12px 14px; font-size: 16px; min-width: 76px; }
+  .card.rec .rb { background: #222; }
+  .pb { background: #5a3a22; color: #fff; padding: 12px 12px; font-size: 16px; }
+  .pb[disabled] { opacity: .3; }
+  .meter { height: 6px; border-radius: 3px; background: #e6cdb0; margin-top: 6px; overflow: hidden; display: none; }
+  .card.rec .meter { display: block; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--red); transition: width .05s; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(20,12,8,.96); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); display: flex; gap: 10px; border-top: 1px solid #3a2818; }
+  .bar button { flex: 1; padding: 14px; font-size: 16px; }
+  .send { background: var(--gold); color: var(--ink); }
+  .back { background: #3a2818; color: #f3e6cc; flex: 0 0 auto !important; }
+  .err { background: #5a1a14; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; display: none; line-height: 1.6; }
+</style>
+</head>
+<body>
+<h1>🎙 ノブの声の録音</h1>
+<p class="lead">大将の決まり文句を、ノブさんの声で録ります。録った言葉は、お店でノブさんの声で流れます(大将の声を「ノブの声(録音)」にしたとき)。</p>
+<div class="tips">
+  ・静かな場所で、スマホを口から20cmくらい離して<br>
+  ・「録る」を押してから話して、話し終わったら「止める」(5秒で自動で止まります)<br>
+  ・「▶」で聞きなおせます。気に入らなければ、もう一度「録る」<br>
+  ・録ったものはこのスマホに残るので、何回かに分けても大丈夫です<br>
+  ・全部でなくても大丈夫。録っていない言葉は、代わりの声で流れます
+</div>
+<div id="err" class="err"></div>
+<div id="prog" class="prog"></div>
+<div id="list"></div>
+<div class="bar">
+  <button class="back" onclick="location.href='./'">◀ お店へ</button>
+  <button class="send" id="send">📤 まとめて送る</button>
+</div>
+<script src="../js/config.js"></script>
+<script>
+'use strict';
+(function () {
+  var PH = SHOP.OWNER_PHRASES;   // 大将用の言葉だけ(お客さん用は録らない)
+  var DB = null, recs = {};      // id → { blob, type, at }
+  var cur = null;                // 録音中 { id, mr, stream, chunks, timer, raf }
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function err(t) { var e = $('err'); e.innerHTML = t; e.style.display = 'block'; }
+
+  /* スマホの中に残す(IndexedDB) */
+  function openDB() {
+    return new Promise(function (ok) {
+      try {
+        var r = indexedDB.open('izakaya-nobu-voice', 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore('rec'); };
+        r.onsuccess = function () { DB = r.result; ok(); };
+        r.onerror = function () { ok(); };
+      } catch (e) { ok(); }
+    });
+  }
+  function loadAll() {
+    return new Promise(function (ok) {
+      if (!DB) return ok();
+      var tx = DB.transaction('rec', 'readonly'), st = tx.objectStore('rec'), req = st.openCursor();
+      req.onsuccess = function () { var c = req.result; if (c) { recs[c.key] = c.value; c.continue(); } else ok(); };
+      req.onerror = function () { ok(); };
+    });
+  }
+  function save(id, v) { recs[id] = v; if (!DB) return; try { DB.transaction('rec', 'readwrite').objectStore('rec').put(v, id); } catch (e) {} }
+
+  function render() {
+    var h = '', cat = '', n = 0;
+    PH.forEach(function (p) {
+      if (p.cat !== cat) { h += '<div class="sec">' + esc(p.cat) + '</div>'; cat = p.cat; }
+      var r = recs[p.id]; if (r) n++;
+      h += '<div class="card' + (r ? ' done' : '') + (cur && cur.id === p.id ? ' rec' : '') + '" id="c-' + p.id + '">' +
+        '<div class="t">' + esc(p.say) + '<small>' + (cur && cur.id === p.id ? '● 録音中… 話してください' : r ? '✓ 録音ずみ(' + (r.sec || 0).toFixed(1) + '秒)' : 'まだ') + '</small><div class="meter"><i></i></div></div>' +
+        '<button class="pb" data-play="' + p.id + '"' + (r ? '' : ' disabled') + '>▶</button>' +
+        '<button class="rb" data-rec="' + p.id + '">' + (cur && cur.id === p.id ? '■ 止める' : r ? '録りなおす' : '● 録る') + '</button></div>';
+    });
+    $('list').innerHTML = h;
+    $('prog').textContent = '録音ずみ ' + n + ' / ' + PH.length;
+    document.querySelectorAll('[data-rec]').forEach(function (b) { b.onclick = function () { var id = b.getAttribute('data-rec'); if (cur && cur.id === id) stop(); else start(id); }; });
+    document.querySelectorAll('[data-play]').forEach(function (b) { b.onclick = function () { play(b.getAttribute('data-play')); }; });
+  }
+
+  var player = new Audio();
+  function play(id) {
+    var r = recs[id]; if (!r) return;
+    try { player.pause(); } catch (e) {}
+    player.src = URL.createObjectURL(r.blob); player.play().catch(function () {});
+  }
+
+  function pickType() {
+    var L = ['audio/mp4', 'audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus'];
+    for (var i = 0; i < L.length; i++) if (window.MediaRecorder && MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(L[i])) return L[i];
+    return '';
+  }
+  var actx = null;
+  function start(id) {
+    if (cur) stop();
+    if (!navigator.mediaDevices || !window.MediaRecorder) { err('このブラウザでは録音できません。<br>iPhone は Safari、Android は Chrome で開いてください(LINE の中では録音できないことがあります)。'); return; }
+    navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: true, autoGainControl: true } }).then(function (stream) {
+      var type = pickType(), mr = type ? new MediaRecorder(stream, { mimeType: type }) : new MediaRecorder(stream), chunks = [], t0 = Date.now();
+      cur = { id: id, mr: mr, stream: stream, chunks: chunks };
+      mr.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      mr.onstop = function () {
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        var blob = new Blob(chunks, { type: mr.mimeType || type || 'audio/webm' });
+        if (blob.size > 800) save(id, { blob: blob, type: blob.type, at: Date.now(), sec: (Date.now() - t0) / 1000 });
+        if (cur && cur.id === id) { cancelAnimationFrame(cur.raf); cur = null; }
+        render();
+      };
+      mr.start();
+      cur.timer = setTimeout(stop, 5000);
+      // 声の大きさの棒(録れているのが分かるように)
+      try {
+        actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+        var src = actx.createMediaStreamSource(stream), an = actx.createAnalyser(); an.fftSize = 512; src.connect(an);
+        var buf = new Uint8Array(an.fftSize);
+        (function loop() {
+          if (!cur || cur.id !== id) return;
+          an.getByteTimeDomainData(buf); var m = 0; for (var i = 0; i < buf.length; i++) m = Math.max(m, Math.abs(buf[i] - 128));
+          var bar = document.querySelector('#c-' + id + ' .meter i'); if (bar) bar.style.width = Math.min(100, m / 1.1) + '%';
+          cur.raf = requestAnimationFrame(loop);
+        })();
+      } catch (e) {}
+      render();
+    }).catch(function () {
+      err('マイクが使えませんでした。<br>ブラウザの設定で、このページにマイクを許可してください。LINE の中で開いているときは、Safari や Chrome で開きなおしてください。');
+    });
+  }
+  function stop() { if (!cur) return; clearTimeout(cur.timer); try { if (cur.mr.state !== 'inactive') cur.mr.stop(); } catch (e) {} }
+
+  /* まとめて1つのファイル(zip)にする。中身は <言葉のid>.<形式> */
+  var CRC = (function () { var t = []; for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(u8) { var c = 0xFFFFFFFF; for (var i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zip(files) {   // files: [{name, data(Uint8Array)}] 圧縮なし
+    var parts = [], central = [], off = 0;
+    function u16(v) { return [v & 255, (v >>> 8) & 255]; }
+    function u32(v) { return [v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255]; }
+    files.forEach(function (f) {
+      var nm = new TextEncoder().encode(f.name), crc = crc32(f.data), sz = f.data.length;
+      var lh = [].concat(u32(0x04034b50), u16(20), u16(0x0800), u16(0), u16(0), u16(0), u32(crc), u32(sz), u32(sz), u16(nm.length), u16(0));
+      parts.push(new Uint8Array(lh), nm, f.data);
+      central.push(new Uint8Array([].concat(u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0), u16(0), u16(0), u32(crc), u32(sz), u32(sz), u16(nm.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(off))), nm);
+      off += lh.length + nm.length + sz;
+    });
+    var cs = central.reduce(function (a, b) { return a + b.length; }, 0);
+    var end = new Uint8Array([].concat(u32(0x06054b50), u16(0), u16(0), u16(files.length), u16(files.length), u32(cs), u32(off), u16(0)));
+    return new Blob(parts.concat(central, [end]), { type: 'application/zip' });
+  }
+  function ext(type) { return /mp4|m4a|aac/.test(type) ? 'm4a' : /ogg/.test(type) ? 'ogg' : 'webm'; }
+  $('send').onclick = function () {
+    var ids = PH.map(function (p) { return p.id; }).filter(function (id) { return recs[id]; });
+    if (!ids.length) { alert('まだ録音がありません'); return; }
+    Promise.all(ids.map(function (id) { return recs[id].blob.arrayBuffer().then(function (b) { return { name: id + '.' + ext(recs[id].type), data: new Uint8Array(b) }; }); })).then(function (files) {
+      var list = PH.filter(function (p) { return recs[p.id]; }).map(function (p) { return p.id + '\t' + p.say; }).join('\n');
+      files.push({ name: 'list.txt', data: new TextEncoder().encode(list + '\n') });
+      var d = new Date(), stamp = d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '-' + ('0' + d.getHours()).slice(-2) + ('0' + d.getMinutes()).slice(-2);
+      var name = 'nobu-voice-' + stamp + '.zip', blob = zip(files), file = null;
+      try { file = new File([blob], name, { type: 'application/zip' }); } catch (e) {}
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: 'ノブの声の録音' }).catch(function () {});
+      } else {
+        var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+        alert('「' + name + '」を保存しました。Google ドライブに入れて、Claude に知らせてください。');
+      }
+    });
+  };
+
+  openDB().then(loadAll).then(render);
+})();
+</script>
+</body>
+</html>

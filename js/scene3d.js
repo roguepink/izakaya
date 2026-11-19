@@ -1760,6 +1760,12 @@ function createShop(canvas, opts) {
   }
 
   const api = {
+    /* 重さの物差し(確認用): 1回の絵で描いた三角の数・描く回数・アバター1体ごとの三角の数 */
+    weight() {
+      const tri = (o) => { let n = 0; o.traverse((m) => { if (m.isMesh && m.geometry && m.visible) { const g = m.geometry; n += (g.index ? g.index.count : g.attributes.position.count) / 3; } }); return Math.round(n); };
+      return { tris: renderer.info.render.triangles, calls: renderer.info.render.calls, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries,
+               owner: owner ? tri(owner) : 0, seats: seatAvatars.map((a) => a ? tri(a) : 0) };
+    },
     onTap: null, onFrame: null, onItemTap: null, onTagTap: null, onAvatarTap: null,
     /* 確認用: 料理の画面上の位置 */
     itemPos(key) { const h = itemHitList.find((x) => x.userData.key === key); if (!h) return null; const v = new THREE.Vector3(); h.getWorldPosition(v); v.y += 0.02; v.project(camera); const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; },

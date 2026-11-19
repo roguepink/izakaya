@@ -48,8 +48,11 @@ def load():
     return js_list(c, "GUEST_PHRASES"), js_list(c, "OWNER_PHRASES"), js_list(a, "GUEST_VOICES"), js_list(a, "OWNER_VOICES")
 
 
+READ = {"ウケる！": "うけるー！", "はいよ！": "はいよー！", "はい、お待ち！": "はいっ、おまち！"}   # Google の声が読みまちがえる言葉の読み方(2026-11-19「ウケる」が「来る」、威勢のいい声の「はいよ」が「あや」に聞こえた)
+
+
 def spoken(t):
-    return t.replace("〜", "ー")
+    return READ.get(t, t).replace("〜", "ー")
 
 
 def request(text, voice, style):
@@ -165,10 +168,10 @@ def encode(pcm, a, b, out):
     tmp.unlink()
 
 
-def seconds(path):
-    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
-                       capture_output=True, text=True)
-    return float(r.stdout.strip() or 0)
+def seconds(path):   # ffprobe がない Mac もあるので、ffmpeg の出力から長さを読む
+    r = subprocess.run(["ffmpeg", "-i", str(path), "-f", "null", "-"], capture_output=True, text=True)
+    m = re.findall(r"time=(\d+):(\d+):([\d.]+)", r.stderr)
+    return int(m[-1][0]) * 3600 + int(m[-1][1]) * 60 + float(m[-1][2]) if m else 0.0
 
 
 def main():
