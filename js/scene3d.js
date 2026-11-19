@@ -1187,6 +1187,8 @@ const PHOTO_LAYOUTS = {
         slots: [[0, 1.42, 1.6], [-0.15, 1.62, 1.31], [0.15, 1.62, 1.31], [-0.3, 1.42, 1.6], [0.3, 1.42, 1.6], [-0.45, 1.62, 1.31], [0.45, 1.62, 1.31],
                 [-0.6, 1.42, 1.6], [0.6, 1.42, 1.6], [-0.15, 1.22, 1.92], [0.15, 1.22, 1.92], [-0.45, 1.22, 1.92], [0.45, 1.22, 1.92], [-0.75, 1.62, 1.31]] },
   N4: { name: 'N4 すき間に顔', w: 1080, h: 1350, edge: 0.24, lean: 0.1, tilt: 0.28, cam: 1.95, under: 0.42, underMany: 0.3, auto: true,
+        // お客さん1人+大将のときは ツーショット(横にならんで 頭を寄せ合う。大将は右で、スマホを持つ手は写真の外へ)
+        duo: { slots: [[0.21, 1.52, 1.5], [-0.21, 1.56, 1.46]], under: 0.55, tilt: 0.45, lean: 0.25, selfie: 'down' },
         /* れんが積み(ノブさん 2026-11-20 これに決定)。同じ段のとなりは 0.52m(顔1つぶん あける)。上の段の顔は 下の2人の すき間へ。
            0番は大将(2だん目のまん中)。お客さんは 人数がふえるほど 外がわ・上へ */
         slots: [[0, 1.46, 1.56],
@@ -1218,7 +1220,7 @@ function photoPose(av, dt) {
   const pose = PHOTO_POSES.find((p) => p[0] === P.pose) || PHOTO_POSES[0], wave = pose[0] === 'wave';
   const setArm = (i, key, wv) => { const sd = i === 1 ? 1 : -1, A = ARM[key]; u.arms[i].rotation.set(A[0], 0, sd * A[1] + (wv ? Math.sin(u.t * 9) * 0.28 * sd : 0)); if (u.fores) u.fores[i].rotation.x = A[2]; };
   let main = 1;
-  if (P.owner) { setArm(1, 'selfie'); setArm(0, pose[2], wave); main = 0; }   // 大将は 片手でスマホ(自撮り)、もう片方でポーズ
+  if (P.owner) { setArm(1, P.selfie || 'selfie'); setArm(0, pose[2], wave); main = 0; }   // 大将は 片手でスマホ(自撮り)、もう片方でポーズ
   else { setArm(1, pose[2], wave); setArm(0, pose[3]); }
   const list = !pose[4] || pose[4] === 'mug' ? [] : pose[0] === 'wpeace' && !P.owner ? [['v', 1], ['v', 0]] : [[pose[4], main]], key = JSON.stringify(list);
   if (key !== u.attKey) { photoAttach(av, list); u.attKey = key; }
@@ -2015,7 +2017,7 @@ function createShop(canvas, opts) {
       if (sh !== viewApplied) { viewApplied = sh; const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
         if (sh) { camera.aspect = baseAspect * sh * 2; camera.setViewOffset(w * sh * 2, h, 0, 0, w, h); } else { camera.aspect = baseAspect; camera.clearViewOffset(); } } }
     { const hb = camPos.z < -1.8; if (hb !== backHidden) { backHidden = hb; backList().forEach((o) => { o.visible = !hb; }); scene.fog.near = hb ? 9 : 7; scene.fog.far = hb ? 18 : 14; } }
-    seatAvatars.forEach((a) => a && animateAvatar(a, dt));
+    seatAvatars.forEach((a) => { if (a) { animateAvatar(a, dt); lookNext(a); } });
     tagList.forEach((tg) => { const f = tg.userData.flash; if (!f) return; const e = (performance.now() - f) / 500; if (e >= 1) { tg.rotation.z = 0; tg.userData.flash = 0; return; } tg.rotation.z = Math.sin(e * Math.PI * 4) * 0.12 * (1 - e); });
     // 押した料理が「ぽよん」とはねる
     const tnow = performance.now();
@@ -2027,7 +2029,7 @@ function createShop(canvas, opts) {
       m.scale.set(1 + k2 * 0.18, 1 - k2 * 0.12 + Math.sin(e * Math.PI * 2) * 0.05, 1 + k2 * 0.18); m.position.y = k2 * 0.03;
     }));
     tvStep(dt);
-    if (owner) { animateAvatar(owner, dt); if (!photo) owner.position.x += (ownerTargetX - owner.position.x) * Math.min(1, dt * 3); }
+    if (owner) { animateAvatar(owner, dt); lookNext(owner); if (!photo) owner.position.x += (ownerTargetX - owner.position.x) * Math.min(1, dt * 3); }
     const ov = view.mode === 'owner' && !photo;   // 大将の目線では、ちょうちんと壁のモニターは出さない(動画は左上の小窓)
     lanterns.forEach((l, i) => { l.visible = !ov; l.rotation.z = Math.sin(clock.elapsedTime * 0.8 + i) * 0.03; });
     tv2.visible = !ov;
@@ -2036,6 +2038,16 @@ function createShop(canvas, opts) {
   }
   requestAnimationFrame(frame);
 
+  function lookStart(a, target, secs) {
+    const t = target === 'owner' ? owner : seatAvatars[target]; if (!t) return;
+    let yaw = Math.atan2(t.position.x - a.position.x, t.position.z - a.position.z) - a.rotation.y;
+    while (yaw > Math.PI) yaw -= Math.PI * 2; while (yaw < -Math.PI) yaw += Math.PI * 2;
+    a.userData.lookYaw = Math.max(-1.75, Math.min(1.75, yaw)); a.userData.lookT = secs; a.userData.lookTo = target;
+  }
+  function lookNext(a) {   // 向き終わって 顔が少し戻ったら、順番待ちの次の人へ
+    const u = a && a.userData; if (!u || !u.lookQ || !u.lookQ.length || u.lookT > 0 || (u.lw || 0) > 0.45) return;
+    const q = u.lookQ.shift(); lookStart(a, q.target, Math.min(q.secs, 3));   // 待っていたぶん 少し短く
+  }
   /* 記念撮影のカメラ(大将のスマホの位置)。みんなの顔が横いっぱいに入る広さ */
   let photo = null;
   function photoCam(cam, aspect, live) {
@@ -2155,7 +2167,9 @@ function createShop(canvas, opts) {
       // 席の順(左から)に並べる。大将がいれば まん中の前。顔が上下に重なるように 前後2〜3列
       const LY = PHOTO_LAYOUTS[layoutId] || PHOTO_LAYOUTS.N1, SL = LY.slots; photo.ly = LY; photo.cam.y = LY.cam || 1.66; photo.cam.z = LY.camZ || 3.4;   // 少し離れて撮ると、前とうしろの顔の大きさが そろう
       const own = list.find((p) => p.key === 'owner'), guests = list.filter((p) => p.key !== 'owner').sort((x, y) => x.key - y.key);
-      const slots = (own ? SL.slice(1, 1 + guests.length) : SL.slice(0, guests.length)).slice().sort((x, y) => x[0] - y[0]);
+      const duo = own && guests.length === 1 && LY.duo;
+      const SLd = duo ? LY.duo.slots : SL;
+      const slots = duo ? [SLd[1]] : (own ? SL.slice(1, 1 + guests.length) : SL.slice(0, guests.length)).slice().sort((x, y) => x[0] - y[0]);
       // 1人ずつ 頭の大きさを測る(髪のてっぺん・あご)。帽子や ツンツン頭でも、うしろの人の顔が かくれないように
       const measure = (a) => {
         const u = a.userData; if (u.hm) return u.hm;
@@ -2168,7 +2182,7 @@ function createShop(canvas, opts) {
       };
       const E = [];
       const add = (a, p, sl, isOwner) => { const hm = measure(a); E.push({ a, p, sl, isOwner, x: sl[0], z: sl[1], y: sl[2], hm }); };
-      if (own && owner) add(owner, own, SL[0], true);
+      if (own && owner) add(owner, own, SLd[0], true);
       guests.forEach((p, k) => { const a = seatAvatars[p.key]; if (a && slots[k]) add(a, p, slots[k], false); });
       // 前の人から順に、全員(大将も)の顔が 見えるように並べる。
       // うしろの人が前の人に かくれるときは、まず横の あいている所へ少し ずれる。それでも かくれるときだけ 上げる
@@ -2201,13 +2215,13 @@ function createShop(canvas, opts) {
         a.position.set(e.x, e.y - u.headOff, e.z);
         a.rotation.y = Math.atan2(photo.cam.x - e.x, photo.cam.z - e.z);
         u.lookT = 0; u.lw = 0;
-        u.photo = { pose: e.p.pose || 'normal', face: e.p.face || 'smile', owner: e.isOwner, tilt: Math.max(-0.35, Math.min(0.35, e.x * (LY.tilt || 0.4))), lean: Math.max(-0.25, Math.min(0.25, e.x * LY.lean * 2)) };   // 頭と体を まん中へ かたむける
+        u.photo = { pose: e.p.pose || 'normal', face: e.p.face || 'smile', owner: e.isOwner, selfie: duo && LY.duo.selfie, tilt: Math.max(-0.35, Math.min(0.35, e.x * ((duo && LY.duo.tilt) || LY.tilt || 0.4))), lean: Math.max(-0.25, Math.min(0.25, e.x * ((duo && LY.duo.lean) || LY.lean) * 2)) };   // 頭と体を まん中へ かたむける
       });
       window.__photoDbg = E.map((e) => ({ k: e.isOwner ? 'owner' : e.p.key, x: +e.x.toFixed(2), z: e.z, y: +e.y.toFixed(2), y0: e.y0, top: +e.hm.top.toFixed(2), chin: +e.hm.chin.toFixed(2), hw: +e.hm.hw.toFixed(2) }));   // 確認用
       const gs = E.filter((e) => !e.isOwner);
       photo.half = Math.max(0.45, ...E.map((e) => Math.abs(e.x) + LY.edge));   // 横のはしの人は 少し切れてもよい(自撮りらしく)
       photo.top = Math.max(...E.map((e) => e.y + e.hm.top)) + 0.12;
-      photo.bot = (gs.length ? Math.min(...gs.map((e) => e.y)) : 1.3) - (gs.length >= 8 && LY.underMany ? LY.underMany : (LY.under || 0.45));   // 前の列は胸から上(人数が多いときは顔と首くらい)
+      photo.bot = (gs.length ? Math.min(...gs.map((e) => e.y)) : 1.3) - (duo ? LY.duo.under : gs.length >= 8 && LY.underMany ? LY.underMany : (LY.under || 0.45));   // 前の列は胸から上(人数が多いときは顔と首くらい)
       photo.look.y = (photo.top + photo.bot) / 2;
     },
     photoEnd() {
@@ -2235,14 +2249,20 @@ function createShop(canvas, opts) {
       return c;
     },
     photoPoses: PHOTO_POSES, photoFaces: PHOTO_FACES, photoLayouts: PHOTO_LAYOUTS,
-    /* seat の人が target の人のほうを secs 秒 向く(target は 席の番号か 'owner') */
+    /* seat の人が target の人のほうを secs 秒 向く(target は 席の番号か 'owner')。
+       すでに だれかの方を向いているときは、いまの数秒が終わってから 次の人の方を向く(順番待ちは2つまで。古いものから消す)。
+       コメントは いつでも送れるまま、アバターが2人の間で 首をふって迷わないようにする(ノブさん 2026-11-20) */
     lookAt(seat, target, secs) {
-      const a = seat === 'owner' ? owner : seatAvatars[seat], t = target === 'owner' ? owner : seatAvatars[target];
-      if (!a || !t) return;
-      let yaw = Math.atan2(t.position.x - a.position.x, t.position.z - a.position.z) - a.rotation.y;
-      while (yaw > Math.PI) yaw -= Math.PI * 2; while (yaw < -Math.PI) yaw += Math.PI * 2;
-      a.userData.lookYaw = Math.max(-1.75, Math.min(1.75, yaw)); a.userData.lookT = secs;
+      const a = seat === 'owner' ? owner : seatAvatars[seat]; if (!a) return;
+      const u = a.userData;
+      if (u.lookT > 0.2 || (u.lookQ && u.lookQ.length)) {
+        if (u.lookTo === target && u.lookT > 0) { u.lookT = Math.max(u.lookT, secs); return; }   // 同じ人に また話しかけられたら のばすだけ
+        (u.lookQ = u.lookQ || []).push({ target, secs }); if (u.lookQ.length > 2) u.lookQ.shift();
+        return;
+      }
+      lookStart(a, target, secs);
     },
+    lookState(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; return a ? { to: a.userData.lookTo, t: +(a.userData.lookT || 0).toFixed(2), wait: (a.userData.lookQ || []).map((q) => q.target) } : null; },   // 確認用
     /* 吹き出しを出す位置(画面の点) */
     anchors() { return { seats: seatAvatars.map((a, i) => (a && a.visible ? headPos(a) : null)), owner: headPos(owner), empty: stools.map((s, i) => { tmp.set(seatX(i, N), STOOL_Y + 0.25, GUEST_Z); const v = tmp.clone().project(camera); if (v.z > 1) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }) }; },
     name: SHOPNAME,
