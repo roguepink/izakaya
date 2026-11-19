@@ -551,6 +551,7 @@
     scene.setSeats(seats);
     var st = tree.state || {};
     scene.setOwner((st.ownerAvatar && AVATAR.fix(st.ownerAvatar)) || AVATAR.fix(AVATAR.OWNER));
+    photoTick();
     updateTables();
     if (!inside) return;
 
@@ -870,7 +871,7 @@
       withScene(function (s) {
         s.talk(m.seat);
         // 話しかけられた人が、話しかけた人のほうを数秒向く(話した人も相手を見る)
-        if ((okSeat(m.to) || m.to === 'owner') && (okSeat(m.seat) || m.seat === 'owner') && m.to !== m.seat) { s.lookAt(m.to, m.seat, 4); s.lookAt(m.seat, m.to, 2.5); }
+        if ((okSeat(m.to) || m.to === 'owner') && (okSeat(m.seat) || m.seat === 'owner') && m.to !== m.seat) { s.lookAt(m.to, m.seat, 4); s.lookAt(m.seat, m.to, 3); }
       }); if (!ownerPresent()) ownerTo(m.seat, false);
     });
   }
@@ -1069,6 +1070,8 @@
         if (isK) { for (var i = 0; i < N; i++) if (seatUid(i)) floater(i, '🍻'); floater('owner', '🍻'); }
         else if (ph.emoji) floater(who, ph.emoji);
         playPhrase(ph, e.voice);
+      } else if (e.type === 'photoReq') {
+        if (OWNER_MODE && e.by !== ME.uid) toast('📸 ' + (e.name || 'お客さん') + 'さんから 記念撮影のリクエスト', 9000, '📸 撮影する', startPhoto);
       } else if (e.type === 'clear') {
         ownerTo(e.seat, false);   // 下げに行く
       } else if (e.type === 'order') {
@@ -1315,6 +1318,10 @@
       SHOP.SONGS.forEach(function (s) { html += '<div class="li"><div class="t">' + esc(s.title) + '</div><button data-req="' + esc(s.id) + '">リクエスト</button></div>'; });
       html += '</div>';
       if (!force && body._h === html) return;
+    } else if (sheetKind === 'photos') {
+      $('shTitle').textContent = '📸 記念写真';
+      if (force) { body.innerHTML = '<p class="small-note">読みこみ中…</p>'; body._h = ''; photosSheetFill(); }
+      return;
     } else if (sheetKind === 'phrases') {
       title = OWNER_MODE ? '大将のひとこと' : 'ひとこと';
       html = phrasesHTML();
@@ -1336,6 +1343,7 @@
         '<p class="small-note">いま: ' + (LOCAL ? 'おためしモード' : s.phase === 'open' ? '営業中(' + fmtTime(s.end) + 'まで)' : s.phase === 'doors' ? 'まもなく開店' : '準備中') + '</p>' +
         '<div class="sh-sec">片づけ</div><div class="btn-row"><button id="clearChat">💬 会話を全部消す</button><button id="clearTables">🍽️ 料理を下げる</button></div>' +
         '<div class="sh-sec">大将の見た目</div><div class="btn-row"><button id="ownerLook">🎨 アバターを作りなおす</button></div>' +
+        '<div class="sh-sec">記念写真</div><div class="btn-row"><button id="phListBtn">📸 記念写真を見る</button></div>' +
         '<div class="sh-sec">大将の声</div><div class="btn-row"><button id="recBtn">🎙 ノブの声を録音する</button></div><p class="small-note">大将の決まり文句を、ノブさんの声で録れます。録ったら「まとめて送る」で Claude に渡してください。</p>' +
         (ROLE === 'nobu' ? '<div class="sh-sec">お店の予定</div><div class="btn-row"><button id="planBtn" class="red">📅 お店の予定・マスター交代・席の数</button></div>' : '<p class="small-note">お店の予定は ノブさんだけが直せます。</p>');
     } else if (sheetKind === 'plan') {
@@ -1390,6 +1398,7 @@
       q('#clearChat').onclick = function () { if (confirm('会話を全部消しますか?')) { net.remove('chat'); closeSheet(); } };
       q('#clearTables').onclick = function () { net.remove('tables'); closeSheet(); };
       q('#ownerLook').onclick = function () { closeSheet(); openMaker(); };
+      q('#phListBtn').onclick = function () { openSheet('photos'); };
       q('#recBtn').onclick = function () { if (inside && !confirm('録音ページへ移ります。お店からは一度出ます。よろしいですか?')) return; if (inside) leave(); location.href = 'owner/rec.html'; };
       var pb = q('#planBtn'); if (pb) pb.onclick = function () { openSheet('plan'); };
     } else if (sheetKind === 'plan') {
@@ -1512,6 +1521,160 @@
     var s = SHOP.SONGS.filter(function (x) { return x.id === id; })[0]; if (!s) return;
     pushQueue({ kind: 'file', id: s.id, src: s.src, title: s.title });
   }
+  /* ---------------- 記念撮影(大将の自撮り風) ----------------
+     お客さんが「📸 撮影」でリクエスト → 大将が「撮影する」→ 全員の画面でカウントダウン。
+     残り PICK_FROM〜PICK_TO 秒のあいだに ポーズと表情を選ぶ(「今回は写らない」も選べる)。0秒で 全員が同じ絵を それぞれのスマホで写真にする。
+     写真は送り合わない(それぞれのスマホで作る)。大将のスマホには KEEP_DAYS 日だけ とっておき、消せる */
+  var PH = Object.assign({ SEC: 20, PICK_FROM: 15, PICK_TO: 3, KEEP_DAYS: 30 }, SHOP.PHOTO || {});
+  var phOn = null, phShot = false, phSaid = {}, myPick = { pose: 'peace', face: 'smile', hide: false }, phReqAt = 0, phBots = false;
+  function ownerUid() { var ms = members(); return Object.keys(ms).filter(function (u) { return ms[u].owner && fresh(ms[u]); })[0] || null; }
+  function photoList() {   // 写る人(席の順)。写らないを選んだ人は入れない
+    var picks = tree.photo || {}, ms = members(), L = [];
+    function pk(uid) { var p = uid === ME.uid ? myPick : (picks[uid] || {}); return { pose: p.pose || 'peace', face: p.face || 'smile', hide: !!p.hide }; }
+    for (var i = 0; i < N; i++) { var u = seatUid(i), m = u && ms[u]; if (!m || !fresh(m)) continue; var p = pk(u); if (!p.hide) L.push({ key: i, pose: p.pose, face: p.face }); }
+    var ou = ownerUid(); if (ou) { var po = pk(ou); if (!po.hide) L.push({ key: 'owner', pose: po.pose, face: po.face }); }
+    return L;
+  }
+  function startPhoto() {
+    if (!OWNER_MODE) return;
+    var st = (tree.state || {}).photo; if (st && st.at && now() - st.at < (st.sec + 8) * 1000) { toast('いま撮影中です'); return; }
+    net.remove('photo');
+    net.update('state', { photo: { id: 'p' + Date.now(), at: TS, sec: PH.SEC } });
+    sys('📸 記念撮影をします');
+  }
+  $('bPhoto').onclick = function () {
+    if (OWNER_MODE) { if (confirm('記念撮影をはじめますか?(' + PH.SEC + '秒のカウントダウンのあと、みんなで自撮りします)')) startPhoto(); return; }
+    if (mySeat < 0) { toast('先に席に座ってください'); return; }
+    if (phOn) { toast('いま撮影中です'); return; }
+    if (Date.now() - phReqAt < 20000) { toast('大将にお願いしてあります。少し待ってください'); return; }
+    phReqAt = Date.now();
+    event({ type: 'photoReq', seat: mySeat, name: currentName() });
+    sys('📸 ' + currentName() + 'さんが記念撮影をリクエストしました');
+    toast(ownerPresent() ? '大将に記念撮影をお願いしました' : '大将がいるときに撮影できます');
+  };
+  function phChips() {
+    var S = scene || {}, poses = S.photoPoses || [], faces = S.photoFaces || [];
+    $('phPoses').innerHTML = poses.map(function (p) { return '<button data-pose="' + p[0] + '" class="' + (myPick.pose === p[0] ? 'on' : '') + '">' + esc(p[1]) + '</button>'; }).join('');
+    $('phFaces').innerHTML = faces.map(function (f) { return '<button data-face="' + f[0] + '" class="' + (myPick.face === f[0] ? 'on' : '') + '">' + esc(f[1]) + '</button>'; }).join('');
+    $('phPoses').querySelectorAll('[data-pose]').forEach(function (b) { b.onclick = function () { myPick.pose = b.getAttribute('data-pose'); phSend(); }; });
+    $('phFaces').querySelectorAll('[data-face]').forEach(function (b) { b.onclick = function () { myPick.face = b.getAttribute('data-face'); phSend(); }; });
+  }
+  function phSend() { net.set('photo/' + ME.uid, { pose: myPick.pose, face: myPick.face, hide: myPick.hide, at: TS }); phChips(); photoTick(); }
+  $('phHide').onclick = function () {
+    if ($('phPick').classList.contains('locked')) return;
+    myPick.hide = !myPick.hide; phSend();
+    toast(myPick.hide ? '今回は写りません' : '写真に写ります', 1600);
+  };
+  function photoTick() {
+    var st = (tree.state || {}).photo;
+    if (!st || !st.at || !inside) { if (phOn) photoEndUI(); return; }
+    var rem = st.sec - (now() - st.at) / 1000;
+    if (rem < -7) { if (phOn) photoEndUI(); if (OWNER_MODE && amLeader()) net.update('state', { photo: null }); return; }
+    if (phOn !== st.id) {   // 始まり
+      phOn = st.id; phShot = false; phSaid = {}; myPick = { pose: 'peace', face: 'smile', hide: false };
+      document.body.classList.add('photo-mode'); $('photoUi').classList.remove('hidden'); closeSheet();
+      phChips();
+      if (LOCAL && !phBots) { phBots = true; setTimeout(function () { phBots = false; Object.keys(bots).forEach(function (u) { var P = (scene && scene.photoPoses) || [['peace']], F = (scene && scene.photoFaces) || [['smile']]; net.set('photo/' + u, { pose: P[Math.floor(Math.random() * P.length)][0], face: F[Math.floor(Math.random() * 4)][0], hide: false, at: TS }); }); }, 6000); }
+    }
+    var picking = rem <= PH.PICK_FROM && rem > PH.PICK_TO, locked = rem <= PH.PICK_TO;
+    $('phCount').textContent = rem > 0 ? Math.ceil(rem) : '📸';
+    $('phTitle').textContent = rem <= 0 ? 'はい、チーズ！' : locked ? 'まもなく撮影します…' : picking ? 'ポーズと表情を選んでください' : '📸 記念撮影をします。皆さん準備してください';
+    $('phPick').classList.toggle('waiting', !picking && !locked);
+    $('phPick').classList.toggle('locked', locked);
+    $('phPick').classList.toggle('hidden', rem <= 0);
+    $('phHide').textContent = myPick.hide ? '🙈 写りません(押すと写ります)' : '🙈 今回は写らない';
+    $('phHide').classList.toggle('on', myPick.hide);
+    $('phChoose').classList.toggle('off', myPick.hide || !picking);
+    $('phNote').textContent = myPick.hide ? 'あなたは この写真に写りません。ほかの人の写真は受けとれます。'
+      : locked ? '選んだポーズで撮ります' : picking ? 'あと ' + Math.ceil(rem - PH.PICK_TO) + '秒 選べます' : 'あと ' + Math.ceil(rem - PH.PICK_FROM) + '秒で ポーズと表情を選べます。写りたくない人は「今回は写らない」を押してください';
+    withScene(function (s) { if (s.photoSet) s.photoSet(photoList()); });
+    // 大将の声(みんなのスマホで、それぞれ同じ時に鳴らす)
+    var say = function (id, when) { if (!phSaid[id] && rem <= when && rem > when - 2) { phSaid[id] = 1; var ph = SHOP.PHRASES.filter(function (p) { return p.id === id; })[0]; if (ph) playPhrase(ph); } };
+    say('o_photo', PH.SEC - 0.3); say('o_cheese', 1.6);
+    if (rem <= 0 && !phShot) { phShot = true; photoShoot(); }
+  }
+  setInterval(function () { if (phOn || ((tree.state || {}).photo || {}).at) photoTick(); }, 250);
+  function photoEndUI() {
+    phOn = null; document.body.classList.remove('photo-mode'); $('photoUi').classList.add('hidden');
+    withScene(function (s) { if (s.photoEnd) s.photoEnd(); });
+  }
+  function shutter() {
+    if (!actx) return;
+    try {
+      var t = actx.currentTime, len = 0.12, buf = actx.createBuffer(1, actx.sampleRate * len, actx.sampleRate), d = buf.getChannelData(0);
+      for (var i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+      var src = actx.createBufferSource(), g = actx.createGain(); src.buffer = buf; g.gain.value = 0.5 * vol + 0.1; src.connect(g); g.connect(actx.destination); src.start(t);
+    } catch (e) {}
+  }
+  var phBlob = null, phUrl = '';
+  function photoShoot() {
+    var f = $('flash'); f.classList.remove('hidden'); f.classList.remove('go'); void f.offsetWidth; f.classList.add('go'); setTimeout(function () { f.classList.add('hidden'); }, 900);
+    shutter();
+    var cv = null; try { cv = scene && scene.capturePhoto && scene.capturePhoto(); } catch (e) { cv = null; }
+    if (!cv) { toast('この端末では写真を作れませんでした'); return; }
+    // 下に 店の名前と日付の帯
+    var W = cv.width, H = cv.height, band = Math.round(W * 0.1), out = document.createElement('canvas'); out.width = W; out.height = H + band;
+    var g = out.getContext('2d'); g.drawImage(cv, 0, 0);
+    g.fillStyle = '#1c120c'; g.fillRect(0, H, W, band);
+    g.fillStyle = '#c8261c'; g.fillRect(0, H, W, Math.max(4, band * 0.06));
+    var d = new Date(), ds = d.getFullYear() + '.' + (d.getMonth() + 1) + '.' + d.getDate();
+    g.fillStyle = '#f3e6cc'; g.textBaseline = 'middle'; g.font = 'bold ' + Math.round(band * 0.42) + 'px "Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif';
+    g.fillText('🏮 ' + shopName(), band * 0.35, H + band * 0.54);
+    g.textAlign = 'right'; g.font = Math.round(band * 0.32) + 'px sans-serif'; g.fillText(ds, W - band * 0.35, H + band * 0.54);
+    out.toBlob(function (blob) {
+      if (!blob) return;
+      phBlob = blob; if (phUrl) URL.revokeObjectURL(phUrl); phUrl = URL.createObjectURL(blob);
+      setTimeout(function () {
+        $('pbImg').src = phUrl; $('photoBox').classList.remove('hidden');
+        $('pbNote').textContent = /Line\//i.test(navigator.userAgent) ? 'LINE の中では「保存」が効かないことがあります。写真を長押しして保存してください。' : (OWNER_MODE ? 'この写真は、大将のスマホの「🏮 店主 → 📸 記念写真」にも ' + PH.KEEP_DAYS + '日間 とっておきます。' : '保存して、みんなに送ってください。');
+      }, 700);
+      if (OWNER_MODE) photoSave(blob);
+    }, 'image/jpeg', 0.9);
+  }
+  function photoName() { var d = new Date(); return 'izakaya-' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '-' + ('0' + d.getHours()).slice(-2) + ('0' + d.getMinutes()).slice(-2) + '.jpg'; }
+  function saveBlob(blob, name) { var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000); }
+  function shareBlob(blob, name) {
+    var file = null; try { file = new File([blob], name, { type: 'image/jpeg' }); } catch (e) {}
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) navigator.share({ files: [file], title: shopName() + 'の記念写真' }).catch(function () {});
+    else { saveBlob(blob, name); toast('共有が使えないので、保存しました'); }
+  }
+  $('pbSave').onclick = function () { if (phBlob) saveBlob(phBlob, photoName()); };
+  $('pbShare').onclick = function () { if (phBlob) shareBlob(phBlob, photoName()); };
+  $('pbClose').onclick = function () { $('photoBox').classList.add('hidden'); };
+  /* 大将のスマホに とっておく(IndexedDB)。KEEP_DAYS 日すぎたら 開いたときに自動で消す */
+  function photoDB(fn) {
+    try { var r = indexedDB.open('izakaya-photos', 1); r.onupgradeneeded = function () { r.result.createObjectStore('p', { keyPath: 'at' }); }; r.onsuccess = function () { fn(r.result); }; r.onerror = function () { fn(null); }; } catch (e) { fn(null); }
+  }
+  function photoSave(blob) { photoDB(function (db) { if (!db) return; try { db.transaction('p', 'readwrite').objectStore('p').put({ at: Date.now(), blob: blob, shop: shopName() }); } catch (e) {} }); }
+  function photoAll(fn) {
+    photoDB(function (db) {
+      if (!db) return fn([]);
+      var out = [], cut = Date.now() - PH.KEEP_DAYS * DAY, tx = db.transaction('p', 'readwrite'), st = tx.objectStore('p');
+      st.openCursor().onsuccess = function (e) { var c = e.target.result; if (c) { if (c.value.at < cut) c.delete(); else out.push(c.value); c.continue(); } else fn(out.reverse()); };
+    });
+  }
+  function photoDel(at, fn) { photoDB(function (db) { if (!db) return fn(); var tx = db.transaction('p', 'readwrite'); tx.objectStore('p').delete(at); tx.oncomplete = fn; }); }
+  var phThumbs = [];
+  function photosSheetFill() {
+    photoAll(function (list) {
+      if (sheetKind !== 'photos') return;
+      phThumbs.forEach(function (u) { URL.revokeObjectURL(u); }); phThumbs = [];
+      var body = $('shBody'), h = '<p class="small-note">撮った記念写真は、このスマホの中だけに とっておきます(お店のネットには置きません)。' + PH.KEEP_DAYS + '日たつと自動で消えます。</p>';
+      if (!list.length) h += '<div class="li"><div class="t"><small>まだありません</small></div></div>';
+      h += '<div class="ph-list">';
+      list.forEach(function (p, i) {
+        var u = URL.createObjectURL(p.blob); phThumbs.push(u);
+        var d = new Date(p.at), left = Math.max(0, Math.ceil((p.at + PH.KEEP_DAYS * DAY - Date.now()) / DAY));
+        h += '<div class="ph-item"><img src="' + u + '" alt="記念写真"><div class="ph-meta">' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2) + '<small>あと' + left + '日で消えます</small></div>' +
+          '<div class="btn-row"><button data-psave="' + i + '">保存</button><button data-pshare="' + i + '">共有</button><button class="red" data-pdel="' + i + '">削除</button></div></div>';
+      });
+      body.innerHTML = h + '</div>'; body._h = '';
+      body.querySelectorAll('[data-psave]').forEach(function (b) { b.onclick = function () { var p = list[+b.getAttribute('data-psave')]; saveBlob(p.blob, 'izakaya-' + p.at + '.jpg'); }; });
+      body.querySelectorAll('[data-pshare]').forEach(function (b) { b.onclick = function () { var p = list[+b.getAttribute('data-pshare')]; shareBlob(p.blob, 'izakaya-' + p.at + '.jpg'); }; });
+      body.querySelectorAll('[data-pdel]').forEach(function (b) { b.onclick = function () { var p = list[+b.getAttribute('data-pdel')]; if (confirm('この写真を消しますか?(もとに戻せません)')) photoDel(p.at, photosSheetFill); }; });
+    });
+  }
+
   $('bMenu').onclick = function () { if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return; } openSheet('menu'); };
   $('bMusic').onclick = function () { openSheet('music'); };
   $('nowPlaying').onclick = function () { openSheet('music'); };

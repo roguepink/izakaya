@@ -200,8 +200,14 @@ var SHOP = {
     { id: 'lastcall',   cat: 'おくる',   say: 'そろそろ閉店です。ラストオーダー、どうぞ！' },
     { id: 'mataokoshi', cat: 'おくる',   say: 'またお越しください！',        main: true },
     { id: 'o_kiwotsukete', cat: 'おくる', say: '気をつけて帰ってね！' },
-    { id: 'oyasumi',    cat: 'おくる',   say: 'おやすみなさい！' }
+    { id: 'oyasumi',    cat: 'おくる',   say: 'おやすみなさい！' },
+    { id: 'o_photo',    cat: 'さつえい', say: '記念撮影しまーす！' },
+    { id: 'o_cheese',   cat: 'さつえい', say: 'はい、チーズ！' }
   ],
+
+  /* 記念撮影(大将の自撮り風)。SEC: カウントダウンの秒数 / PICK_FROM〜PICK_TO: ポーズと表情を選べる残り秒数 /
+     KEEP_DAYS: 大将のスマホに写真を とっておく日数(すぎたら自動で消す)。秒数は まだ決めている途中(ノブさん 2026-11-19) */
+  PHOTO: { SEC: 20, PICK_FROM: 15, PICK_TO: 3, KEEP_DAYS: 30 },
 
   /* ノブさんの声を録音してある言葉の id(大将の声「ノブの声(録音)」で使う)。録音ページ rec.html で録って、voice/nobu/ に置く。
      ここにない言葉は、代わりの声(落ち着いた男性)で読む */

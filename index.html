@@ -114,6 +114,7 @@
     <button id="bView" class="sbtn" title="視点"><span>👁</span><small id="bViewLbl">目線</small></button>
     <button id="bMusic" class="sbtn"><span>🎵</span><small>曲</small></button>
     <button id="bMenu" class="sbtn"><span>🍺</span><small>注文</small></button>
+    <button id="bPhoto" class="sbtn"><span>📸</span><small>撮影</small></button>
     <button id="bOrders" class="sbtn owner-only"><span>📋</span><small>注文票</small><i id="ordBadge" class="badge hidden">0</i></button>
     <button id="bOwner" class="sbtn owner-only"><span>🏮</span><small>店主</small></button>
     <button id="bBot" class="sbtn hidden"><span>🤖</span><small>おためし客</small></button>
@@ -138,6 +139,27 @@
   <div id="shBody" class="sh-body"></div>
 </div>
 
+<div id="photoUi" class="photo-ui hidden">
+  <div class="ph-top"><div id="phTitle" class="ph-title"></div><div id="phCount" class="ph-count"></div></div>
+  <div id="phPick" class="ph-pick">
+    <button id="phHide" class="ph-hide" type="button"></button>
+    <div id="phChoose">
+      <div class="ph-sec">ポーズ</div><div id="phPoses" class="ph-chips"></div>
+      <div class="ph-sec">表情</div><div id="phFaces" class="ph-chips"></div>
+    </div>
+    <p id="phNote" class="ph-note"></p>
+  </div>
+</div>
+<div id="flash" class="flash hidden"></div>
+<div id="photoBox" class="screen hidden">
+  <div class="pb-card">
+    <div class="pb-title">📸 記念写真が撮れました</div>
+    <img id="pbImg" alt="記念写真">
+    <div class="btn-row"><button id="pbSave" type="button">💾 保存</button><button id="pbShare" type="button">📤 共有</button></div>
+    <p id="pbNote" class="small-note"></p>
+    <button id="pbClose" class="gray" type="button">閉じる</button>
+  </div>
+</div>
 <div id="toast" class="toast hidden"></div>
 <div id="closing" class="screen hidden">
   <div class="closing-box">

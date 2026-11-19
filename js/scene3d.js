@@ -925,7 +925,7 @@ function buildAvatar(raw, opt = {}) {
   buildAcc(skull, body, a, R, f);
   tuckHair(skull, hairObjs);
   root.scale.setScalar(a.size);
-  root.userData = { body, head, arms, fores, cheerMug, torso, t: Math.random() * 10, cheer: 0, talk: 0 };
+  root.userData = { body, head, arms, fores, hands, cheerMug, torso, t: Math.random() * 10, cheer: 0, talk: 0, face, faceA: a, skin: skinC };
   if (!window.__nobake) bakeAvatar(root, [body, head, arms[0], arms[1], fores[0], fores[1]], new Set([cheerMug]));
   return root;
 }
@@ -1125,12 +1125,12 @@ function buildAcc(head, body, a, R, f) {
 /* ---------- 見えない所を描かない ----------
    大将の体(胴と前掛け)のうち、高さ y より下の三角を消す。腕・頭・ジョッキは動くので消さない。
    y は、すべての目線で「消す前と後が1点もちがわない」ことを確かめて決めた(scratchpad t40.py) */
-const OWNER_HIDE_Y = window.__hideY || 0.86;
+const OWNER_HIDE_Y = window.__hideY || 0.80;   // 0.86 まで134の目線で写らないことを確かめ、6cm 余裕をとった
 function cullBelow(root, yCut) {
   const u = root.userData, moving = new Set([u.head, ...(u.arms || []), ...(u.fores || []), u.cheerMug].filter(Boolean));
   const v = new THREE.Vector3(), stats = { before: 0, after: 0 };
-  root.traverse((m) => {
-    if (!m.isMesh || !m.geometry || !m.geometry.attributes.position) return;
+  const list = []; root.traverse((m) => { if (m.isMesh && m.geometry && m.geometry.attributes.position) list.push(m); });   // 先に集める(途中で足す物を また調べないように)
+  list.forEach((m) => {
     for (let q = m; q && q !== root; q = q.parent) if (moving.has(q)) return;
     const g = m.geometry, pa = g.attributes.position, idx = g.index, keep = [];
     const n = idx ? idx.count : pa.count;
@@ -1160,7 +1160,57 @@ function cullBelow(root, yCut) {
   window.__cullStats = stats;
 }
 function disposeAvatar(o) { if (!o) return; o.traverse((m) => { if (m.isMesh && m.geometry) m.geometry.dispose(); }); }
+/* ---------- 記念撮影のポーズと表情 ----------
+   腕の形 [肩の前後, 肩の外むき, ひじ]。外むきは 左右で向きを合わせて使う。指をさすポーズは入れない(ノブさん) */
+const ARM = { down: [-0.12, 0.1, -0.2], cheek: [-0.95, 0.22, -2.25], high: [-2.85, 0.28, -0.15], cheer: [-1.85, 0.6, -0.7], guts: [-0.3, 0.42, -2.35],
+              thumb: [-1.05, 0.12, -1.0], heart: [-2.55, -0.05, -1.25], cross: [-0.85, -0.42, -1.75], selfie: [-1.62, 0.3, -0.12] };
+const PHOTO_POSES = [['normal', '🙂 ふつう', 'down', 'down'], ['peace', '✌️ ピース', 'cheek', 'down', 'v'], ['wpeace', '✌️ ダブルピース', 'cheek', 'cheek', 'v'],
+  ['wave', '👋 手をふる', 'high', 'down'], ['banzai', '🙌 バンザイ', 'high', 'high'], ['kanpai', '🍻 かんぱい', 'cheer', 'down', 'mug'],
+  ['guts', '💪 ガッツポーズ', 'guts', 'down'], ['thumb', '👍 いいね', 'thumb', 'down', 'thumb'], ['heart', '🫶 ハート', 'heart', 'heart'], ['cross', '😎 腕組み', 'cross', 'cross']];
+const PHOTO_FACES = [['smile', '😊 にっこり', { eyes: 'smile', mouth: 'grin' }], ['wink', '😉 ウインク', { eyes: 'wink', mouth: 'grin' }], ['laugh', '😆 大笑い', { eyes: 'smile', mouth: 'open' }],
+  ['surprise', '😲 びっくり', { eyes: 'round', mouth: 'open' }], ['normal', '🙂 いつもの顔', null]];
+function photoAttach(av, list) {   // 指(ピースの2本・いいねの親指)を その時だけ手につける。list = [[種類, 手], ...]
+  const u = av.userData;
+  (u.atts || []).forEach((g) => { g.parent && g.parent.remove(g); g.traverse((m) => m.geometry && m.geometry.dispose()); });
+  u.atts = [];
+  if (!u.hands) return;
+  const sk = u.skin || '#f6d2b8';
+  list.forEach(([kind, hi]) => {
+    const g = new THREE.Group();
+    if (kind === 'v') [-1, 1].forEach((sd) => { const f = tm(new THREE.CapsuleGeometry(0.0085, 0.036, 4, 6), sk, sd * 0.011, -0.05, 0.004, 0.002); f.rotation.z = sd * 0.25; g.add(f); });
+    if (kind === 'thumb') { const f = tm(new THREE.CapsuleGeometry(0.01, 0.026, 4, 6), sk, 0, -0.012, 0.032, 0.002); f.rotation.x = Math.PI / 2; g.add(f); }
+    u.hands[hi].add(g); u.atts.push(g);
+  });
+}
+function photoPose(av, dt) {
+  const u = av.userData, P = u.photo; u.t += dt;
+  u.body.position.y = Math.sin(u.t * 2.1) * 0.004; u.body.rotation.set(0, 0, 0);
+  const pose = PHOTO_POSES.find((p) => p[0] === P.pose) || PHOTO_POSES[0], wave = pose[0] === 'wave';
+  const setArm = (i, key, wv) => { const sd = i === 1 ? 1 : -1, A = ARM[key]; u.arms[i].rotation.set(A[0], 0, sd * A[1] + (wv ? Math.sin(u.t * 9) * 0.28 * sd : 0)); if (u.fores) u.fores[i].rotation.x = A[2]; };
+  let main = 1;
+  if (P.owner) { setArm(1, 'selfie'); setArm(0, pose[2], wave); main = 0; }   // 大将は 片手でスマホ(自撮り)、もう片方でポーズ
+  else { setArm(1, pose[2], wave); setArm(0, pose[3]); }
+  const list = !pose[4] || pose[4] === 'mug' ? [] : pose[0] === 'wpeace' && !P.owner ? [['v', 1], ['v', 0]] : [[pose[4], main]], key = JSON.stringify(list);
+  if (key !== u.attKey) { photoAttach(av, list); u.attKey = key; }
+  u.head.rotation.set(-0.05 + Math.sin(u.t * 0.7) * 0.012, 0, P.tilt || 0);
+  const mug = pose[4] === 'mug' && !P.owner;
+  u.cheerMug.visible = mug; if (mug) u.cheerMug.rotation.set(-(ARM.cheer[0] + ARM.cheer[2]), 0, -ARM.cheer[1]);
+  const fk = P.face + '|' + P.pose;
+  if (u.face && u.faceKey !== fk) {
+    u.faceKey = fk; u.smiling = false;
+    const fd = (PHOTO_FACES.find((f) => f[0] === P.face) || PHOTO_FACES[0])[2];
+    u.face.material.map = faceTexture(fd ? Object.assign({}, u.faceA, fd) : u.faceA); u.face.material.needsUpdate = true;
+  }
+}
+function photoClear(av) {   // 撮影が終わったら もとの形へ
+  const u = av.userData; if (!u.photo) return;
+  u.photo = null; photoAttach(av, []);
+  u.attKey = null; u.faceKey = null; u.cheerMug.visible = false;
+  if (u.face) { u.face.material.map = faceTexture(u.faceA); u.face.material.needsUpdate = true; }
+  [0, 1].forEach((i) => { u.arms[i].rotation.set(-0.45, 0, 0.06 * (i ? 1 : -1)); if (u.fores) u.fores[i].rotation.x = -0.55; });
+}
 function animateAvatar(av, dt) {
+  if (av.userData.photo) { photoPose(av, dt); return; }
   const u = av.userData; u.t += dt;
   u.cheer = Math.max(0, u.cheer - dt); u.talk = Math.max(0, u.talk - dt);
   const breath = Math.sin(u.t * 2.1) * 0.006;
@@ -1175,6 +1225,13 @@ function animateAvatar(av, dt) {
   hy = hy * (1 - ld) + headY * ld; hx += 0.05 * ld;
   u.body.rotation.y = bodyY * ld;
   u.head.rotation.set(hx, hy, Math.sin(u.t * 0.5) * 0.03 * (1 - ld));
+  /* 向いている間は笑顔(目は にこにこ、口は にかっ)。終わったら もとの顔 */
+  const smile = u.lookT > 0.3;
+  if (u.face && smile !== !!u.smiling) {
+    u.smiling = smile;
+    u.face.material.map = smile ? faceTexture(Object.assign({}, u.faceA, { eyes: 'smile', mouth: u.faceA.mouth === 'grin' ? 'smile' : 'grin' })) : faceTexture(u.faceA);
+    u.face.material.needsUpdate = true;
+  }
   /* 乾杯(2.2秒): 持ち上げる → 前へ出して カチン → 掲げる → 口へ運んで ひと口 → 下ろす */
   const e = u.cheer > 0 ? CHEER_T - u.cheer : -1;
   const P = e < 0 ? CHEER_KEYS[0] : cheerPose(e);
@@ -1393,18 +1450,23 @@ function buildItem(item, empty, half) {
       g.add(rectPlate(0.13, 0.13, '#3a2a20'));
       g.add(box(0.11, 0.002, 0.11, '#f6f0dc', 0, 0.017, 0, 0.3));   // 紙
       const big = item.model === 'friesbig';
-      const n = big ? 46 : 16;
+      /* ポテト: 長さはばらばら、両はしは少しこげ茶。下は寝かせて重ね、上ほど いろいろな角度で立てかけて山にする。
+         全部を1つの形にまとめる(1本ずつだと 描く回数が多くなる) */
+      const n = big ? 44 : 16, fr = [];
       for (let k = 0; k < n; k++) {
-        let x, y, z, rx, rz;
-        if (!big) { x = (rnd(k) - 0.5) * 0.08; y = 0.024 + (k % 3) * 0.006; z = (rnd(k + 30) - 0.5) * 0.08; rx = Math.PI / 2; rz = rnd(k + 60) * 3; }
-        else {   // 上にこんもり。量は同じくらいでも、たてに積んで山にする
-          const lvl = k / n, ang = k * 2.39, rad = 0.045 * (1 - lvl * 0.9);
-          x = Math.cos(ang) * rad; z = Math.sin(ang) * rad; y = 0.03 + lvl * 0.11; rx = 0.4 * Math.cos(ang); rz = 0.4 * Math.sin(ang);
-        }
-        const f = box(0.008, 0.06, 0.008, k % 4 ? '#f2c24a' : '#e8a83a', x, y, z); f.rotation.set(rx, 0, rz); food.add(f);
+        const len = (big && k > n * 0.3 ? 0.045 : 0.036) + rnd(k + 7) * 0.03, th = 0.0085 + rnd(k + 11) * 0.002;
+        const geo = new THREE.BoxGeometry(th, len, th, 1, 3, 1), gp = geo.attributes.position;
+        for (let i = 0; i < gp.count; i++) { const yy = gp.getY(i); if (Math.abs(Math.abs(yy) - len / 6) < 1e-6) gp.setY(i, Math.sign(yy) * (len / 2 - 0.004)); }   // 両はしの近くに 色の境目
+        const fg = vcolor(geo, rnd(k + 3) < 0.3 ? '#f0c862' : '#f8da7a', { band: [[-1, -len / 2 + 0.001, '#cf9440'], [len / 2 - 0.001, 1, '#cf9440']] });
+        let tilt, yaw = rnd(k + 19) * Math.PI * 2, x, y, z;
+        const lvl = big ? k / n : 0, a = k * 2.39 + rnd(k + 23), rad = big ? 0.048 * (1 - lvl * 0.8) * (0.3 + rnd(k + 29) * 0.7) : 0.035 + rnd(k + 29) * 0.012 * 0;
+        if (!big || lvl < 0.3) { tilt = Math.PI / 2 - 0.15 + rnd(k + 31) * 0.3; x = Math.cos(a) * (big ? rad : (rnd(k) - 0.5) * 0.09 / 0.9); z = Math.sin(a) * (big ? rad : (rnd(k + 30) - 0.5) * 0.09 / 0.9); if (!big) { x = (rnd(k) - 0.5) * 0.08; z = (rnd(k + 30) - 0.5) * 0.08; } y = 0.024 + (big ? lvl * 0.04 : (k % 3) * 0.006); }
+        else { tilt = 1.12 + rnd(k + 31) * 0.38; x = Math.cos(a) * rad; z = Math.sin(a) * rad; y = 0.03 + lvl * 0.075; yaw = rnd(k + 37) * Math.PI * 2; }   // 寝かせ気味に いろんな向きで 交差させて積む(上ほど小さく)
+        fg.rotateZ(tilt); fg.rotateY(yaw); fg.translate(x, y, z); fr.push(fg);
       }
-      if (big) food.add(box(0.003, 0.05, 0.002, '#8a6a4a', 0, 0.17, 0));
-      if (big) food.add(box(0.025, 0.016, 0.001, '#c8261c', 0.013, 0.188, 0));   // 小さな旗
+      food.add(new THREE.Mesh(mergeGeos(fr, ['position', 'normal', 'color']), new THREE.MeshLambertMaterial({ vertexColors: true })));
+      if (big) food.add(box(0.003, 0.05, 0.002, '#8a6a4a', 0, 0.125, 0));
+      if (big) food.add(box(0.025, 0.016, 0.001, '#c8261c', 0.013, 0.143, 0));   // 小さな旗
       g.add(mesh(new THREE.CylinderGeometry(0.018, 0.016, 0.012, 14), mat(W), 0.07, 0.022, 0.06));
       food.add(disc(0.015, 0.029, '#c8261c'));
       food.children[food.children.length - 1].position.set(0.07, 0.029, 0.06);
@@ -1915,10 +1977,11 @@ function createShop(canvas, opts) {
     const k = 1 - Math.pow(0.002, dt);
     camPos.lerp(wantPos, k); camLook.lerp(wantLook, k);
     camera.position.copy(camPos); camera.lookAt(camLook);
+    if (photo) { if (viewApplied) { viewApplied = 0; camera.clearViewOffset(); } photoCam(camera, baseAspect, true); }
     if (window.__cam) { camera.position.set(...window.__cam[0]); camera.lookAt(...window.__cam[1]); camera.fov = window.__cam[2] || camera.fov; camera.updateProjectionMatrix(); }   // 確認用(棚などを近くで撮る)
-    { const zf = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(wantFov / 2)) / view.zoom));   // アップ = 見る広さをせまく
+    if (!photo) { const zf = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(wantFov / 2)) / view.zoom));   // アップ = 見る広さをせまく
       if (Math.abs(camera.fov - zf) > 0.05) { camera.fov += (zf - camera.fov) * Math.min(1, k * 2.5); camera.updateProjectionMatrix(); } }
-    { const sh = view.mode === 'owner' ? viewShift : 0;   // 絵の中心を 画面の横 sh の位置へ(ゆがまないように、広い絵の左側を切りとる)
+    if (!photo) { const sh = view.mode === 'owner' ? viewShift : 0;   // 絵の中心を 画面の横 sh の位置へ(ゆがまないように、広い絵の左側を切りとる)
       if (sh !== viewApplied) { viewApplied = sh; const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
         if (sh) { camera.aspect = baseAspect * sh * 2; camera.setViewOffset(w * sh * 2, h, 0, 0, w, h); } else { camera.aspect = baseAspect; camera.clearViewOffset(); } } }
     { const hb = camPos.z < -1.8; if (hb !== backHidden) { backHidden = hb; backList().forEach((o) => { o.visible = !hb; }); scene.fog.near = hb ? 9 : 7; scene.fog.far = hb ? 18 : 14; } }
@@ -1934,8 +1997,8 @@ function createShop(canvas, opts) {
       m.scale.set(1 + k2 * 0.18, 1 - k2 * 0.12 + Math.sin(e * Math.PI * 2) * 0.05, 1 + k2 * 0.18); m.position.y = k2 * 0.03;
     }));
     tvStep(dt);
-    if (owner) { animateAvatar(owner, dt); owner.position.x += (ownerTargetX - owner.position.x) * Math.min(1, dt * 3); }
-    const ov = view.mode === 'owner';   // 大将の目線では、ちょうちんと壁のモニターは出さない(動画は左上の小窓)
+    if (owner) { animateAvatar(owner, dt); if (!photo) owner.position.x += (ownerTargetX - owner.position.x) * Math.min(1, dt * 3); }
+    const ov = view.mode === 'owner' && !photo;   // 大将の目線では、ちょうちんと壁のモニターは出さない(動画は左上の小窓)
     lanterns.forEach((l, i) => { l.visible = !ov; l.rotation.z = Math.sin(clock.elapsedTime * 0.8 + i) * 0.03; });
     tv2.visible = !ov;
     renderer.render(scene, camera);
@@ -1943,6 +2006,16 @@ function createShop(canvas, opts) {
   }
   requestAnimationFrame(frame);
 
+  /* 記念撮影のカメラ(大将のスマホの位置)。みんなの顔が横いっぱいに入る広さ */
+  let photo = null;
+  function photoCam(cam, aspect, live) {
+    const d = photo.cam.distanceTo(photo.look), vf = 2 * Math.atan((photo.top - photo.bot) / 2 / d), hf = 2 * Math.atan(photo.half / d);
+    const fv = Math.max(vf, 2 * Math.atan(Math.tan(hf / 2) / aspect));
+    // 画面で見ている間(たて長のスマホ)は、下の「選ぶ」パネルに かくれないよう 集合を画面の上寄りに出す
+    const up = live && aspect < 0.85 ? 0.24 * 2 * d * Math.tan(fv / 2) : 0;
+    cam.position.copy(photo.cam); cam.lookAt(photo.look.x, photo.look.y - up, photo.look.z);
+    cam.fov = THREE.MathUtils.radToDeg(fv); cam.aspect = aspect; cam.updateProjectionMatrix();
+  }
   function headPos(obj) {
     if (!obj) return null;
     obj.userData.head.getWorldPosition(tmp);
@@ -2035,11 +2108,59 @@ function createShop(canvas, opts) {
       if (mode !== view.mode) { view.yaw = 0; view.pitch = 0; view.zoom = 1; }
       view.mode = mode; view.seat = seat; api._hideMine();
     },
-    _hideMine() { seatAvatars.forEach((a, i) => { if (a) a.visible = !(view.mode === 'first' && i === view.seat); }); if (owner) owner.visible = view.mode !== 'owner'; },
+    _hideMine() { if (photo) return; seatAvatars.forEach((a, i) => { if (a) a.visible = !(view.mode === 'first' && i === view.seat); }); if (owner) owner.visible = view.mode !== 'owner'; },
     cheer(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.cheer = 2.2; },
     cheerAt(seat, e) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.cheer = Math.max(0.001, CHEER_T - e); },   // 確認用: 乾杯の途中の形
     cheerAll() { seatAvatars.forEach((a) => a && (a.userData.cheer = 2.2)); if (owner) owner.userData.cheer = 2.2; },
     talk(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.talk = 1.6; },
+    /* ---------- 記念撮影(大将の自撮り風) ----------
+       list = [{ key: 席の番号 か 'owner', pose, face }](写らない人は入れない)。何回よんでもよい(選びなおし・人の出入り) */
+    photoSet(list) {
+      if (!photo) photo = { cam: new THREE.Vector3(0, 1.66, 2.85), look: new THREE.Vector3(0, 1.56, 1.45), half: 0.6, top: 2.1, bot: 1.05 };
+      const want = new Set(list.map((p) => String(p.key)));
+      seatAvatars.forEach((a, i) => { if (!a) return; a.visible = want.has(String(i)); if (!a.visible) photoClear(a); });
+      if (owner) { owner.visible = want.has('owner'); if (!owner.visible) photoClear(owner); }
+      // 席の順(左から)に並べる。大将がいれば まん中の前。顔が上下に重なるように 前後2〜3列
+      // [横, 前後, 顔の高さ]。前の列(低い)・真ん中の列(高い)・うしろの列(いちばん高い)。顔どうしが少し重なるくらい ぎゅっと
+      const SL = [[0, 1.62, 1.38], [-0.3, 1.56, 1.33], [0.3, 1.56, 1.33], [-0.15, 1.36, 1.72], [0.15, 1.36, 1.72], [-0.45, 1.38, 1.67], [0.45, 1.38, 1.67],
+                  [0, 1.12, 2.02], [-0.3, 1.14, 1.98], [0.3, 1.14, 1.98], [-0.6, 1.5, 1.3], [0.6, 1.5, 1.3], [-0.75, 1.3, 1.66], [0.75, 1.3, 1.66]];
+      const own = list.find((p) => p.key === 'owner'), guests = list.filter((p) => p.key !== 'owner').sort((x, y) => x.key - y.key);
+      const slots = (own ? SL.slice(1, 1 + guests.length) : SL.slice(0, guests.length)).slice().sort((x, y) => x[0] - y[0]);
+      const place = (a, p, sl, isOwner) => {
+        const u = a.userData;
+        if (u.headOff == null) { const r = a.rotation.y; a.rotation.y = 0; a.updateMatrixWorld(true); u.head.getWorldPosition(tmp); u.headOff = tmp.y - a.position.y; a.rotation.y = r; }
+        a.position.set(sl[0], sl[2] - u.headOff, sl[1]);
+        a.rotation.y = Math.atan2(photo.cam.x - sl[0], photo.cam.z - sl[1]);
+        u.lookT = 0; u.lw = 0;
+        u.photo = { pose: p.pose || 'normal', face: p.face || 'smile', owner: isOwner, tilt: Math.max(-0.22, Math.min(0.22, -sl[0] * 0.3)) };
+      };
+      if (own && owner) place(owner, own, SL[0], true);
+      guests.forEach((p, k) => { const a = seatAvatars[p.key]; if (a && slots[k]) place(a, p, slots[k], false); });
+      const used = (own ? [SL[0]] : []).concat(slots);
+      photo.half = Math.max(0.5, ...used.map((sl) => Math.abs(sl[0]) + 0.38));   // 上げた手・ジョッキが切れないように
+      photo.top = Math.max(...used.map((sl) => sl[2])) + 0.26; photo.bot = Math.min(...used.map((sl) => sl[2])) - 0.3;
+      photo.look.y = (photo.top + photo.bot) / 2;
+    },
+    photoEnd() {
+      if (!photo) return; photo = null;
+      seatAvatars.forEach((a, i) => { if (!a) return; photoClear(a); a.position.set(seatX(i, N), STOOL_Y, GUEST_Z); a.rotation.y = Math.PI; });
+      if (owner) { photoClear(owner); owner.position.set(ownerTargetX, 0.88, OWNER_Z); owner.rotation.y = 0; }
+      api._hideMine();
+    },
+    get photoOn() { return !!photo; },
+    /* いまの集合の絵を、写真の大きさ(正方形。顔の集まりは横に広いので、足が写らず顔が大きい)で1枚 写しとる。画面と同じ色の仕上げにするため、一瞬だけ大きく描く */
+    capturePhoto(w = 1080, h = 1080) {
+      if (!photo) return null;
+      const pr = renderer.getPixelRatio(), sz = renderer.getSize(new THREE.Vector2()), cam = camera.clone();
+      cam.clearViewOffset(); photoCam(cam, w / h);
+      renderer.setPixelRatio(1); renderer.setSize(w, h, false);
+      renderer.render(scene, cam);
+      const c = document.createElement('canvas'); c.width = w; c.height = h; c.getContext('2d').drawImage(renderer.domElement, 0, 0, w, h);
+      renderer.setPixelRatio(pr); renderer.setSize(sz.x, sz.y, false);
+      renderer.render(scene, camera);
+      return c;
+    },
+    photoPoses: PHOTO_POSES, photoFaces: PHOTO_FACES,
     /* seat の人が target の人のほうを secs 秒 向く(target は 席の番号か 'owner') */
     lookAt(seat, target, secs) {
       const a = seat === 'owner' ? owner : seatAvatars[seat], t = target === 'owner' ? owner : seatAvatars[target];
