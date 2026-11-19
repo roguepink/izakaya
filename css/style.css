@@ -281,6 +281,29 @@ button.mini { background: rgba(0,0,0,.1); border-radius: 999px; width: 30px; hei
 .closing-box h2 { font-family: var(--mincho); margin: 0; font-size: 26px; }
 .closing-box p { color: var(--paper2); line-height: 1.7; margin: 0; }
 
+/* ---------- だれのコメントか分かるように・押すと その人あてに書く(2026-11-19) ---------- */
+.tag.tap { pointer-events: auto; cursor: pointer; }
+.tag.tap::after { content: ' 💬'; font-size: 9px; }
+.bubble.owner { background: #8c1d16; color: #fff; border: 2px solid var(--gold); font-weight: 700; }
+.bubble.owner::after { border-top-color: #8c1d16; }
+.bubble.owner .bn, .bubble.owner.moved .bn { display: block; color: var(--gold); }
+.bubble.owner .bn::before { content: '🏮 '; }
+.bubble.clamp .bt { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.log .ln { cursor: pointer; }
+.log .ln.owner { background: rgba(140,29,22,.9); border: 1px solid rgba(232,163,61,.75); color: #fff; }
+.log .ln.owner b { color: var(--gold); }
+.log .ln.new { background: rgba(255,232,170,.2); box-shadow: inset 3px 0 0 var(--gold); }
+@keyframes toFlash { 0% { box-shadow: 0 0 0 3px var(--gold); } 100% { box-shadow: 0 0 0 0 rgba(232,163,61,0); } }
+.chat textarea.to-flash { animation: toFlash 1.2s ease-out; }
+/* 大将の接客画面: 会話の欄を大きく、右のボタンは「☰」にたたむ */
+#bMore { display: none; }
+body.owner-view #bMore { display: flex; }
+body.owner-view:not(.side-open) .side > .sbtn:not(#bMore):not(#bOrders) { display: none; }
+body.owner-view .log { max-height: 27vh; font-size: 14.5px; background: rgba(20,12,8,.55); border-radius: 12px; padding: 14px 6px 6px; }
+body.owner-view .log .ln { background: rgba(255,255,255,.07); }
+body.owner-view .log .ln.owner { background: rgba(140,29,22,.9); }
+body.owner-view .log .ln.new { background: rgba(255,232,170,.2); }
+
 /* ---------- 横向き(スマホを横にしたとき) ---------- */
 @media (orientation: landscape) and (max-height: 520px) {
   .topbar { right: auto; width: min(46vw, 420px); padding: 5px 12px; font-size: 13px; }
@@ -294,6 +317,11 @@ button.mini { background: rgba(0,0,0,.1); border-radius: 999px; width: 30px; hei
   .bottom { right: auto; width: min(60vw, 560px); padding-left: calc(env(safe-area-inset-left, 0px) + 8px); }
   .log { display: none; }
   .log-wrap.big .log { display: flex; }
+  body.owner-view .log { display: flex; max-height: calc(100vh - 222px); max-height: calc(100dvh - 222px); font-size: 13px; }
+  body.owner-view.has-tv .log { max-height: calc(100vh - 300px); max-height: calc(100dvh - 300px); }
+  body.owner-view .bottom { width: min(40vw, 380px); background: linear-gradient(90deg, rgba(20,12,8,.75), rgba(20,12,8,.55)); }
+  body.owner-view .topbar { width: min(40vw, 380px); }
+  body.owner-view .np-row { max-width: min(40vw, 380px); }
   .log-btn { position: static; margin-left: auto; display: block; margin-bottom: 2px; }
   .log-wrap.big .log-btn { position: absolute; }
   .phrases button { padding: 4px 10px; font-size: 12.5px; }

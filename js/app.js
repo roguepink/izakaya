@@ -152,6 +152,7 @@
       scene = make2D();
     }
     scene.onTap = function (seat) { if (seat >= 0) onSeatTap(seat); };
+    scene.onAvatarTap = function (k) { replyToSeat(k, true); };
     scene.onItemTap = function (seat, key) { if (inside && seat === mySeat && !OWNER_MODE) eat(key); };
     scene.onTagTap = function (id) {   // 壁の木札を押すと、すぐ注文(取り消しもできる)
       if (!inside || OWNER_MODE) return;
@@ -374,7 +375,8 @@
     return 'matrix3d(' + [a / TVW, d / TVW, 0, g / TVW, b / TVH, e / TVH, 0, h / TVH, 0, 0, 1, 0, c, f, 0, 1].map(r).join(',') + ')';
   }
   function placeTV() {
-    var box = $('tv'); if (box.classList.contains('hidden')) return;
+    var box = $('tv'), hid = box.classList.contains('hidden'); if (document.body.classList.contains('has-tv') === hid) document.body.classList.toggle('has-tv', !hid);
+    if (hid) return;
     var css, mode;
     if (tvMode === 'big') {
       var vw = window.innerWidth, vh = window.innerHeight;
@@ -390,7 +392,8 @@
       if (q && wpx > 56 && seen > 0.72 && seen * (1 - hiddenByHead(q, headHull)) > 0.6) { css = quadMatrix(q); mode = 'monitor'; }   // 帯や大将の頭で半分近く隠れるなら小窓
       else {   // モニターが見えない向きは左上の小窓
         var sat = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
-        css = 'translate(10px,' + Math.round(sat + 92) + 'px) scale(' + ((tvTall ? 100 : 168) / TVW).toFixed(4) + ')'; mode = 'pip';
+        var small = OWNER_MODE && view === 'owner' && window.innerWidth > window.innerHeight && window.innerHeight < 520;   // 横向きの大将の画面は 小さめ(下に会話の欄)
+        css = 'translate(10px,' + Math.round(sat + (small ? 84 : 92)) + 'px) scale(' + ((tvTall ? (small ? 60 : 100) : (small ? 136 : 168)) / TVW).toFixed(4) + ')'; mode = 'pip';
       }
     }
     box.classList.toggle('pip', mode === 'pip');
@@ -710,7 +713,7 @@
 
   /* ---------------- 視点 ---------------- */
   var VIEW_NAMES = { first: '目線', back: '後ろ', overview: '全体', owner: '大将' };
-  function setView(v) { view = v; withScene(function (s) { s.setView(v, mySeat); }); $('bViewLbl').textContent = VIEW_NAMES[v] || '目線'; }
+  function setView(v) { view = v; document.body.classList.toggle('owner-view', OWNER_MODE && v === 'owner'); withScene(function (s) { s.setView(v, mySeat); }); $('bViewLbl').textContent = VIEW_NAMES[v] || '目線'; }
   $('bView').onclick = function () {
     var order = OWNER_MODE ? ['owner', 'overview'] : (mySeat >= 0 ? ['first', 'back', 'overview'] : ['overview']);
     var i = order.indexOf(view); setView(order[(i + 1) % order.length]);
@@ -736,7 +739,19 @@
     var log = $('log'); log.scrollTop = log.scrollHeight;
   }
   $('logBtn').onclick = function () { toggleLog(); };
-  $('log').addEventListener('click', function () { if (!document.querySelector('.log-wrap').classList.contains('big')) toggleLog(true); });
+  $('log').addEventListener('click', function (e) {
+    var ln = e.target.closest && e.target.closest('.ln[data-seat]'), big = document.querySelector('.log-wrap').classList.contains('big');
+    if (ln && !ln.getAttribute('data-me') && ln.getAttribute('data-seat') !== '') {
+      var k = ln.getAttribute('data-seat'); if (k !== 'owner') k = +k;
+      var nm = nameOfSeat(k) || (ln.querySelector('b') ? ln.querySelector('b').textContent.replace(/^🏮 /, '') : '');
+      if (k === 'owner' && OWNER_MODE) return;
+      if (big) toggleLog(false);
+      replyTo(nm, k === 'owner'); return;
+    }
+    if (!big) toggleLog(true);
+  });
+  /* 名札を押しても、その人あてに書ける */
+  $('tags').addEventListener('click', function (e) { var t = e.target.closest && e.target.closest('.tag[data-seat]'); if (t) { var k = t.getAttribute('data-seat'); replyToSeat(k === 'owner' ? 'owner' : +k, false); } });
   $('chatForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var t = $('chatInput').value.trim().slice(0, 500);
@@ -747,14 +762,41 @@
     net.push('chat', { uid: ME.uid, name: currentName(), seat: OWNER_MODE ? 'owner' : mySeat, owner: OWNER_MODE, text: t, at: TS });
     $('chatInput').value = ''; growInput();
   });
+  /* その人あてに書く: 入力欄の頭に「〇〇さん、」を入れる(前に別の人あてが入っていれば入れかえる)。みんなにも だれあてか分かる */
+  function nameOfSeat(k) {
+    if (k === 'owner') return ownerPresent() ? ((tree.state || {}).ownerName || SHOP.OWNER_NAME) : '';
+    var u = seatUid(+k), m = u && members()[u]; return m && fresh(m) ? m.name : '';
+  }
+  function replyTo(name, isOwner) {
+    if (!name || !inside) return;
+    if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return; }
+    var call = isOwner ? ((tree.state || {}).ownerRole === 'master' ? 'マスター、' : '大将、') : name + 'さん、';
+    var v = chatIn.value.replace(/^(大将|マスター|[^、\s]{1,16}さん)、/, '');
+    chatIn.value = call + v; growInput();
+    try { chatIn.focus(); chatIn.setSelectionRange(chatIn.value.length, chatIn.value.length); } catch (e) {}
+    chatIn.classList.remove('to-flash'); void chatIn.offsetWidth; chatIn.classList.add('to-flash');
+  }
+  function replyToSeat(k, fromAvatar) {
+    if (k === mySeat && !OWNER_MODE) return;
+    if (k === 'owner' && OWNER_MODE) return;
+    var nm = nameOfSeat(k); if (!nm) return;
+    replyTo(nm, k === 'owner');
+    if (OWNER_MODE && fromAvatar && typeof k === 'number') toast(nm + 'さんへ書けます', 2600, '🍶 料理を出す', function () { openSheet('seat', k); });
+  }
+  var SEAT_COLORS = ['#7ec8ff', '#ff9ec4', '#8fe39a', '#ffd36a', '#c9a8ff', '#7fe0d8', '#ffb07a', '#b8d86a', '#f0a0a0', '#a0c0f0'];
+  var lastOwnerAt = 0;
   function renderLog() {
-    var c = tree.chat || {}, keys = Object.keys(c).sort();
+    var c = tree.chat || {}, keys = Object.keys(c).sort(); lastOwnerAt = 0;
     var shown = keys.filter(function (k) { return (c[k].at || 0) >= joinAt - 10 * MIN; }).slice(-120);
+    shown.forEach(function (k) { if (c[k].owner) lastOwnerAt = Math.max(lastOwnerAt, c[k].at || 0); });
     var log = $('log'), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
     var html = shown.map(function (k) {
       var m = c[k];
       if (m.sys) return '<div class="ln sys">' + esc(m.text) + '</div>';
-      return '<div class="ln' + (m.owner ? ' owner' : '') + '"><b>' + esc(m.name || '') + '</b>' + esc(m.text) + '</div>';
+      if (m.owner) { return '<div class="ln owner" data-seat="owner"><b>🏮 ' + esc(m.name || '') + '</b>' + esc(m.text) + '</div>'; }
+      var col = typeof m.seat === 'number' ? SEAT_COLORS[m.seat % SEAT_COLORS.length] : '';
+      var fresh2 = OWNER_MODE && (m.at || 0) > lastOwnerAt && m.uid !== ME.uid;   // 大将が まだ返事していない新しいコメント
+      return '<div class="ln' + (fresh2 ? ' new' : '') + '" data-seat="' + (typeof m.seat === 'number' ? m.seat : '') + '"' + (m.uid === ME.uid ? ' data-me="1"' : '') + '><b' + (col ? ' style="color:' + col + '"' : '') + '>' + esc(m.name || '') + '</b>' + esc(m.text) + '</div>';
     }).join('');
     if (log._h !== html) { log.innerHTML = html; log._h = html; if (atBottom || true) log.scrollTop = log.scrollHeight; }
     keys.forEach(function (k) {
@@ -775,7 +817,7 @@
     if (!b) { b = bubbles[key] = { el: document.createElement('div'), bn: document.createElement('div'), bt: document.createElement('div') }; b.bn.className = 'bn'; b.bt.className = 'bt'; b.el.appendChild(b.bn); b.el.appendChild(b.bt); }
     b.el.style.display = 'none';   // 中身が変わったら、次に置き場所が決まるまで隠す(古い場所で一瞬重ならないように)
     $('bubbles').appendChild(b.el);   // いちばん新しい吹き出しを、いちばん手前に
-    b.el.className = 'bubble' + (phrase ? ' phrase' : '') + (text.length > 50 ? ' long' : '');
+    b.el.className = 'bubble' + (phrase ? ' phrase' : '') + (key === 'owner' ? ' owner' : '') + (text.length > 50 ? ' long' : '');
     b.bt.textContent = text; b.bt.scrollTop = 0;
     b.start = Date.now();
     b.until = b.start + Math.min(20000, 3500 + text.length * 90);
@@ -811,11 +853,12 @@
     var put = function (key, cls, text, p, click) { if (!p) return; var t = tagEl(key, cls, text, click); t.style.left = p.x + 'px'; t.style.top = p.y + 'px'; t.style.display = ''; used[key] = 1; };
     if (showTags) {
       var st = tree.state || {};
-      put('owner', 'owner', ownerLabel() + (ownerPresent() ? '' : '(おまかせ中)'), a.owner);
+      if (!(OWNER_MODE && view === 'owner')) put('owner', OWNER_MODE || !ownerPresent() ? 'owner' : 'owner tap', ownerLabel() + (ownerPresent() ? '' : '(おまかせ中)'), a.owner);
+      if (tagEls.owner) { if (OWNER_MODE || !ownerPresent()) tagEls.owner.removeAttribute('data-seat'); else tagEls.owner.setAttribute('data-seat', 'owner'); }
       var resv = reservationsNow();
       for (var i = 0; i < N; i++) {
         var uid = seatUid(i), m = uid && ms[uid];
-        if (m && fresh(m)) { put('s' + i, uid === ME.uid ? 'me' : '', m.name + (uid === ME.uid ? '(あなた)' : ''), a.seats[i]); continue; }
+        if (m && fresh(m)) { put('s' + i, uid === ME.uid ? 'me' : 'tap', m.name + (uid === ME.uid ? '(あなた)' : ''), a.seats[i]); var tg = tagEls['s' + i]; if (tg) { if (uid === ME.uid) tg.removeAttribute('data-seat'); else tg.setAttribute('data-seat', i); } continue; }
         var r = resv[i];
         if (r) {   // 予約済みの席は、だれにでも名前が見える
           (function (k, rr) { put('e' + k, rr.uid === ME.uid ? 'free mine' : 'reserved', rr.uid === ME.uid ? 'ご予約の席(あなた)' : '予約済み ' + rr.name + 'さま', a.empty[k], function () { onSeatTap(k); }); })(i, r);
@@ -836,9 +879,11 @@
     var t = Date.now();
     var topEl = document.querySelector('.topbar');
     var topLimit = (topEl && topEl.offsetParent ? topEl.getBoundingClientRect().bottom : 50) + 6;
+    var npEl = document.querySelector('.np-row');   // 曲名の帯にも かぶらないように
+    if (npEl && npEl.offsetParent && npEl.getBoundingClientRect().height) topLimit = Math.max(topLimit, npEl.getBoundingClientRect().bottom + 4);
     var list = [];
     Object.keys(bubbles).forEach(function (k) {
-      var b = bubbles[k], p = k === 'owner' ? a.owner : a.seats[+k];
+      var b = bubbles[k], p = k === 'owner' ? (OWNER_MODE && view === 'owner' ? null : a.owner) : a.seats[+k];
       if (!p || t > b.until + 500) { b.el.remove(); delete bubbles[k]; return; }
       list.push({ k: k, b: b, p: p });
     });
@@ -856,7 +901,9 @@
       b.el.classList.remove('moved');   // 測る前に、名前の行を消しておく(ずらすときに付けて、測りなおす)
       // まず、頭の上から上の端までを使える高さにして、自然な大きさを測る
       var T = p.y;                                   // 吹き出しの「しっぽの先」の位置
-      b.bt.style.maxHeight = Math.max(MIN_TEXT, Math.min(T - TAIL - topLimit - 16, share - 16)) + 'px';
+      var ov = OWNER_MODE && view === 'owner';   // 大将の接客画面: 吹き出しは3行まで(全文は下の会話の欄)
+      b.bt.style.maxHeight = (ov ? 62 : Math.max(MIN_TEXT, Math.min(T - TAIL - topLimit - 16, share - 16))) + 'px';
+      b.el.classList.toggle('clamp', ov);
       var w = b.el.offsetWidth, h = b.el.offsetHeight;
       var land = window.innerWidth > window.innerHeight && window.innerHeight < 520;   // 横向きはボタンが上に並ぶので右も使える
       var hw = Math.min(w, window.innerWidth - 100) / 2 + 6;
@@ -886,7 +933,7 @@
       }
       // 入りきらない文字は、中でゆっくり上に流す
       var over = b.bt.scrollHeight - b.bt.clientHeight;
-      if (over > 2) {
+      if (over > 2 && !ov) {
         b.el.classList.add('scroll');
         b.bt.scrollTop = Math.max(0, Math.min(over, (t - b.start - WAIT) / 1000 * SPEED));
         b.until = Math.max(b.until, b.start + WAIT + over / SPEED * 1000 + 3500);
@@ -1389,6 +1436,9 @@
   $('bOrders').onclick = function () { openSheet('orders'); };
   $('bOwner').onclick = function () { openSheet('owner'); };
   $('bBot').onclick = function () { openSheet('bot'); };
+  /* 大将の接客画面の「☰」: 右のボタンを出す・しまう。ほかのボタンを押したら しまう */
+  $('bMore').onclick = function () { var o = document.body.classList.toggle('side-open'); $('bMoreLbl').textContent = o ? 'しまう' : 'メニュー'; };
+  document.querySelectorAll('.side > .sbtn').forEach(function (b) { if (b.id !== 'bMore') b.addEventListener('click', function () { document.body.classList.remove('side-open'); $('bMoreLbl').textContent = 'メニュー'; }); });
 
   /* ---------------- おためし客(おためしモードだけ) ---------------- */
   var bots = {};
@@ -1483,6 +1533,16 @@
     { name: '甚平', top: 'jinbei', topColor: 4, head: 'nejiri', apron: 'none' },
     { name: 'Tシャツと前掛け', top: 'tee', topColor: 1, head: 'bandana', apron: 'black' }
   ];
+  /* 女性の大将(女将・看板娘)の着こなし。かわいらしい お店の衣装 */
+  var OWNER_PRESETS_F = [
+    { name: '看板娘(着物)', top: 'kimono', topColor: 8, head: 'kanzashi', apron: 'frill' },
+    { name: '割烹着の女将', top: 'kappogi', topColor: 2, head: 'sankaku', apron: 'none' },
+    { name: '浴衣', top: 'yukata', topColor: 7, head: 'flower', apron: 'none' },
+    { name: 'はっぴ娘', top: 'happi', topColor: 8, head: 'hachimaki', apron: 'pink' },
+    { name: 'カフェ風', top: 'blouse', topColor: 9, head: 'ribbon', apron: 'pinkfrill' },
+    { name: '作務衣', top: 'samue', topColor: 4, head: 'band', apron: 'red' }
+  ];
+  function ownerPresets() { return draft && draft.sex === 'f' ? OWNER_PRESETS_F : OWNER_PRESETS; }
   var preview = null, draft = null, mkTab = 0;
   function sexLabel(x) { return x === 'f' ? '女性' : '男性'; }
   var GUEST_TABS = [
@@ -1508,8 +1568,8 @@
     { name: 'おまかせ', build: function () {
       var h = '<div class="mk-sex">大将のアバター(' + sexLabel(draft.sex) + ') <button data-resex="1">女性/男性を選びなおす</button></div>';
       h += '<div class="mk-sec">大将の着こなし</div><div class="presets">';
-      OWNER_PRESETS.forEach(function (p, i) { h += '<button data-opreset="' + i + '">' + esc(p.name) + '</button>'; });
-      return h + '</div><div class="mk-sec">はちまき・前掛けなど お店の人の服は、大将だけが着られます</div>';
+      ownerPresets().forEach(function (p, i) { h += '<button data-opreset="' + i + '">' + esc(p.name) + '</button>'; });
+      return h + '</div><div class="mk-sec">' + (draft.sex === 'f' ? '着物・割烹着・フリルエプロンなど、女将・看板娘の服も選べます。' : '') + 'はちまき・前掛けなど お店の人の服は、大将だけが着られます</div>';
     } },
     GUEST_TABS[1], GUEST_TABS[2], GUEST_TABS[3],
     { name: '大将の服', build: function () { return opts('服', 'top') + swatch('服の色', 'topColor', AVATAR.CLOTH_COLOR); } },
@@ -1541,7 +1601,7 @@
   }
   function chooseSex(sx) {
     var keep = draft ? { voice: draft.voice, size: draft.size } : {};
-    if (OWNER_MODE) { var o = JSON.parse(JSON.stringify(AVATAR.OWNER)); o.sex = sx; if (sx === 'f') { o.hair = 'bun'; o.eyes = 'big'; o.brows = 'soft'; o.mouth = 'smile'; o.voice = 2; } draft = AVATAR.fix(o); }
+    if (OWNER_MODE) { var o = JSON.parse(JSON.stringify(AVATAR.OWNER)); o.sex = sx; if (sx === 'f') { var fp = OWNER_PRESETS_F[0]; o.hair = 'bun'; o.bangs = 'seethrough'; o.eyes = 'big'; o.brows = 'soft'; o.mouth = 'smile'; o.face = 'egg'; o.skin = 1; o.hairColor = 1; o.lip = 1; o.cheek = 2; o.size = 1; o.voice = 2; o.top = fp.top; o.topColor = fp.topColor; o.head = fp.head; o.apron = fp.apron; } draft = AVATAR.fix(o); }
     else { var p = JSON.parse(JSON.stringify(AVATAR.PRESETS[sx][0])); p.sex = sx; p.voice = sx === 'f' ? 2 : 1; draft = AVATAR.fix(p); }
     if (keep.size) draft.size = keep.size;
     mkTab = 0; sexStep = false; updateDraft(); renderMaker();
@@ -1596,7 +1656,7 @@
       b.onclick = function () { var p = JSON.parse(JSON.stringify(AVATAR.PRESETS[draft.sex][+b.getAttribute('data-preset')])); p.sex = draft.sex; p.voice = draft.voice; p.size = draft.size; draft = AVATAR.fix(p); updateDraft(); renderMaker(); };
     });
     body.querySelectorAll('[data-opreset]').forEach(function (b) {
-      b.onclick = function () { var p = OWNER_PRESETS[+b.getAttribute('data-opreset')]; ['top', 'topColor', 'head', 'apron'].forEach(function (k) { draft[k] = p[k]; }); draft = AVATAR.fix(draft); updateDraft(); renderMaker(); };
+      b.onclick = function () { var p = ownerPresets()[+b.getAttribute('data-opreset')]; ['top', 'topColor', 'head', 'apron'].forEach(function (k) { draft[k] = p[k]; }); draft = AVATAR.fix(draft); updateDraft(); renderMaker(); };
     });
     var rs = body.querySelector('[data-resex]'); if (rs) rs.onclick = function () { sexStep = true; renderMaker(); };
     body.querySelectorAll('[data-free]').forEach(function (inp) {
@@ -1609,7 +1669,7 @@
   $('makerBtn').onclick = function () { unlockAudio(); openMaker(); };
   $('mkRandom').onclick = function () {
     if (!draft) return;
-    if (OWNER_MODE) { var p = OWNER_PRESETS[Math.floor(Math.random() * OWNER_PRESETS.length)]; ['top', 'topColor', 'head', 'apron'].forEach(function (k) { draft[k] = p[k]; }); var r = AVATAR.random(draft.sex); ['hair', 'hairColor', 'eyes', 'brows', 'mouth', 'face', 'skin'].forEach(function (k) { draft[k] = r[k]; }); draft = AVATAR.fix(draft); }
+    if (OWNER_MODE) { var OP = ownerPresets(), p = OP[Math.floor(Math.random() * OP.length)]; ['top', 'topColor', 'head', 'apron'].forEach(function (k) { draft[k] = p[k]; }); var r = AVATAR.random(draft.sex); ['hair', 'hairColor', 'eyes', 'brows', 'mouth', 'face', 'skin'].forEach(function (k) { draft[k] = r[k]; }); draft = AVATAR.fix(draft); }
     else { var v = draft.voice; draft = AVATAR.random(draft.sex); draft.voice = v; }
     updateDraft(); renderMaker();
   };

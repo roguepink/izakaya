@@ -53,6 +53,15 @@ var AVATAR = {
     head:  [['none', 'なし'], ['hachimaki', 'はちまき'], ['nejiri', 'ねじりはちまき'], ['tenugui', '手ぬぐい'], ['itamae', '板前帽'], ['bandana', 'バンダナ']],
     apron: [['none', 'なし'], ['navy', '紺の前掛け'], ['black', '黒の前掛け'], ['white', '白の前掛け'], ['brown', '茶の前掛け']]
   },
+  /* 女性の大将(女将・看板娘)だけの服と小物。かわいらしい お店の衣装。上の大将の服も そのまま選べる */
+  OWNER_PARTS_F: {
+    top:   [['kimono', '着物とたすき'], ['yukata', '浴衣'], ['kappogi', '割烹着(かっぽうぎ)'], ['blouse', 'ブラウス(カフェ風)'],
+            ['happi', '法被(はっぴ)'], ['samue', '作務衣(さむえ)'], ['hakui', '板前の白衣'], ['jinbei', '甚平'], ['tee', 'Tシャツ']],
+    head:  [['none', 'なし'], ['kanzashi', 'かんざし'], ['flower', '花の髪かざり'], ['sankaku', '三角巾'], ['ribbon', 'リボン'], ['band', 'カチューシャ'],
+            ['hachimaki', 'はちまき'], ['nejiri', 'ねじりはちまき'], ['tenugui', '手ぬぐい'], ['bandana', 'バンダナ']],
+    apron: [['none', 'なし'], ['frill', '白のフリルエプロン'], ['pinkfrill', 'ピンクのフリルエプロン'], ['pink', 'ピンクの前掛け'], ['red', '赤の前掛け'],
+            ['navy', '紺の前掛け'], ['black', '黒の前掛け'], ['white', '白の前掛け'], ['brown', '茶の前掛け']]
+  },
   SIZE_MIN: 0.88, SIZE_MAX: 1.12,
   VOICES: [
     { name: '男性・低め', pitch: 0.75, rate: 1.0 },
@@ -88,6 +97,7 @@ var AVATAR = {
   /* その人が選べる部品の一覧 */
   parts: function (a, key) {
     var S = AVATAR.SEX[a.sex] || AVATAR.SEX.m;
+    if (a.owner && a.sex === 'f' && AVATAR.OWNER_PARTS_F[key]) return AVATAR.OWNER_PARTS_F[key];
     if (a.owner && AVATAR.OWNER_PARTS[key]) return AVATAR.OWNER_PARTS[key];
     return S[key] || AVATAR.COMMON[key] || [];
   },

@@ -514,7 +514,8 @@ const TOP_DEF = {
   suit: { sleeve: 'long' }, suitopen: { sleeve: 'long' }, shirt: { sleeve: 'long' }, polo: { sleeve: 'short' }, knit: { sleeve: 'long', tex: 'rib' }, hoodie: { sleeve: 'long' },
   jacket: { sleeve: 'long' }, denim: { sleeve: 'long', color: '#4a6a9a', tex: 'denim' }, work: { sleeve: 'long' }, tee: { sleeve: 'short' },
   blouse: { sleeve: 'puff' }, onepiece: { sleeve: 'short', skirt: true }, cardigan: { sleeve: 'long', tex: 'rib' }, office: { sleeve: 'long', skirt: true }, pantsuit: { sleeve: 'long', pants: 'same' },
-  happi: { sleeve: 'wide' }, samue: { sleeve: 'long' }, hakui: { sleeve: 'long', color: '#f4f2ec' }, jinbei: { sleeve: 'wide' }
+  happi: { sleeve: 'wide' }, samue: { sleeve: 'long' }, hakui: { sleeve: 'long', color: '#f4f2ec' }, jinbei: { sleeve: 'wide' },
+  kimono: { sleeve: 'long' }, yukata: { sleeve: 'wide' }, kappogi: { sleeve: 'long', color: '#f8f6f0' }
 };
 const TEX_CACHE = {};
 function fabricTex(kind) {
@@ -573,6 +574,18 @@ function buildTop(body, a, f, cc) {
       put(onChest(new THREE.CircleGeometry(0.03, 20), f, 0.07, 0.24, 0.006), W, 0.002); break;
     case 'samue': crossCollar(shade(cc, 0.72), 0.026); body.add(tm(new THREE.CylinderGeometry(0.145, 0.146, 0.02, 28), shade(cc, 0.7), 0, 0.12, 0, 0.002)); break;
     case 'hakui': crossCollar('#e8e4da', 0.03); { const st = tm(new THREE.CylinderGeometry(0.05, 0.054, 0.035, 18, 1, true), '#f4f2ec', 0, 0.44, 0, 0.002); body.add(st); } buttons(3, 0.06, '#d8d4c8', 0.3, 0.07); break;
+    case 'kimono': case 'yukata': {   // 着物・浴衣: えり + 帯(+ 帯じめ)。着物は赤いたすき、浴衣は白い花のがら
+      const kim = a.top === 'kimono';
+      if (kim) crossCollar('#f8f4ea', 0.03); crossCollar(shade(cc, 0.78), kim ? 0.016 : 0.026);
+      const obi = (y, h, color, out) => { const r = torsoR(f, y) + out; const m = tm(new THREE.CylinderGeometry(r, r, h, 28, 1, true), color, 0, y, 0, 0.002); m.scale.z = 0.74; body.add(m); };
+      obi(0.17, kim ? 0.1 : 0.075, kim ? '#e8c06a' : '#c8304a', 0.01); obi(0.17, 0.012, kim ? '#c8304a' : '#f6e27a', 0.016);
+      if (kim) [-1, 1].forEach((s2) => put(onChest(shapeGeo([[s2 * 0.088, 0.405], [s2 * 0.104, 0.41], [s2 * 0.134, 0.29], [s2 * 0.12, 0.285]], 0.003, 0.001), f, 0, 0, 0.012), '#d0283a'));
+      else [[-0.07, 0.33], [0.055, 0.3], [-0.035, 0.07], [0.08, 0.06], [0.0, 0.37]].forEach(([x, y]) => {
+        for (let k = 0; k < 5; k++) { const an = k / 5 * Math.PI * 2; put(onChest(new THREE.CircleGeometry(0.008, 10), f, x + Math.cos(an) * 0.009, y + Math.sin(an) * 0.009, 0.005), '#fbf6ee', 0); }
+        put(onChest(new THREE.CircleGeometry(0.005, 8), f, x, y, 0.007), '#f2c84a', 0);
+      });
+      break; }
+    case 'kappogi': neckRib('#e8e4da', 0.047); pocket(0.065, 0.12, '#ece8de'); hem('#e8e4da'); break;
     case 'jinbei': crossCollar(shade(cc, 0.8), 0.028); [-1, 1].forEach((s) => put(onChest(shapeGeo([[-0.022, 0.003], [0.022, 0.003], [0.022, -0.003], [-0.022, -0.003]], 0.003, 0), f, s * 0.05, 0.2, 0.008), shade(cc, 0.65), 0)); break;
   }
   return TOP_DEF[a.top] && TOP_DEF[a.top].skirt ? 'skirt' : '';
@@ -733,23 +746,38 @@ function buildAcc(head, body, a, R, f) {
   if (!a.owner && (a.acc === 'earring')) [-1, 1].forEach((s) => { head.add(tm(new THREE.SphereGeometry(0.012, 8, 6), '#e8c84a', R * 0.98 * s, -R * 0.28, 0)); head.add(tm(new THREE.TorusGeometry(0.014, 0.003, 6, 12), '#e8c84a', R * 0.98 * s, -R * 0.36, 0)); });
   if (!a.owner && a.acc === 'necklace') { const n = new THREE.Mesh(new THREE.TorusGeometry(0.075, 0.004, 6, 24, Math.PI), new THREE.MeshBasicMaterial({ color: '#d8b84a' })); n.rotation.set(Math.PI / 2 + 0.5, 0, Math.PI); n.position.set(0, 0.42, 0.003); body.add(n); body.add(tm(new THREE.SphereGeometry(0.012, 8, 6), '#e8e8f0', 0, 0.355, 0.11)); }
   if (a.owner) {
+    const Rh = f ? R * 1.2 : R;   // 女性は髪がふくらんでいるので、頭の飾りを ひとまわり大きく(髪にうもれないように)
     switch (a.head) {
-      case 'hachimaki': case 'nejiri': {
-        const band = tm(new THREE.TorusGeometry(R * 1.03, a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), '#f6f4ee', 0, R * 0.3, 0, 0.003); band.rotation.x = Math.PI / 2 + 0.15; head.add(band);
-        if (a.head === 'nejiri') for (let k = 0; k < 24; k++) { const ang = k / 24 * Math.PI * 2; head.add(tm(new THREE.BoxGeometry(0.006, 0.03, 0.01), '#2a3a6a', Math.sin(ang) * R * 1.04, R * 0.3 + Math.cos(ang) * R * 0.15 * 0.98, Math.cos(ang) * R * 1.04)); }
-        const knot = tm(new THREE.SphereGeometry(0.025, 8, 6), '#f6f4ee', 0, R * 0.25, -R * 1.02, 0.003); head.add(knot);
-        [-1, 1].forEach((s) => { const tl = tm(new THREE.BoxGeometry(0.03, 0.09, 0.006), '#f6f4ee', s * 0.03, R * 0.12, -R * 1.04); tl.rotation.z = s * 0.4; head.add(tl); });
+      case 'hachimaki': case 'nejiri': { const Rb = f ? R * 0.98 : R;
+        const band = tm(new THREE.TorusGeometry(Rb * 1.03, a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), '#f6f4ee', 0, Rb * 0.3, 0, 0.003); band.rotation.x = Math.PI / 2 + 0.15; head.add(band);
+        if (a.head === 'nejiri') for (let k = 0; k < 24; k++) { const ang = k / 24 * Math.PI * 2; head.add(tm(new THREE.BoxGeometry(0.006, 0.03, 0.01), '#2a3a6a', Math.sin(ang) * Rb * 1.04, Rb * 0.3 + Math.cos(ang) * Rb * 0.15 * 0.98, Math.cos(ang) * Rb * 1.04)); }
+        const knot = tm(new THREE.SphereGeometry(0.025, 8, 6), '#f6f4ee', 0, Rb * 0.25, -Rb * 1.02, 0.003); head.add(knot);
+        [-1, 1].forEach((s) => { const tl = tm(new THREE.BoxGeometry(0.03, 0.09, 0.006), '#f6f4ee', s * 0.03, Rb * 0.12, -Rb * 1.04); tl.rotation.z = s * 0.4; head.add(tl); });
         break; }
-      case 'tenugui': { const c = tm(new THREE.SphereGeometry(R * 1.1, 26, 14, 0, Math.PI * 2, 0, 1.2), '#2a3a6a', 0, 0, 0, 0.003); c.rotation.x = -0.25; head.add(c);
-        for (let k = 0; k < 10; k++) head.add(tm(new THREE.SphereGeometry(0.01, 6, 5), '#f6f4ee', Math.sin(k * 1.9) * R * 0.6, R * 0.8 + Math.cos(k * 2.3) * R * 0.1, Math.cos(k * 1.9) * R * 0.5));
-        head.add(tm(new THREE.SphereGeometry(0.025, 8, 6), '#2a3a6a', 0, R * 0.35, -R * 1.02, 0.003)); break; }
-      case 'itamae': { const c = tm(new THREE.CylinderGeometry(R * 0.95, R * 1.0, R * 0.9, 24), '#f6f4ee', 0, R * 0.8, -R * 0.05, 0.003); head.add(c); break; }
-      case 'bandana': { const c = tm(new THREE.SphereGeometry(R * 1.1, 26, 14, 0, Math.PI * 2, 0, 1.3), '#8a1f2a', 0, 0, 0, 0.003); c.rotation.x = -0.2; head.add(c);
-        for (let k = 0; k < 14; k++) head.add(tm(new THREE.SphereGeometry(0.008, 6, 5), '#f6f4ee', Math.sin(k * 2.1) * R * 0.7, R * 0.7 + Math.cos(k * 1.3) * R * 0.15, Math.cos(k * 2.1) * R * 0.6));
-        head.add(tm(new THREE.ConeGeometry(0.03, 0.08, 4), '#8a1f2a', 0, R * 0.2, -R * 1.08, 0.003)); break; }
+      case 'tenugui': { const c = tm(new THREE.SphereGeometry(Rh * 1.1, 26, 14, 0, Math.PI * 2, 0, 1.2), '#2a3a6a', 0, 0, 0, 0.003); c.rotation.x = -0.25; head.add(c);
+        for (let k = 0; k < 10; k++) head.add(tm(new THREE.SphereGeometry(0.01, 6, 5), '#f6f4ee', Math.sin(k * 1.9) * Rh * 0.6, Rh * 0.8 + Math.cos(k * 2.3) * Rh * 0.1, Math.cos(k * 1.9) * Rh * 0.5));
+        head.add(tm(new THREE.SphereGeometry(0.025, 8, 6), '#2a3a6a', 0, Rh * 0.35, -Rh * 1.02, 0.003)); break; }
+      case 'itamae': { const c = tm(new THREE.CylinderGeometry(Rh * 0.95, Rh * 1.0, Rh * 0.9, 24), '#f6f4ee', 0, Rh * 0.8, -Rh * 0.05, 0.003); head.add(c); break; }
+      case 'kanzashi': { const g = new THREE.Group(); g.position.set(Rh * 0.42, Rh * 0.74, -Rh * 0.5); g.rotation.z = -0.9; g.scale.setScalar(1.5);   // かんざし: 金の棒 + 赤い玉 + 下がる飾り
+        g.add(tm(new THREE.CylinderGeometry(0.005, 0.005, Rh * 1.1, 6), '#d8b04a', 0, 0, 0)); g.add(tm(new THREE.SphereGeometry(Rh * 0.13, 12, 10), '#d8304a', 0, Rh * 0.55, 0, 0.002));
+        for (let k = 0; k < 5; k++) { const an = k / 5 * Math.PI * 2; g.add(tm(new THREE.SphereGeometry(Rh * 0.07, 8, 6), '#f6a8c0', Math.cos(an) * Rh * 0.13, Rh * 0.55 + Math.sin(an) * Rh * 0.13, Rh * 0.06)); }
+        [-1, 1].forEach((s2) => { g.add(tm(new THREE.CylinderGeometry(0.0015, 0.0015, Rh * 0.35, 4), '#d8b04a', s2 * Rh * 0.08, Rh * 0.32, Rh * 0.05)); g.add(tm(new THREE.SphereGeometry(Rh * 0.045, 8, 6), '#f2d64a', s2 * Rh * 0.08, Rh * 0.14, Rh * 0.05)); });
+        head.add(g); break; }
+      case 'flower': { const g = new THREE.Group(); g.position.set(Rh * 0.78, Rh * 0.52, Rh * 0.28); g.rotation.y = 1.0; g.scale.setScalar(1.45);   // 花の髪かざり(耳の上)
+        for (let k = 0; k < 5; k++) { const an = k / 5 * Math.PI * 2; const pt = tm(new THREE.SphereGeometry(Rh * 0.13, 12, 8), '#f28aa8', Math.cos(an) * Rh * 0.15, Math.sin(an) * Rh * 0.15, 0, 0.002); pt.scale.z = 0.45; g.add(pt); }
+        g.add(tm(new THREE.SphereGeometry(Rh * 0.09, 10, 8), '#f6d64a', 0, 0, Rh * 0.04)); head.add(g); break; }
+      case 'sankaku': { const c = tm(new THREE.SphereGeometry(Rh * 1.1, 26, 14, 0, Math.PI * 2, 0, 1.25), '#fbf4f0', 0, 0, 0, 0.003); c.rotation.x = -0.22; head.add(c);   // 三角巾(白にピンクの水玉)
+        for (let k = 0; k < 18; k++) { const th = 0.25 + (k % 4) * 0.24, ph = k * 2.4, rr = Rh * 1.1 * 1.01; c.add(tm(new THREE.SphereGeometry(0.011, 6, 5), '#ee7a9a', Math.sin(th) * Math.cos(ph) * rr, Math.cos(th) * rr, Math.sin(th) * Math.sin(ph) * rr)); }
+        head.add(tm(new THREE.ConeGeometry(0.032, 0.085, 4), '#fbf4f0', 0, Rh * 0.22, -Rh * 1.08, 0.003)); break; }
+      case 'ribbon': { const g = new THREE.Group(); g.position.set(Rh * 0.55, Rh * 0.8, Rh * 0.05); g.rotation.set(0, 0.5, -0.55); g.scale.setScalar(1.4); [-1, 1].forEach((s2) => { const w = tm(new THREE.ConeGeometry(0.045, 0.08, 4), '#e86a8a', s2 * 0.04, 0, 0, 0.003); w.rotation.z = s2 * Math.PI / 2; g.add(w); }); g.add(tm(new THREE.SphereGeometry(0.017, 8, 6), '#c84a6a')); head.add(g); break; }
+      case 'band': { const holder = new THREE.Group(); holder.rotation.x = 0.3; holder.position.y = Rh * 0.02; holder.add(new THREE.Mesh(new THREE.TorusGeometry(f ? R * 1.13 : R * 1.15, 0.015, 6, 30, Math.PI), toon('#e85a7a'))); head.add(holder); break; }
+      case 'bandana': { const c = tm(new THREE.SphereGeometry(Rh * 1.1, 26, 14, 0, Math.PI * 2, 0, 1.3), '#8a1f2a', 0, 0, 0, 0.003); c.rotation.x = -0.2; head.add(c);
+        for (let k = 0; k < 14; k++) head.add(tm(new THREE.SphereGeometry(0.008, 6, 5), '#f6f4ee', Math.sin(k * 2.1) * Rh * 0.7, Rh * 0.7 + Math.cos(k * 1.3) * Rh * 0.15, Math.cos(k * 2.1) * Rh * 0.6));
+        head.add(tm(new THREE.ConeGeometry(0.03, 0.08, 4), '#8a1f2a', 0, Rh * 0.2, -Rh * 1.08, 0.003)); break; }
     }
+    const put2 = (geo, color) => { const m = tm(geo, color, 0, 0, 0, 0.002); body.add(m); return m; };
     if (a.apron && a.apron !== 'none') {   // 前掛け: 下の角が丸く、体に そって 曲がった布 + 腰ひも + ポケット
-      const ac = { navy: '#1f2a4a', black: '#1a1a1e', white: '#f2efe6', brown: '#6a4428' }[a.apron];
+      const ac = { navy: '#1f2a4a', black: '#1a1a1e', white: '#f2efe6', brown: '#6a4428', pink: '#e88aa8', red: '#b8282c', frill: '#fbf8f2', pinkfrill: '#f4b0c2' }[a.apron] || '#1f2a4a';
       const W2 = 0.15, top = 0.13, bot = -0.3, rc = 0.03, pts = [];
       pts.push([-W2, top], [W2, top]);
       for (let k = 0; k <= 6; k++) { const an = (k / 6) * Math.PI / 2; pts.push([W2 - rc + Math.sin(an) * rc * 0, bot + rc - Math.sin(an) * rc]); }
@@ -759,12 +787,19 @@ function buildAcc(head, body, a, R, f) {
       for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), an = x / Rr; const sway = y < 0 ? -y * 0.15 : 0; p.setXYZ(i, Math.sin(an) * (Rr + z), y, Math.cos(an) * (Rr + z) * 0.78 + sway + 0.012); }
       g.computeVertexNormals();
       const ap = tm(g, ac, 0, 0, 0, 0.003); body.add(ap);
-      body.add(tm(new THREE.CylinderGeometry(0.152, 0.154, 0.028, 28), shade(ac, 0.85), 0, top, 0, 0.002));   // 腰ひも
+      { const rw = torsoR(f, top) + 0.012, wb = tm(new THREE.CylinderGeometry(rw, rw, 0.028, 28, 1, true), shade(ac, 0.85), 0, top, 0, 0.002); wb.scale.z = 0.74; body.add(wb); }   // 腰ひも(体にそわせる)
       const knot = tm(new THREE.SphereGeometry(0.018, 10, 8), shade(ac, 0.85), 0, top, -0.115, 0.002); body.add(knot);
       [-1, 1].forEach((s2) => { const tl = tm(new THREE.BoxGeometry(0.02, 0.09, 0.006), shade(ac, 0.85), s2 * 0.02, top - 0.05, -0.118, 0.002); tl.rotation.z = s2 * 0.25; body.add(tl); });
       const pk = shapeGeo([[-0.05, 0.03], [0.05, 0.03], [0.05, -0.03], [-0.05, -0.03]], 0.003, 0.001), pp = pk.attributes.position;
       for (let i = 0; i < pp.count; i++) { const x = pp.getX(i), y = pp.getY(i) - 0.08, z = pp.getZ(i), an = x / Rr; pp.setXYZ(i, Math.sin(an) * (Rr + 0.006 + z), y, Math.cos(an) * (Rr + 0.006 + z) * 0.78 + 0.08 * 0.15 + 0.014); }
       pk.computeVertexNormals(); body.add(tm(pk, lighten(ac, 0.12), 0, 0, 0, 0.002));
+      if (/frill/.test(a.apron)) {   // フリルエプロン: 胸当て + 肩ひも + すそと胸のフリル
+        const fc = lighten(ac, 0.25);
+        put2(onChest(shapeGeo([[-0.072, 0.2], [0.072, 0.2], [0.062, 0], [-0.062, 0]], 0.004, 0.0015), f, 0, top, 0.012), ac);
+        [-1, 1].forEach((s2) => put2(onChest(shapeGeo([[s2 * 0.058, 0.33], [s2 * 0.072, 0.33], [s2 * 0.1, 0.43], [s2 * 0.086, 0.43]], 0.003, 0.001), f, 0, 0, 0.013), ac));
+        for (let k = 0; k <= 9; k++) { const x = -0.072 + k * 0.016, y = top + 0.205; body.add(tm(new THREE.SphereGeometry(0.011, 8, 6), fc, x, y, chestZ(f, y, x) + 0.018)); }
+        for (let k = 0; k <= 16; k++) { const x = -W2 + k * (W2 * 2 / 16), an = x / Rr; const r = tm(new THREE.SphereGeometry(0.018, 8, 6), fc, Math.sin(an) * (Rr + 0.01), bot - 0.004, Math.cos(an) * (Rr + 0.01) * 0.78 - bot * 0.15 + 0.014); r.scale.set(1, 0.7, 0.6); body.add(r); }
+      }
     }
   }
 }
@@ -1368,19 +1403,51 @@ function createShop(canvas, opts) {
   function fitFov(dist) {   // カウンターの端から端までが横に入る広さ
     const half = L / 2 - 0.15;
     const h = 2 * Math.atan(half / dist);
-    return THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(h / 2) / camera.aspect)), 42, 78);
+    return THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(h / 2) / baseAspect)), 42, 78);
+  }
+  /* 大将の目線(接客用): 座っている人だけが入るように、正面から寄ったり引いたりする。
+     1人なら その人を大きく、2〜3人なら横一列、多いときは全体(縦向きで正面に入りきらないときは、はしから斜めに) */
+  const HEAD_Y = 1.36, CAM_Y = 1.58;
+  let viewShift = 0, baseAspect = 1, viewApplied = -1;   // 横向きの大将の画面: 左に会話の欄があるので、絵の中心を右へずらす(0 = ずらさない)
+  function ownerFrame(portrait) {
+    const xs = []; seatAvatars.forEach((a, i) => { if (a) xs.push(seatX(i, N)); });
+    const x0 = xs.length ? Math.min(...xs) : -SEAT_GAP, x1 = xs.length ? Math.max(...xs) : SEAT_GAP;
+    const span = x1 - x0, cx = (x0 + x1) / 2;
+    viewShift = portrait ? 0 : 0.69;
+    const asp = baseAspect * (portrait ? 1 : 0.62);
+    const p = portrait ? 0.38 : 0.52;          // 頭を画面の上から何割の高さに置くか(下は会話の欄、上は吹き出しの場所)
+    const needW = span + (portrait ? Math.max(0.8, 1.25 - span * 0.15) : 1.5), needH = portrait ? 1.3 : 1.15;
+    const dMax = GUEST_Z - (portrait ? -4.15 : -1.85);   // 縦向きは 奥の壁の向こうまで下がれる(壁ぎわの物は隠す)
+    const fit = (fov) => { const t = Math.tan(THREE.MathUtils.degToRad(fov / 2)); return Math.max(needW / (2 * t * asp), needH / (2 * t)); };
+    let fov = portrait ? 66 : 46, d = fit(fov);
+    while (d > dMax && fov < (portrait ? 88 : 80)) { fov += 2; d = fit(fov); }
+    if (d <= dMax || !portrait) {
+      d = Math.min(Math.max(d, 1.7), dMax);
+      const t = Math.tan(THREE.MathUtils.degToRad(fov / 2));
+      wantFov = fov; wantPos.set(cx, CAM_Y + Math.max(0, d - 2.6) * 0.12, GUEST_Z - d);
+      wantLook.set(cx, HEAD_Y - (1 - 2 * p) * t * d, GUEST_Z);   // 頭が上から p の高さに来るように、見る点を下げる
+      return;
+    }
+    // 縦向きで人数が多い・はなれているとき: はしから斜めに見る(前からの形)
+    const ex = Math.max(0, N - 7) * 0.22;
+    wantPos.set(-L / 2 - 0.1 - ex * 0.5, 2.1 + ex * 0.4, -1.25 - ex * 0.3); wantLook.set(L * 0.12, 0.95, 1.45); wantFov = 64 + Math.max(0, N - 7) * 1.5;
+  }
+  /* 奥の壁ぎわの物(棚・木札・モニター・のれん)。大将の画面で 壁の向こうから映すときは隠す */
+  let backStuff = null;
+  function backList() {
+    if (backStuff) return backStuff;
+    backStuff = []; const bx = new THREE.Box3();
+    scene.children.forEach((o) => { if (o.isLight || o === owner || seatAvatars.includes(o)) return; bx.setFromObject(o); if (!bx.isEmpty() && bx.max.z < -1.3) backStuff.push(o); });
+    return backStuff;
   }
   function target() {
     const x = view.seat >= 0 ? seatX(view.seat, N) : 0;
-    const portrait = camera.aspect < 1;
+    const portrait = baseAspect < 1;
     wantFov = portrait ? 70 : 55;
     switch (view.mode) {
       case 'first': wantPos.set(x, 1.5, GUEST_Z + 0.22); wantLook.set(x + THREE.MathUtils.clamp((ownerTargetX - x) * 0.6, -1.0, 1.0), portrait ? 1.08 : 1.24, -0.95); break;   // 横向きは少し上を見る(モニターが入るように)   // 向きすぎると となりの頭でふさがる
       case 'back': wantPos.set(x * 0.85, 2.3, GUEST_Z + 1.35); wantLook.set(x * 0.75, 1.0, -0.45); break;   // 頭ごしに 自分の料理が見える高さ
-      case 'owner':
-        if (portrait) { const ex = Math.max(0, N - 7) * 0.22; wantPos.set(-L / 2 - 0.1 - ex * 0.5, 2.1 + ex * 0.4, -1.25 - ex * 0.3); wantLook.set(L * 0.12, 0.95, 1.45); wantFov = 64 + Math.max(0, N - 7) * 1.5; }
-        else { wantPos.set(0, 2.3, -1.85); wantLook.set(0, 1.2, 1.0); wantFov = fitFov(GUEST_Z + 1.85); }
-        break;
+      case 'owner': ownerFrame(portrait); break;
       default:
         if (portrait) { const ex = Math.max(0, N - 7) * 0.32; wantPos.set(L / 2 + 0.75 + ex * 0.4, 2.55 + ex * 0.35, 2.75 + ex); wantLook.set(-L * 0.12, 1.0, -0.35); wantFov = 64 + Math.max(0, N - 7) * 1.5; }
         else { wantPos.set(0, 2.6, 3.25); wantLook.set(0, 1.0, -0.8); wantFov = fitFov(3.25); }
@@ -1411,13 +1478,20 @@ function createShop(canvas, opts) {
       const r = canvas.getBoundingClientRect();
       ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(ndc, camera);
-      // 先に料理・飲み物(押すと食べる・飲む)、なければ いす
-      const tagHits = ray.intersectObjects(tagList, false);
+      // 押した物のうち、いちばん手前のもの(人のうしろのモニターや木札が先に当たらないように)
       if (!running) { drag = null; return; }
-      if (api.onMonitorTap && ray.intersectObjects(tvScreens, false).length) { api.onMonitorTap(); drag = null; return; }
-      if (tagHits.length && api.onTagTap) { const tg = tagHits[0].object; tg.userData.flash = performance.now(); api.onTagTap(tg.userData.menuId); drag = null; return; }
+      const cand = [];
+      if (api.onMonitorTap) { const h = ray.intersectObjects(tvScreens.filter((t) => t.parent.visible), false); if (h.length) cand.push({ d: h[0].distance, go: () => api.onMonitorTap() }); }
+      const tagHits = ray.intersectObjects(tagList, false);
+      if (tagHits.length && api.onTagTap) { const tg = tagHits[0].object; cand.push({ d: tagHits[0].distance, go: () => { tg.userData.flash = performance.now(); api.onTagTap(tg.userData.menuId); } }); }
       const itemHits = ray.intersectObjects(itemHitList, false);
-      if (itemHits.length && api.onItemTap) { const u = itemHits[0].object.userData; api.onItemTap(u.seat, u.key); drag = null; return; }
+      if (itemHits.length && api.onItemTap) { const u = itemHits[0].object.userData; cand.push({ d: itemHits[0].distance - 0.05, go: () => api.onItemTap(u.seat, u.key) }); }
+      if (api.onAvatarTap) {   // 人を押す → その人あてに書く
+        const ppl = seatAvatars.map((a, i) => (a && a.visible ? { a, k: i } : null)).filter(Boolean);
+        if (owner && owner.visible) ppl.push({ a: owner, k: 'owner' });
+        ppl.forEach((pp) => { const h = ray.intersectObject(pp.a, true); if (h.length) cand.push({ d: h[0].distance, go: () => api.onAvatarTap(pp.k) }); });
+      }
+      if (cand.length) { cand.sort((x, y) => x.d - y.d); cand[0].go(); drag = null; return; }
       const hits = ray.intersectObjects(stools.map((s) => s.hit));
       api.onTap(hits.length ? hits[0].object.userData.seat : -1);
     }
@@ -1427,7 +1501,7 @@ function createShop(canvas, opts) {
   function resize() {
     const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
     renderer.setSize(w, h, false);
-    camera.aspect = w / h;
+    baseAspect = w / h; camera.aspect = baseAspect; viewApplied = -1;
     camera.updateProjectionMatrix();
   }
   window.addEventListener('resize', resize); resize();
@@ -1436,7 +1510,7 @@ function createShop(canvas, opts) {
   const tmp = new THREE.Vector3();
   let running = true;
   // 電池・熱の調整: 1秒に描く回数と、細かさ。動画を大きく見ている間は 3D を休ませる
-  const perf = { fps: 30, ratio: 1.5, rest: false }; let lastDraw = 0;
+  const perf = { fps: 30, ratio: 1.5, rest: false }; let lastDraw = 0, backHidden = false;
   function frame() {
     if (!running) return;
     requestAnimationFrame(frame);
@@ -1451,6 +1525,10 @@ function createShop(canvas, opts) {
     camPos.lerp(wantPos, k); camLook.lerp(wantLook, k);
     camera.position.copy(camPos); camera.lookAt(camLook);
     if (Math.abs(camera.fov - wantFov) > 0.05) { camera.fov += (wantFov - camera.fov) * k; camera.updateProjectionMatrix(); }
+    { const sh = view.mode === 'owner' ? viewShift : 0;   // 絵の中心を 画面の横 sh の位置へ(ゆがまないように、広い絵の左側を切りとる)
+      if (sh !== viewApplied) { viewApplied = sh; const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
+        if (sh) { camera.aspect = baseAspect * sh * 2; camera.setViewOffset(w * sh * 2, h, 0, 0, w, h); } else { camera.aspect = baseAspect; camera.clearViewOffset(); } } }
+    { const hb = view.mode === 'owner' && camPos.z < -1.8; if (hb !== backHidden) { backHidden = hb; backList().forEach((o) => { o.visible = !hb; }); scene.fog.near = hb ? 9 : 7; scene.fog.far = hb ? 18 : 14; } }
     seatAvatars.forEach((a) => a && animateAvatar(a, dt));
     tagList.forEach((tg) => { const f = tg.userData.flash; if (!f) return; const e = (performance.now() - f) / 500; if (e >= 1) { tg.rotation.z = 0; tg.userData.flash = 0; return; } tg.rotation.z = Math.sin(e * Math.PI * 4) * 0.12 * (1 - e); });
     // 押した料理が「ぽよん」とはねる
@@ -1464,7 +1542,9 @@ function createShop(canvas, opts) {
     }));
     tvStep(dt);
     if (owner) { animateAvatar(owner, dt); owner.position.x += (ownerTargetX - owner.position.x) * Math.min(1, dt * 3); }
-    lanterns.forEach((l, i) => { l.rotation.z = Math.sin(clock.elapsedTime * 0.8 + i) * 0.03; });
+    const ov = view.mode === 'owner';   // 大将の目線では、ちょうちんと壁のモニターは出さない(動画は左上の小窓)
+    lanterns.forEach((l, i) => { l.visible = !ov; l.rotation.z = Math.sin(clock.elapsedTime * 0.8 + i) * 0.03; });
+    tv2.visible = !ov;
     renderer.render(scene, camera);
     if (api.onFrame) api.onFrame();
   }
@@ -1481,7 +1561,7 @@ function createShop(canvas, opts) {
   }
 
   const api = {
-    onTap: null, onFrame: null, onItemTap: null, onTagTap: null,
+    onTap: null, onFrame: null, onItemTap: null, onTagTap: null, onAvatarTap: null,
     /* 確認用: 料理の画面上の位置 */
     itemPos(key) { const h = itemHitList.find((x) => x.userData.key === key); if (!h) return null; const v = new THREE.Vector3(); h.getWorldPosition(v); v.y += 0.02; v.project(camera); const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; },
     /* 押した料理を はねさせる(作りなおしたあとでも はねるように 覚えておく) */
@@ -1564,6 +1644,7 @@ function createShop(canvas, opts) {
     name: SHOPNAME,
     // モニターの画面の四すみ(左上・右上・右下・左下)。見えていなければ null
     monitorQuad() {   // 見えているモニターのうち、いちばん大きく見える1台。main=奥の壁の1台
+      if (view.mode === 'owner') return null;   // 大将の目線は いつも左上の小窓
       const r = canvas.getBoundingClientRect();
       let best = null, bestA = 0;
       tvScreens.forEach((scr, idx) => {
@@ -1611,7 +1692,7 @@ function createShop(canvas, opts) {
       up.pop(); lo.pop();
       return lo.concat(up).map((p) => ({ x: p[0], y: p[1] }));
     },
-    stop() { running = false; api.onMonitorTap = api.onTap = api.onItemTap = api.onTagTap = api.onFrame = null; window.removeEventListener('resize', resize); renderer.dispose(); }
+    stop() { running = false; api.onAvatarTap = api.onMonitorTap = api.onTap = api.onItemTap = api.onTagTap = api.onFrame = null; window.removeEventListener('resize', resize); renderer.dispose(); }
   };
   return api;
 }
