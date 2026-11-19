@@ -237,7 +237,8 @@ function hairShell(D, R, o) {
 /* ---------- 毛の束: 根もとが太く、先が とがった 平たい束 ---------- */
 function strandGeo(pts, w0, flat = 0.4, blunt = 0, wave = 0) {
   const curve = new THREE.CatmullRomCurve3(pts, false, 'catmullrom', 0.35);
-  const S = 14, A = 6, pos = [], idx = [];
+  // 段の数は束の長さに合わせる(短い前髪は6段、長い髪は14段まで)。前は全部14段だった(2026-11-19 軽くした)
+  const S = window.__strandFull ? 14 : Math.max(6, Math.min(14, Math.ceil(curve.getLength() / 0.022))), A = 6, pos = [], idx = [];
   const P = new THREE.Vector3(), T = new THREE.Vector3(), N = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3();
   for (let i = 0; i <= S; i++) {
     const t = i / S;
@@ -502,7 +503,7 @@ function torsoGeo(f) {
 function shapeGeo(pts, depth = 0.005, bevel = 0.0015) {
   const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) s.lineTo(pts[i][0], pts[i][1]); s.closePath();
   const g = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2, curveSegments: 6 });
-  g.translate(0, 0, -depth / 2); return tessellate(g.index ? g.toNonIndexed() : g, window.__tessLen || 0.014);
+  g.translate(0, 0, -depth / 2); return tessellate(g.index ? g.toNonIndexed() : g, window.__tessLen || 0.03);   // 3cm ごとに切る(前は1.4cm。前掛け1枚で2万三角になっていた。2026-11-19 軽くした)
 }
 /* 長い三角形を こまかく分ける(曲げたとき 板の中が沈まないように) */
 function tessellate(geo, maxLen) {
@@ -736,7 +737,7 @@ function buildAvatar(raw, opt = {}) {
   const head = new THREE.Group(); head.position.set(0, 0.69, 0); body.add(head);
   const D = headDeform(a.face);
   const skull = new THREE.Group(); head.add(skull);
-  const skullGeo = deformGeo(new THREE.SphereGeometry(R, 40, 30), D, R);
+  const skullGeo = deformGeo(new THREE.SphereGeometry(R, window.__strandFull ? 40 : 32, window.__strandFull ? 30 : 24), D, R);
   const sk = new THREE.Mesh(skullGeo, toon(skinC)); sk.add(outlineOf(skullGeo, LN)); skull.add(sk);
   [-1, 1].forEach((s) => { const ep = sp(D, R, Math.PI / 2 + 0.1, s * Math.PI / 2 * 0.97, R * 0.97); const ear = tm(new THREE.SphereGeometry(R * 0.17, 12, 10), skinC, ep.x, ep.y, ep.z - R * 0.04, LN); ear.scale.set(0.55, 1, 0.8); skull.add(ear); });
   const faceGeo = deformGeo(new THREE.SphereGeometry(R * 1.004, 36, 28, Math.PI / 2 - 0.95, 1.9, Math.PI / 2 - 0.8, 1.6), D, R);
