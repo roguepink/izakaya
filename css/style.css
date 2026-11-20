@@ -409,3 +409,7 @@ body.photo-mode .kp, body.photo-mode .kp-banner { display: none; }
 #emptyNote small { display: block; margin-top: 4px; font-size: 12.5px; font-weight: 400; opacity: .85; }
 #emptyNote.hidden, body:not(.owner-view) #emptyNote { display: none; }
 @media (orientation: landscape) and (max-height: 520px) { body.owner-view #emptyNote { left: 69%; } }
+
+/* 注文票: 料理の出し方(手で / 自動) */
+.auto-pick { flex-wrap: wrap; }
+.auto-tag { flex: none; font-size: 11.5px; font-weight: 800; color: #8c1d16; background: #ffe7b0; border-radius: 999px; padding: 3px 8px; margin-right: 6px; }

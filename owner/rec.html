@@ -10,7 +10,7 @@
 <style>
   :root { --bg: #140c08; --card: #f3e6cc; --ink: #2a1a10; --red: #c8261c; --gold: #ffd27a; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: #f3e6cc; font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; padding: 16px 16px calc(120px + env(safe-area-inset-bottom)); }
+  body { margin: 0; background: var(--bg); color: #f3e6cc; font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; padding: 16px 16px calc(170px + env(safe-area-inset-bottom)); }
   h1 { font-size: 22px; margin: 6px 0 4px; }
   .lead { font-size: 15px; line-height: 1.6; margin: 0 0 12px; color: #e8d7b6; }
   .tips { background: rgba(255,255,255,.06); border-radius: 12px; padding: 10px 14px; font-size: 14px; line-height: 1.7; margin-bottom: 14px; }
@@ -32,6 +32,9 @@
   .bar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(20,12,8,.96); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); display: flex; gap: 10px; border-top: 1px solid #3a2818; }
   .bar button { flex: 1; padding: 14px; font-size: 16px; }
   .send { background: var(--gold); color: var(--ink); }
+  .bar { flex-wrap: wrap; }
+  .send-msg { flex: 0 0 100%; margin: 0 0 2px; color: #ffe7b0; font-size: 14px; line-height: 1.5; }
+  .save2 { display: block; width: 100%; margin: 16px 0 8px; padding: 12px; font-size: 14px; background: #3a2818; color: #f3e6cc; }
   .back { background: #3a2818; color: #f3e6cc; flex: 0 0 auto !important; }
   .err { background: #5a1a14; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; display: none; line-height: 1.6; }
 </style>
@@ -41,7 +44,7 @@
 <p class="lead">大将の決まり文句を、ノブさんの声で録ります。大将の声を「ノブの声(録音)」にしておくと、録った言葉はノブさんの声で流れます。</p>
 <div class="tips"><b>みんなに聞こえるまで</b><br>
   ① ここで録る(録ったらすぐ、このスマホでは ノブさんの声で流れます)<br>
-  ② 下の「📤 まとめて送る」→「ドライブ」→ フォルダ「居酒屋ノブの声」に保存<br>
+  ② 下の「📤 まとめて送る」→「ドライブ」→ フォルダ「居酒屋ノブの声」に保存(送る画面が出ないときは、いちばん下の「💾 スマホに保存する」→ ドライブのアプリでフォルダに入れる)<br>
   ③ Claude に「声入れたよ」と伝える → お店に取りこんで、お客さんのスマホでも流れるようにします
 </div>
 <div class="tips">
@@ -54,7 +57,9 @@
 <div id="err" class="err"></div>
 <div id="prog" class="prog"></div>
 <div id="list"></div>
+<button class="save2" id="saveBtn">💾 送れないときは、スマホに保存する</button>
 <div class="bar">
+  <p id="sendMsg" class="send-msg" style="display:none"></p>
   <button class="back" onclick="location.href='./'">◀ お店へ</button>
   <button class="send" id="send">📤 まとめて送る</button>
 </div>
@@ -88,7 +93,7 @@
       req.onerror = function () { ok(); };
     });
   }
-  function save(id, v) { recs[id] = v; if (!DB) return; try { DB.transaction('rec', 'readwrite').objectStore('rec').put(v, id); } catch (e) {} }
+  function save(id, v) { recs[id] = v; ready = null; setTimeout(prep, 50); if (!DB) return; try { DB.transaction('rec', 'readwrite').objectStore('rec').put(v, id); } catch (e) {} }
 
   function render() {
     var h = '', cat = '', n = 0;
@@ -173,25 +178,46 @@
     return new Blob(parts.concat(central, [end]), { type: 'application/zip' });
   }
   function ext(type) { return /mp4|m4a|aac/.test(type) ? 'm4a' : /ogg/.test(type) ? 'ogg' : 'webm'; }
-  $('send').onclick = function () {
+  /* 送る準備は、ボタンを押す前にすませておく。
+     (押してから まとめると、スマホが「押してから時間がたった」と判断して 送る画面を出さない。2026-11-20 反応なしの原因) */
+  var ready = null;   // { zip: File|null, blob: Blob, name, audio: [File], n }
+  function stampName() { var d = new Date(); return 'nobu-voice-' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '-' + ('0' + d.getHours()).slice(-2) + ('0' + d.getMinutes()).slice(-2) + '.zip'; }
+  function prep() {
     var ids = PH.map(function (p) { return p.id; }).filter(function (id) { return recs[id]; });
-    if (!ids.length) { alert('まだ録音がありません'); return; }
-    Promise.all(ids.map(function (id) { return recs[id].blob.arrayBuffer().then(function (b) { return { name: id + '.' + ext(recs[id].type), data: new Uint8Array(b) }; }); })).then(function (files) {
+    if (!ids.length) { ready = null; return Promise.resolve(); }
+    var audio = ids.map(function (id) { var r = recs[id], t = (r.type || 'audio/webm').split(';')[0]; try { return new File([r.blob], id + '.' + ext(t), { type: t }); } catch (e) { return null; } }).filter(Boolean);
+    return Promise.all(ids.map(function (id) { return recs[id].blob.arrayBuffer().then(function (b) { return { name: id + '.' + ext(recs[id].type), data: new Uint8Array(b) }; }); })).then(function (files) {
       var list = PH.filter(function (p) { return recs[p.id]; }).map(function (p) { return p.id + '\t' + p.say; }).join('\n');
       files.push({ name: 'list.txt', data: new TextEncoder().encode(list + '\n') });
-      var d = new Date(), stamp = d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2) + '-' + ('0' + d.getHours()).slice(-2) + ('0' + d.getMinutes()).slice(-2);
-      var name = 'nobu-voice-' + stamp + '.zip', blob = zip(files), file = null;
+      var name = stampName(), blob = zip(files), file = null;
       try { file = new File([blob], name, { type: 'application/zip' }); } catch (e) {}
-      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: 'ノブの声の録音' }).catch(function () {});
-      } else {
-        var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
-        alert('「' + name + '」を保存しました。Google ドライブのフォルダ「居酒屋ノブの声」に入れて、Claude に「声入れたよ」と伝えてください。');
-      }
+      ready = { zip: file, blob: blob, name: name, audio: audio, n: ids.length };
+    }).catch(function () { ready = { zip: null, blob: null, name: '', audio: audio, n: ids.length }; });
+  }
+  function can(files) { try { return !!(files && files.length && navigator.share && navigator.canShare && navigator.canShare({ files: files })); } catch (e) { return false; } }
+  function saveFile() {   // スマホの中に保存(送る画面が使えないとき)
+    if (!ready || !ready.blob) { alert('保存の準備ができませんでした。ページを開きなおしてから、もう一度押してください。'); return; }
+    var a = document.createElement('a'); a.href = URL.createObjectURL(ready.blob); a.download = ready.name; document.body.appendChild(a); a.click(); a.remove();
+    say('「' + ready.name + '」をスマホに保存しました。Google ドライブのアプリで、フォルダ「居酒屋ノブの声」に入れてください(＋ → アップロード)。');
+  }
+  function say(t) { var e = $('sendMsg'); if (e) { e.textContent = t; e.style.display = 'block'; } }
+  $('send').onclick = function () {
+    if (!Object.keys(recs).length) { alert('まだ録音がありません'); return; }
+    if (!ready) { say('準備中です。2〜3秒まってから、もう一度押してください。'); prep(); return; }
+    // ① まとめた1つのファイル(zip)で送る ② だめなら 声のファイルをそのまま送る ③ どちらもだめなら スマホに保存
+    var files = can(ready.zip ? [ready.zip] : null) ? [ready.zip] : can(ready.audio) ? ready.audio : null;
+    if (!files) { saveFile(); return; }
+    say('送る画面を開きます。「ドライブ」→ フォルダ「居酒屋ノブの声」を選んで保存してください。');
+    navigator.share({ files: files, title: 'ノブの声の録音' }).then(function () {
+      say('送りました(' + ready.n + 'こ)。ドライブに入ったら、Claude に「声入れたよ」と伝えてください。');
+    }).catch(function (e) {
+      if (e && e.name === 'AbortError') { say('送るのをやめました。もう一度押せば、また送れます。'); return; }
+      say('送る画面が使えなかったので、スマホに保存します。'); saveFile();
     });
   };
+  $('saveBtn').onclick = function () { if (!ready) { prep().then(saveFile); return; } saveFile(); };
 
-  openDB().then(loadAll).then(render);
+  openDB().then(loadAll).then(render).then(prep);
 })();
 </script>
 </body>

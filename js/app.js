@@ -1122,6 +1122,18 @@
   }
 
   /* ---------------- 注文と料理 ---------------- */
+  /* 大将の「料理の出し方」。手で出す / 自動(頼まれてから何秒かで出す)。お客さんは注文から3秒は取り消せるので、自動は5秒から */
+  var AUTO_MODES = [
+    { id: '', label: '✋ 手で出す', note: '注文票の「出す」を押したときに出します。' },
+    { id: 'mix', label: '⏱ 自動 おすすめ', note: '飲み物は5秒、料理は10秒で自動で出します(おすすめ)。手で先に出すこともできます。' },
+    { id: '5', label: '⏱ 自動 5秒', note: '頼まれてから5秒で自動で出します。手で先に出すこともできます。' },
+    { id: '10', label: '⏱ 自動 10秒', note: '頼まれてから10秒で自動で出します。手で先に出すこともできます。' }
+  ];
+  function autoWait(mode) {   // 品物ごとの待ち時間(ミリ秒)を返す。手で出すなら null
+    if (!mode) return null;
+    if (mode === 'mix') return function (id) { var m = menuItem(id); return m && m.kind === 'drink' ? 5000 : 10000; };
+    var sec = +mode || 5; return function () { return sec * 1000; };
+  }
   function menuItem(id) { return SHOP.MENU.filter(function (m) { return m.id === id; })[0]; }
   var EAT_MS = (SHOP.EAT_MINUTES || 3) * MIN, CLEAR_MS = (SHOP.CLEAR_SECONDS || 5) * 1000;
   function tableItems(seat) {   // その席に出ている物 [{key, id, at, empty}]
@@ -1225,10 +1237,11 @@
       for (var i = 0; i < N; i++) if (seatUid(i) === uid) { net.remove('seats/' + i); net.remove('tables/' + i); }
     });
     for (var i = 0; i < N; i++) { var u = seatUid(i); if (u && !ms[u]) { net.remove('seats/' + i); net.remove('tables/' + i); } }
-    // 大将がいないときは、注文を自動で出す
-    if (!ownerPresent()) {
+    // 大将がいないとき・大将が「自動で出す」にしているときは、注文を自動で出す(お客さんは3秒は取り消せる)
+    var aw = ownerPresent() ? autoWait(st.autoServe) : function () { return 3000; };
+    if (aw) {
       var o = tree.orders || {};
-      Object.keys(o).forEach(function (k) { if (n - (o[k].at || n) > 3000 && !autoServed[k]) { autoServed[k] = 1; serve(o[k].seat, o[k].item, k); } });   // 3秒は取り消せる
+      Object.keys(o).forEach(function (k) { if (n - (o[k].at || n) > aw(o[k].item) && !autoServed[k]) { autoServed[k] = 1; serve(o[k].seat, o[k].item, k); } });
     }
     // 食べ終わって(空になって)5秒たった物を下げる
     for (var t2 = 0; t2 < N; t2++) {
@@ -1362,10 +1375,14 @@
       if (!force && body._h === html) return;
     } else if (sheetKind === 'orders') {
       title = '注文票';
-      var o = tree.orders || {}, ok = Object.keys(o).sort();
+      var o = tree.orders || {}, ok = Object.keys(o).sort(), am = (tree.state || {}).autoServe || '';
+      if (OWNER_MODE) {
+        html += '<div class="sh-sec">料理の出し方</div><div class="ph-chips auto-pick">' + AUTO_MODES.map(function (m) { return '<button data-auto="' + m.id + '"' + (m.id === am ? ' class="on"' : '') + '>' + m.label + '</button>'; }).join('') + '</div>' +
+          '<p class="small-note">' + (AUTO_MODES.filter(function (m) { return m.id === am; })[0] || AUTO_MODES[0]).note + '</p>';
+      }
       html += '<div class="list">';
       if (!ok.length) html += '<div class="li"><div class="t"><small>注文はありません</small></div></div>';
-      ok.forEach(function (k) { var it = menuItem(o[k].item) || { emoji: '🍽️', name: o[k].item }; html += '<div class="li"><div class="t">' + it.emoji + ' ' + esc(it.name) + '<small>' + (okSeat(o[k].seat) ? o[k].seat + 1 : '?') + '番 ' + esc(honor(o[k].name)) + '</small></div><button data-serve="' + esc(k) + '">出す</button></div>'; });
+      ok.forEach(function (k) { var it = menuItem(o[k].item) || { emoji: '🍽️', name: o[k].item }; html += '<div class="li"><div class="t">' + it.emoji + ' ' + esc(it.name) + '<small>' + (okSeat(o[k].seat) ? o[k].seat + 1 : '?') + '番 ' + esc(honor(o[k].name)) + '</small></div>' + (OWNER_MODE && am ? '<span class="auto-tag">⏱ 自動</span>' : '') + '<button data-serve="' + esc(k) + '">出す</button></div>'; });
       html += '</div><p class="small-note">お客さんの席を押すと、注文がなくても好きな物を出せます。</p>';
       if (!force && body._h === html) return;
     } else if (sheetKind === 'owner') {
@@ -1426,6 +1443,11 @@
       body.querySelectorAll('[data-ph]').forEach(function (b) { b.onclick = function () { if (sayPhrase(b.getAttribute('data-ph'))) closeSheet(); }; });
     } else if (sheetKind === 'orders') {
       body.querySelectorAll('[data-serve]').forEach(function (b) { b.onclick = function () { var k = b.getAttribute('data-serve'), o = (tree.orders || {})[k]; if (o) serve(o.seat, o.item, k); }; });
+      body.querySelectorAll('[data-auto]').forEach(function (b) { b.onclick = function () {
+        var id = b.getAttribute('data-auto'); net.update('state', { autoServe: id || null });
+        var m = AUTO_MODES.filter(function (x) { return x.id === id; })[0]; toast('料理の出し方: ' + (m ? m.label : '手で出す'), 1800);
+        setTimeout(function () { refreshSheet(true); }, 150);
+      }; });
     } else if (sheetKind === 'owner') {
       q('#openBtn').onclick = function () { net.update('state', { forceFrom: now(), forceUntil: now() + 60 * MIN, closedAt: null, closedFor: null }); sys('🏮 臨時で開店しました(1時間)'); closeSheet(); };
       q('#closeBtn').onclick = function () { if (confirm('閉店しますか?(会話と料理は片づけられます)')) { closeSheet(); closeShop(); } };

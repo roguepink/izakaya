@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """ノブさんの声(録音ページ owner/rec.html の「まとめて送る」で出した zip)を、お店に取りこむ。
 
-  python3 tools/import-nobu.py            … ドライブ「居酒屋ノブの声」のいちばん新しい zip
+  python3 tools/import-nobu.py            … ドライブ「居酒屋ノブの声」のいちばん新しい zip と、そのまま送られた声のファイル(<言葉のid>.m4a など)
   python3 tools/import-nobu.py 〇〇.zip   … その zip
+(録音ページは、zip が送れないスマホでは 声のファイルを1つずつ そのまま送る)
 
 やること:
   1. zip の中の <言葉のid>.m4a / .webm / .ogg を取り出す(大将用の言葉 OWNER_PHRASES のものだけ)
@@ -24,11 +25,28 @@ def owner_ids():
     return re.findall(r"id:\s*'([^']+)'", m.group(1)) if m else []
 
 
-def newest_zip():
+AUDIO = ('.m4a', '.webm', '.ogg', '.mp4', '.wav')
+
+
+def drive_sources():
+    """いちばん新しい zip と、そのまま置かれた声のファイル。古い順に並べる(新しいものが上書き)"""
     zs = sorted(glob.glob(os.path.join(DRIVE, '*.zip')), key=os.path.getmtime)
-    if not zs:
-        sys.exit('ドライブの「居酒屋ノブの声」に zip がありません')
-    return zs[-1]
+    loose = [f for f in glob.glob(os.path.join(DRIVE, '*')) if os.path.splitext(f)[1].lower() in AUDIO]
+    src = ([zs[-1]] if zs else []) + loose
+    if not src:
+        sys.exit('ドライブの「居酒屋ノブの声」に 声のファイルがありません')
+    return sorted(src, key=os.path.getmtime)
+
+
+def items(path):
+    """(ファイル名, 中身) を順に出す。zip なら中身を、声のファイルならそれ自体を"""
+    if path.lower().endswith('.zip'):
+        with zipfile.ZipFile(path) as z:
+            for n in z.namelist():
+                yield os.path.basename(n), z.read(n)
+    else:
+        with open(path, 'rb') as f:
+            yield os.path.basename(path), f.read()
 
 
 def convert(src, dst):
@@ -45,29 +63,30 @@ def convert(src, dst):
 
 
 def main():
-    zp = sys.argv[1] if len(sys.argv) > 1 else newest_zip()
+    srcs = [sys.argv[1]] if len(sys.argv) > 1 else drive_sources()
     ids = owner_ids()
     os.makedirs(OUT, exist_ok=True)
-    got, skip = [], []
-    with tempfile.TemporaryDirectory() as tmp, zipfile.ZipFile(zp) as z:
-        for n in z.namelist():
-            base = os.path.basename(n)
-            pid, ext = os.path.splitext(base)
-            if ext.lower() not in ('.m4a', '.webm', '.ogg', '.mp4', '.wav'):
-                continue
-            if pid not in ids:
-                skip.append(base); continue
-            src = os.path.join(tmp, 'in' + ext.lower())
-            with open(src, 'wb') as f:
-                f.write(z.read(n))
-            sec = convert(src, os.path.join(OUT, pid + '.m4a'))
-            got.append((pid, sec))
+    got, skip = {}, []
+    with tempfile.TemporaryDirectory() as tmp:
+        for zp in srcs:
+            for base, data in items(zp):
+                pid, ext = os.path.splitext(base)
+                pid = re.sub(r'\s*\(\d+\)$', '', pid)   # ドライブが付ける「(1)」を外す
+                if ext.lower() not in AUDIO:
+                    continue
+                if pid not in ids:
+                    skip.append(base); continue
+                src = os.path.join(tmp, 'in' + ext.lower())
+                with open(src, 'wb') as f:
+                    f.write(data)
+                got[pid] = convert(src, os.path.join(OUT, pid + '.m4a'))
+    got = list(got.items())
     have = sorted(f[:-4] for f in os.listdir(OUT) if f.endswith('.m4a'))
     have = [i for i in ids if i in have]   # 言葉の並び順で
     s = open(CONFIG, encoding='utf-8').read()
     s2 = re.sub(r"NOBU_VOICE:\s*\[[^\]]*\]", 'NOBU_VOICE: [' + ', '.join("'%s'" % i for i in have) + ']', s)
     open(CONFIG, 'w', encoding='utf-8').write(s2)
-    print('取りこみ元:', os.path.basename(zp))
+    print('取りこみ元:', ', '.join(os.path.basename(x) for x in srcs))
     for pid, sec in got:
         print('  ○ %-12s %.1f秒%s' % (pid, sec, '  ← 短すぎ(聞いて確かめる)' if sec < 0.4 else ''))
     for b in skip:
