@@ -254,9 +254,26 @@
     var oa = (tree.state || {}).ownerAvatar; if (oa && oa.voice) return oa.voice;
     return AVATAR.fix(AVATAR.OWNER).voice;
   }
+  /* 大将のスマホでは、録音ページ(owner/rec.html)で録ったノブさんの声を、取りこむ前からすぐ鳴らせる。
+     ほかの人のスマホに届くのは、Claude が voice/nobu/ に取りこんでから */
+  var localNobu = {};
+  function loadLocalNobu() {
+    if (!OWNER_MODE || !window.indexedDB) return;
+    try {
+      var r = indexedDB.open('izakaya-nobu-voice', 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore('rec'); };
+      r.onsuccess = function () {
+        try {
+          var c = r.result.transaction('rec', 'readonly').objectStore('rec').openCursor();
+          c.onsuccess = function () { var x = c.result; if (!x) return; if (x.value && x.value.blob) localNobu[x.key] = URL.createObjectURL(x.value.blob); x.continue(); };
+        } catch (e) {}
+      };
+    } catch (e) {}
+  }
+  loadLocalNobu();
   function voiceFiles(ph, voiceId) {   // 鳴らす順の候補
     var owner = ph.who === 'owner', v = AVATAR.voiceOf(voiceId, owner), L = [];
-    if (v.rec) { if ((SHOP.NOBU_VOICE || []).indexOf(ph.id) >= 0) L.push('voice/' + v.id + '/' + ph.id + '.m4a'); v = AVATAR.voiceOf(v.fallback, owner); }
+    if (v.rec) { if (localNobu[ph.id]) L.push(localNobu[ph.id]); if ((SHOP.NOBU_VOICE || []).indexOf(ph.id) >= 0) L.push('voice/' + v.id + '/' + ph.id + '.m4a'); v = AVATAR.voiceOf(v.fallback, owner); }
     if (v.tts) L.push('voice/' + v.id + '/' + ph.id + '.m4a');
     return { files: L, v: v };
   }
@@ -1356,7 +1373,7 @@
         '<div class="sh-sec">片づけ</div><div class="btn-row"><button id="clearChat">💬 会話を全部消す</button><button id="clearTables">🍽️ 料理を下げる</button></div>' +
         '<div class="sh-sec">大将の見た目</div><div class="btn-row"><button id="ownerLook">🎨 アバターを作りなおす</button></div>' +
         '<div class="sh-sec">記念写真</div><div class="btn-row"><button id="phListBtn">📸 記念写真を見る</button></div>' +
-        '<div class="sh-sec">大将の声</div><div class="btn-row"><button id="recBtn">🎙 ノブの声を録音する</button></div><p class="small-note">大将の決まり文句を、ノブさんの声で録れます。録ったら「まとめて送る」で Claude に渡してください。</p>' +
+        '<div class="sh-sec">大将の声</div><div class="btn-row"><button id="recBtn">🎙 ノブの声を録音する</button></div><p class="small-note">大将の決まり文句を、ノブさんの声で録れます。録った声は、このスマホではすぐ流れます(大将の声を「ノブの声(録音)」にしたとき)。みんなに聞こえるようにするには「まとめて送る」→ Google ドライブの「居酒屋ノブの声」フォルダに保存 → Claude に「声入れたよ」と伝えてください。</p>' +
         (ROLE === 'nobu' ? '<div class="sh-sec">お店の予定</div><div class="btn-row"><button id="planBtn" class="red">📅 お店の予定・マスター交代・席の数</button></div>' : '<p class="small-note">お店の予定は ノブさんだけが直せます。</p>');
     } else if (sheetKind === 'plan') {
       title = 'お店の予定';
@@ -2066,5 +2083,5 @@
 
   initEntrance();
   // 確認用(画面の自動テストから使う)
-  window.IZ = { scene: function () { return scene; }, get tree() { return tree; }, get inside() { return inside; }, get seat() { return mySeat; }, net: function () { return net; }, addBot: addBot, status: status, upcoming: upcoming };
+  window.IZ = { scene: function () { return scene; }, get tree() { return tree; }, get inside() { return inside; }, get seat() { return mySeat; }, net: function () { return net; }, addBot: addBot, status: status, upcoming: upcoming, voiceFiles: voiceFiles };
 })();

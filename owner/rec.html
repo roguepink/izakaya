@@ -38,7 +38,12 @@
 </head>
 <body>
 <h1>🎙 ノブの声の録音</h1>
-<p class="lead">大将の決まり文句を、ノブさんの声で録ります。録った言葉は、お店でノブさんの声で流れます(大将の声を「ノブの声(録音)」にしたとき)。</p>
+<p class="lead">大将の決まり文句を、ノブさんの声で録ります。大将の声を「ノブの声(録音)」にしておくと、録った言葉はノブさんの声で流れます。</p>
+<div class="tips"><b>みんなに聞こえるまで</b><br>
+  ① ここで録る(録ったらすぐ、このスマホでは ノブさんの声で流れます)<br>
+  ② 下の「📤 まとめて送る」→「ドライブ」→ フォルダ「居酒屋ノブの声」に保存<br>
+  ③ Claude に「声入れたよ」と伝える → お店に取りこんで、お客さんのスマホでも流れるようにします
+</div>
 <div class="tips">
   ・静かな場所で、スマホを口から20cmくらい離して<br>
   ・「録る」を押してから話して、話し終わったら「止める」(5秒で自動で止まります)<br>
@@ -181,7 +186,7 @@
         navigator.share({ files: [file], title: 'ノブの声の録音' }).catch(function () {});
       } else {
         var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove();
-        alert('「' + name + '」を保存しました。Google ドライブに入れて、Claude に知らせてください。');
+        alert('「' + name + '」を保存しました。Google ドライブのフォルダ「居酒屋ノブの声」に入れて、Claude に「声入れたよ」と伝えてください。');
       }
     });
   };

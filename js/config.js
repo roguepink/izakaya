@@ -117,30 +117,38 @@ var SHOP = {
   ],
 
   /* ---------------- 曲 ----------------
-     src: 曲のファイルのアドレス(mp3 など)。このアプリの music/ に置いたら 'music/ファイル名.mp3' と書く */
+     src: 曲のファイルのアドレス(mp3 など)。このアプリの music/ に置いたら 'music/ファイル名.m4a' と書く
+     11-20 ドライブ「居酒屋ノブの曲」の14曲に入れ替え(96k の m4a に軽くして music/ へ) */
   SONGS: [
-    { id: 'kiiro-uta', title: '黄色が好き',    src: 'https://www.roguepink.com/music/kiiro-ga-suki/kiiro-ga-suki-uta.mp3' },
-    { id: 'kiiro-rap', title: '黄色が好き(ラップ)', src: 'https://www.roguepink.com/music/kiiro-ga-suki/kiiro-ga-suki-rap.mp3' },
-    { id: 'k01', title: '静かな灯',   src: 'https://roguepink.github.io/kyandoru/music/01-stille-lys.mp3' },
-    { id: 'k02', title: '冬のあかり', src: 'https://roguepink.github.io/kyandoru/music/02-vinterljus.mp3' },
-    { id: 'k03', title: '小さな炎',   src: 'https://roguepink.github.io/kyandoru/music/03-petite-flamme.mp3' },
-    { id: 'k04', title: 'Candlelight', src: 'https://roguepink.github.io/kyandoru/music/04-candlelight.mp3' },
-    { id: 'k05', title: 'ゆらめき',   src: 'https://roguepink.github.io/kyandoru/music/05-kerzenschein.mp3' },
-    { id: 'k06', title: 'やさしい光', src: 'https://roguepink.github.io/kyandoru/music/06-piccola-luce.mp3' },
-    { id: 'k07', title: 'ほのかな灯', src: 'https://roguepink.github.io/kyandoru/music/07-lucecita.mp3' },
-    { id: 'k08', title: 'やすらぎ',   src: 'https://roguepink.github.io/kyandoru/music/08-nour.mp3' },
-    { id: 'k09', title: '祈りの灯',   src: 'https://roguepink.github.io/kyandoru/music/09-diya.mp3' },
-    { id: 'k10', title: '小さな灯り', src: 'https://roguepink.github.io/kyandoru/music/10-jageun-bulbit.mp3' },
-    { id: 'r01', title: '灯心',   src: 'https://roguepink.github.io/rosoku/music/01-candle-flame-meditation.mp3' },
-    { id: 'r02', title: '水月',   src: 'https://roguepink.github.io/rosoku/music/02-moonlight-over-still-water.mp3' },
-    { id: 'r04', title: '夜の鈴', src: 'https://roguepink.github.io/rosoku/music/04-midnight-forest-chimes.mp3' }
+    { id: 'm-golden',   title: 'Golden Hour',         src: 'music/golden-hour.m4a' },
+    { id: 'm-wind',     title: 'Wind of Okinawa',     src: 'music/wind-of-okinawa.m4a' },
+    { id: 'm-ano',      title: 'あの三ヶ月',           src: 'music/ano-sankagetsu.m4a' },
+    { id: 'm-okinawa',  title: '沖縄の風にのって',     src: 'music/okinawa-no-kaze.m4a' },
+    { id: 'm-asa',      title: '朝の光に送ります',     src: 'music/asa-no-hikari.m4a' },
+    { id: 'm-choki',    title: '超気持ちいい',         src: 'music/chokimochii.m4a' },
+    { id: 'm-kiiro',    title: '黄色が好き',           src: 'music/kiiro-uta.m4a' },
+    { id: 'm-kiiro-r',  title: '黄色が好き(ラップ)',   src: 'music/kiiro-rap.m4a' },
+    { id: 'm-omocha',   title: 'ひみつのおもちゃ箱',   src: 'music/himitsu-omochabako.m4a' },
+    { id: 'm-hunter',   title: 'ハンター',             src: 'music/hunter.m4a' },
+    { id: 'm-hiyukko',  title: 'ひゆっこちゃんは みんなのプリンセス', src: 'music/hiyukko-princess.m4a' },
+    { id: 'm-sotto',    title: 'ぶちっじゃなくて そっと', src: 'music/sotto.m4a' },
+    { id: 'm-chikyu',   title: '地球へようこそ',       src: 'music/chikyu-e-youkoso.m4a' },
+    { id: 'm-nidai',    title: '荷台の重さ',           src: 'music/nidai-no-omosa.m4a' }
   ],
-  // お店の動画(大将のうしろのモニターで流せる。足すときは ここに1行)
+  // お店の動画(大将のうしろのモニターで流せる。足すときは ここに1行)。11-20 ホームページの YouTube 動画を全部
   VIDEOS: [
-    { id: 'v-hunter', src: 'https://youtu.be/6-EKdZDA0-Q', title: 'ハンターカブ PV「ARE YOU A HUNTER?」' },
     { id: 'v-kokoro', src: 'https://youtu.be/WsvsmZkaC2Q', title: '心上等' },
+    { id: 'v-dear-e', src: 'https://youtu.be/pJwx7CJEMoc', title: 'dear feat. EMIRIN' },
+    { id: 'v-dear',   src: 'https://youtu.be/k0y5ZOXHDFg', title: 'dear' },
+    { id: 'v-mama',   src: 'https://youtu.be/EL9wC8z6ERc', title: 'ママへの想い' },
     { id: 'v-omocha', src: 'https://youtu.be/9gTNoVWstSk', title: 'ひみつのおもちゃ箱' },
-    { id: 'v-sena', src: 'https://www.youtube.com/shorts/zTkUrPNrBEo', title: '聖奈のルール(縦長)' }
+    { id: 'v-code',   src: 'https://youtu.be/Ud0yZ-VS2lU', title: 'CODE LOVE' },
+    { id: 'v-sena',   src: 'https://www.youtube.com/shorts/zTkUrPNrBEo', title: '聖奈のルール(縦長)' },
+    { id: 'v-ganba',  src: 'https://www.youtube.com/shorts/CxY3V32idt0', title: '頑張らなくていい(縦長)' },
+    { id: 'v-hunter', src: 'https://youtu.be/6-EKdZDA0-Q', title: 'ハンターカブ PV「ARE YOU A HUNTER?」' },
+    { id: 'v-ise',    src: 'https://youtu.be/xgdnkC6Zk7E', title: '伊勢神宮巡り' },
+    { id: 'v-michi',  src: 'https://youtu.be/EtXsStSuXY8', title: '道の先へ' },
+    { id: 'v-kyoto',  src: 'https://youtu.be/vVNb-xA1B_4', title: '京都、六日間' }
   ],
   // 壁の木札にかならず出す品(ほかは名物から順に、入るだけ)
   TAG_ALWAYS: ['beer', 'sake', 'reishu'],
