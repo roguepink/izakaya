@@ -5,8 +5,10 @@
    ===================================================================== */
 (function () {
   var $ = function (id) { return document.getElementById(id); };
-  var LOCAL = !(SHOP.FIREBASE && SHOP.FIREBASE.databaseURL) || /[#&]local\b/.test(location.hash);
-  var OWNER_MODE = !!window.IZ_OWNER || /[#&]owner\b/.test(location.hash);   // 大将用のページ(owner.html)か、アドレスの最後に #owner
+  var OWNER_MODE = !!window.IZ_OWNER || /[#&]owner\b/.test(location.hash);
+  /* 見本(ホームページの「覗いてみる」): アドレスの最後に #demo。このスマホの中だけで、作りもののお客さん4人と大将が動く。音は出さない */
+  var DEMO = !OWNER_MODE && /[#&]demo\b/.test(location.hash);
+  var LOCAL = DEMO || !(SHOP.FIREBASE && SHOP.FIREBASE.databaseURL) || /[#&]local\b/.test(location.hash);   // 大将用のページ(owner.html)か、アドレスの最後に #owner
   /* 席の数: 回ごとに変えられる(上限 SHOP.MAX_SEATS)。3Dのカウンターは読みこんだときの数で作るので、
      次の回の席の数がちがうときは、店に入る前に ページを読みなおして合わせる(checkSeats) */
   var MAXS = Math.max(1, Math.min(20, SHOP.MAX_SEATS || 12));
@@ -216,6 +218,7 @@
   }
   var actx = null;
   function ding() {
+    if (DEMO) return;
     if (!actx) return;
     try {
       var t = actx.currentTime;
@@ -279,6 +282,7 @@
     return { files: L, v: v };
   }
   function playPhrase(ph, voiceId) {
+    if (DEMO) return;
     if (!inside) return;
     var owner = ph.who === 'owner';
     if (owner) voiceId = ownerVoiceId();
@@ -349,6 +353,7 @@
   function advance(fromKey) {
     var st = tree.state || {};
     if (musicKey(st.music) !== fromKey) return;
+    if (DEMO) { demoVideo(); return; }   // 見本は ハンターカブの PV を くりかえす
     var q = tree.queue || {}, keys = Object.keys(q).sort();
     var next;
     if (keys.length) { next = q[keys[0]]; net.remove('queue/' + keys[0]); }
@@ -383,7 +388,7 @@
     ytOn = true; ytState = -1; ytLoadedAt = Date.now(); ytMuted = false; ytReady = false; ytDur = 0; ytLastCT = 0;
     var f = document.createElement('iframe');
     f.allow = 'autoplay; encrypted-media; fullscreen'; f.allowFullscreen = true;
-    f.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&playsinline=1&enablejsapi=1&controls=1&rel=0&iv_load_policy=3&fs=1&cc_load_policy=0&start=' + Math.floor(elapsed(m)) + '&origin=' + encodeURIComponent(location.origin);
+    f.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1' + (DEMO ? '&mute=1&loop=1&playlist=' + id : '') + '&playsinline=1&enablejsapi=1&controls=1&rel=0&iv_load_policy=3&fs=1&cc_load_policy=0&start=' + Math.floor(elapsed(m)) + '&origin=' + encodeURIComponent(location.origin);
     f.onload = function () { try { f.contentWindow.postMessage(JSON.stringify({ event: 'listening', id: 1, channel: 'widget' }), '*'); } catch (e) {} setVol(); [800, 2500, 6000].forEach(function (t) { setTimeout(ytNoCaptions, t); }); };
     $('tvHolder').innerHTML = ''; $('tvHolder').appendChild(f);
     tvShow(true);
@@ -569,11 +574,13 @@
     var seats = [];
     for (var i = 0; i < N; i++) {
       var uid = seatUid(i), m = uid && ms[uid];
-      seats.push(m && (fresh(m) || away(m)) ? { key: uid, avatar: m.avatar, name: m.name, me: uid === ME.uid } : null);
+      seats.push(m && (fresh(m) || away(m)) ? { key: uid, avatar: withCos(m.avatar, cosOf(uid, m)), name: m.name, me: uid === ME.uid } : null);
     }
     scene.setSeats(seats);
     var st = tree.state || {};
-    scene.setOwner((st.ownerAvatar && AVATAR.fix(st.ownerAvatar)) || AVATAR.fix(AVATAR.OWNER));
+    var ou0 = ownerUid();
+    scene.setOwner(withCos((st.ownerAvatar && AVATAR.fix(st.ownerAvatar)) || AVATAR.fix(AVATAR.OWNER), ou0 ? cosOf(ou0, ms[ou0]) : ''));
+    applyCeleb();
     photoTick();
     updateTables();
     if (!inside) return;
@@ -656,7 +663,8 @@
     if (OWNER_MODE) $('modeNote').textContent += (OWNER_MODE ? ' その回のマスターは、ノブさんから聞いた合言葉で入れます。' : '');
     drawFace2D($('meFace'), myAvatar());
     // 合言葉がいらない店なら、すぐ店の様子を読みこむ(営業中かどうか・予約を見るため)
-    if (!SHOP.PASSCODE_HASH) connect('main');
+    if (DEMO) startDemo();
+    else if (!SHOP.PASSCODE_HASH) connect('main');
     else if ($('passInput').value) roomFor($('passInput').value).then(connect).catch(function () {});
     setInterval(function () { renderEntrance(); if (inside) tick(); }, 1000);
   }
@@ -744,7 +752,7 @@
     audio.pause(); hideYT(); curKey = '';
     closeSheet();
     $('bubbles').innerHTML = ''; bubbles = {}; $('log').innerHTML = ''; $('log')._h = ''; toggleLog(false);
-    $('shop').classList.add('hidden'); $('entrance').classList.remove('hidden'); $('emptyNote').classList.add('hidden');
+    $('shop').classList.add('hidden'); $('entrance').classList.remove('hidden'); $('emptyNote').classList.add('hidden'); $('bCos').classList.add('hidden');
     setView('overview');
   }
   /* 「帰る」を押さずに画面を閉じた: すぐには帰さず「席を外しています」にする(3分は席と料理が残る。戻ればそのまま座れる) */
@@ -774,7 +782,7 @@
   }
   function myReservation() { var r = reservationsNow(); for (var i = 0; i < N; i++) if (r[i] && r[i].uid === ME.uid) return i; return -1; }
   function onSeatTap(i) {
-    if (!inside) return;
+    if (!inside || DEMO) return;   // 見本は 座れない(見るだけ)
     var uid = seatUid(i), m = uid && members()[uid];
     if (OWNER_MODE) { if (m && fresh(m)) openSheet('seat', i); return; }
     if (mySeat >= 0) return;
@@ -796,9 +804,9 @@
   var VIEW_NAMES = { first: '目線', back: '後ろ', overview: '全体', owner: '接客', ownerAll: '全体' };
   /* 大将の目線か(接客 = 座っている人だけ大きく / 全体 = お店ぜんぶ)。どちらも 会話の欄は大きく、ボタンはたたむ */
   function ownerCam() { return OWNER_MODE && (view === 'owner' || view === 'ownerAll'); }
-  function setView(v) { if (OWNER_MODE && inside && v !== 'owner' && v !== 'ownerAll') v = 'owner'; view = v; document.body.classList.toggle('owner-view', ownerCam()); withScene(function (s) { s.setView(v, mySeat); }); $('bViewLbl').textContent = VIEW_NAMES[v] || '目線'; }
+  function setView(v) { if (OWNER_MODE && inside && v !== 'owner' && v !== 'ownerAll') v = 'owner'; view = v; document.body.classList.toggle('owner-view', ownerCam()); withScene(function (s) { s.setView(v, DEMO ? DEMO_SEAT : mySeat); if (DEMO && s.setZoom) s.setZoom(v === 'overview' ? 0.82 : 1); }); $('bViewLbl').textContent = VIEW_NAMES[v] || '目線'; }
   $('bView').onclick = function () {
-    var order = OWNER_MODE ? ['owner', 'ownerAll'] : (mySeat >= 0 ? ['first', 'back', 'overview'] : ['overview']);
+    var order = OWNER_MODE ? ['owner', 'ownerAll'] : DEMO ? ['overview', 'first', 'back'] : (mySeat >= 0 ? ['first', 'back', 'overview'] : ['overview']);
     var i = order.indexOf(view); setView(order[(i + 1) % order.length]);
     toast('視点: ' + VIEW_NAMES[view] + (view === 'owner' ? '(座っている人を大きく)' : view === 'ownerAll' ? '(お店ぜんぶ)' : ''), 1500);
   };
@@ -1030,7 +1038,7 @@
         var r = resv[i];
         if (r) {   // 予約済みの席は、だれにでも名前が見える
           (function (k, rr) { put('e' + k, rr.uid === ME.uid ? 'free mine' : 'reserved', rr.uid === ME.uid ? 'ご予約の席(あなた)' : '予約済み ' + sama(rr.name), a.empty[k], function () { onSeatTap(k); }); })(i, r);
-        } else if (inside && !OWNER_MODE && mySeat < 0 && !document.body.classList.contains('no3d')) {
+        } else if (inside && !OWNER_MODE && !DEMO && mySeat < 0 && !document.body.classList.contains('no3d')) {
           (function (k) { put('e' + k, 'free', (k + 1) + '番 空席', a.empty[k], function () { onSeatTap(k); }); })(i);
         }
       }
@@ -1126,7 +1134,7 @@
 
   /* ---------------- 決まり文句・乾杯などの合図 ---------------- */
   function event(e) { e.at = TS; e.by = ME.uid; e.voice = myAvatar().voice || ''; net.push('events', e); }
-  function myPhrases() { return OWNER_MODE ? SHOP.OWNER_PHRASES : SHOP.GUEST_PHRASES; }   // 大将とお客さんで まったく別
+  function myPhrases() { return (OWNER_MODE ? SHOP.OWNER_PHRASES : SHOP.GUEST_PHRASES).filter(inMode); }   // お祝いの日だけの言葉は その日だけ   // 大将とお客さんで まったく別
   function sayPhrase(id) {
     if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return false; }
     event({ type: 'phrase', id: id, seat: OWNER_MODE ? 'owner' : mySeat });
@@ -1170,6 +1178,10 @@
         playPhrase(ph, e.voice);
       } else if (e.type === 'kanpaiJoin') {
         kpJoined(e);
+      } else if (e.type === 'boom') {   // お祝いの合図: 紙吹雪
+        celebBoom();
+      } else if (e.type === 'countdown') {
+        showCountdown(e.to);
       } else if (e.type === 'photoReq') {
         if (OWNER_MODE && e.by !== ME.uid) toast('📸 ' + (e.name ? honor(e.name) : 'お客さん') + 'から 記念撮影のリクエスト', 9000, '📸 撮影する', startPhoto);
       } else if (e.type === 'clear') {
@@ -1296,6 +1308,7 @@
   function tick() {
     if (!amLeader()) return;
     var n = now(), ms = members(), st = tree.state || {};
+    autoCountdown(n);
     // いなくなった人の片づけ
     Object.keys(ms).forEach(function (uid) {
       if (fresh(ms[uid]) || away(ms[uid]) || (ms[uid].bot && bots[uid])) return;
@@ -1366,7 +1379,9 @@
   /* お品書き: 分類の見出しで切りかえ。置けない物は うすく、理由を出す */
   var menuCat = (SHOP.CATS && SHOP.CATS[0] && SHOP.CATS[0].id) || 'drink';
   function menuHTML(seat) {
-    var c = seatCounts(seat), cats = SHOP.CATS || [{ id: 'drink', name: '飲み物', emoji: '🍺' }];
+    var c = seatCounts(seat), cats = (SHOP.CATS || [{ id: 'drink', name: '飲み物', emoji: '🍺' }]).filter(function (ct) { return !ct.only || celebKind(); });
+    cats = cats.filter(function (ct) { return ct.only; }).concat(cats.filter(function (ct) { return !ct.only; }));   // 限定を いちばん前に
+    if (!cats.some(function (ct) { return ct.id === menuCat; })) menuCat = cats[0].id;
     var h = '<div class="mn-count">' + (seat === mySeat && !OWNER_MODE ? 'あなたの前' : (seat + 1) + '番の席') +
       ' <b class="' + (c.food >= SHOP.FOOD_LIMIT ? 'full' : '') + '">料理 ' + c.food + '/' + SHOP.FOOD_LIMIT + '</b>' +
       ' <b class="' + (c.drink >= SHOP.DRINK_LIMIT ? 'full' : '') + '">飲み物 ' + c.drink + '/' + SHOP.DRINK_LIMIT + '</b>' +
@@ -1374,7 +1389,7 @@
     h += '<div class="mn-tabs">';
     cats.forEach(function (ct) { h += '<button data-cat="' + ct.id + '" class="' + (ct.id === menuCat ? 'on' : '') + '">' + ct.emoji + ' ' + esc(ct.name) + '</button>'; });
     h += '</div><div class="mn-list">';
-    SHOP.MENU.filter(function (m) { return (m.cat || (m.kind === 'drink' ? 'drink' : 'otsumami')) === menuCat; }).forEach(function (m) {
+    SHOP.MENU.filter(function (m) { return inMode(m) && (m.cat || (m.kind === 'drink' ? 'drink' : 'otsumami')) === menuCat; }).forEach(function (m) {
       var why = whyNot(seat, m.id);
       h += '<button class="mn-card' + (m.pun ? ' pun' : '') + (why ? ' off' : '') + '" data-id="' + esc(m.id) + '">' +
         (m.pun ? '<i class="mn-badge">名物</i>' : '') +
@@ -1464,10 +1479,15 @@
         '<button id="openBtn">🏮 臨時で開ける(1時間)</button><button id="closeBtn" class="red">🌙 閉店する</button></div>' +
         '<p class="small-note">いま: ' + (LOCAL ? 'おためしモード' : s.phase === 'open' ? '営業中(' + fmtTime(s.end) + 'まで)' : s.phase === 'doors' ? 'まもなく開店' : '準備中') + '</p>' +
         '<div class="sh-sec">片づけ</div><div class="btn-row"><button id="clearChat">💬 会話を全部消す</button><button id="clearTables">🍽️ 料理を下げる</button></div>' +
+        celebSheetHTML() +
         '<div class="sh-sec">大将の見た目</div><div class="btn-row"><button id="ownerLook">🎨 アバターを作りなおす</button></div>' +
         '<div class="sh-sec">記念写真</div><div class="btn-row"><button id="phListBtn">📸 記念写真を見る</button></div>' +
         '<div class="sh-sec">大将の声</div><div class="btn-row"><button id="recBtn">🎙 ノブの声を録音する</button></div><p class="small-note">大将の決まり文句を、ノブさんの声で録れます。録った声は、このスマホではすぐ流れます(大将の声を「ノブの声(録音)」にしたとき)。みんなに聞こえるようにするには「まとめて送る」→ Google ドライブの「居酒屋ノブの声」フォルダに保存 → Claude に「声入れたよ」と伝えてください。</p>' +
         (ROLE === 'nobu' ? '<div class="sh-sec">お店の予定</div><div class="btn-row"><button id="planBtn" class="red">📅 お店の予定・マスター交代・席の数</button></div>' : '<p class="small-note">お店の予定は ノブさんだけが直せます。</p>');
+    } else if (sheetKind === 'costume') {
+      title = '🎭 仮装(今日だけ)';
+      html = costumeHTML();
+      if (!force && body._h === html) return;
     } else if (sheetKind === 'plan') {
       title = 'お店の予定';
       html = planListHTML();
@@ -1510,6 +1530,8 @@
         else { toast('リンクが読めませんでした(YouTube か、mp4 などの動画のリンク)'); return; }
         q('#ytIn').value = '';
       };
+    } else if (sheetKind === 'costume') {
+      wireCostume(body);
     } else if (sheetKind === 'phrases') {
       body.querySelectorAll('[data-ph]').forEach(function (b) { b.onclick = function () { if (sayPhrase(b.getAttribute('data-ph'))) closeSheet(); }; });
     } else if (sheetKind === 'orders') {
@@ -1521,6 +1543,7 @@
         setTimeout(function () { refreshSheet(true); }, 150);
       }; });
     } else if (sheetKind === 'owner') {
+      wireCeleb(q);
       q('#openBtn').onclick = function () { net.update('state', { forceFrom: now(), forceUntil: now() + 60 * MIN, closedAt: null, closedFor: null }); sys('🏮 臨時で開店しました(1時間)'); closeSheet(); };
       q('#closeBtn').onclick = function () { if (confirm('閉店しますか?(会話と料理は片づけられます)')) { closeSheet(); closeShop(); } };
       q('#clearChat').onclick = function () { if (confirm('会話を全部消しますか?')) { net.remove('chat'); closeSheet(); } };
@@ -1654,6 +1677,7 @@
      押した人から順に ジョッキが上がって「カチン」(そろうほど大きく)。おわりに「🍻 ◯人で かんぱーい！」と 大きなカチーン */
   var KP_WIN = 3000, kp = null, kpT = null;
   function clink(n, big) {
+    if (DEMO) return;
     if (!actx) return;
     try {
       var t = actx.currentTime, fs = big ? [2093, 2637, 3136, 4186] : [2350 + Math.random() * 500, 3500 + Math.random() * 500];
@@ -1704,6 +1728,144 @@
     clink(r.n, true);
     Object.keys(r.joined).forEach(function (s) { floater(s === 'owner' ? 'owner' : +s, '✨'); });
   }
+
+  /* ---------------- 見本(#demo。ホームページの「覗いてみる」) ----------------
+     このスマホの中だけ(ほかの人には つながらない)。お客さん4人・大将・後ろのモニターにハンターカブの PV。
+     会話は流れるが、入力・注文などのボタンは出さない。👁 で 全体 → 席から → 後ろから と 視点を変えて試せる */
+  var DEMO_SEAT = 4;
+  function demoVideo() { var v = SHOP.VIDEOS.filter(function (x) { return x.id === 'v-hunter'; })[0]; if (v) net.set('state/music', { kind: 'yt', id: v.id + '-' + Date.now(), src: v.src, title: v.title, by: '', byName: '', start: TS }); }
+  function startDemo() {
+    document.body.classList.add('demo');
+    try { localStorage.removeItem('iz-local-demo'); } catch (e) {}
+    ME = { uid: 'demo-viewer', name: '見学の人', avatar: AVATAR.random() };   // 見ている人(座らない・保存しない)
+    connect('demo');
+    setTimeout(function () {
+      enter('見学の人');
+      net.set('members/demo-owner', { name: SHOP.OWNER_NAME, owner: true, at: TS, seen: TS, voice: '' });
+      net.update('state', { ownerAvatar: AVATAR.OWNER, ownerName: SHOP.OWNER_NAME, ownerRole: 'nobu', autoServe: 'mix' });
+      [0, 900, 1800, 2700].forEach(function (t) { setTimeout(addBot, 600 + t); });
+      setTimeout(demoVideo, 1500);
+      setView('overview');
+      setInterval(function () {   // 大将も ときどき話す(作りもの)
+        net.update('members/demo-owner', { seen: TS });
+        if (Math.random() < 0.35) { var L = ['irasshai', 'haiyo', 'o_iine', 'o_moriagari', 'o_arigato', 'o_kanpai']; event({ type: 'phrase', id: L[Math.floor(Math.random() * L.length)], seat: 'owner', by: 'demo-owner' }); }
+      }, 9000);
+    }, 400);
+  }
+
+  /* ---------------- お祝いモード(クリスマス・お正月・誕生日) ----------------
+     大将が ☰ → 🏮店主 で切りかえる(state.celebrate = { kind, who: [誕生日の人の uid], at })。
+     飾り(3D)・限定メニュー(MENU の only)・限定の言葉(PHRASES の only)・その日だけの仮装(members/<uid>.costume = 'かぶりもの|メガネ|たすき') */
+  function celeb() { var c = (tree.state || {}).celebrate; return c && SHOP.CELEBRATE[c.kind] ? c : null; }
+  function celebKind() { var c = celeb(); return c ? c.kind : ''; }
+  function inMode(x) { return !x.only || x.only === celebKind(); }
+  function cosOf(uid, m) {   // 今日のお祝いで使える仮装だけ(ほかの日の物は 出さない)
+    var k = celebKind(); if (!k || !m) return '';
+    var d = SHOP.CELEBRATE[k], mine = myCos(m, k), p = (mine || '').split('|'), has = function (L, v) { return (L || []).some(function (x) { return x[0] === v; }); };
+    var h = has(d.hats, p[0]) ? p[0] : '', fc = has(SHOP.FACES, p[1]) ? p[1] : '', bd = has(d.bodies, p[2]) ? p[2] : '';
+    if (k === 'birthday' && mine == null && (celeb().who || []).indexOf(uid) >= 0) { h = 'crown'; bd = 'sash'; }   // 誕生日の主役は はじめから王冠とたすき(自分でえらぶまで)
+    return h || fc || bd ? h + '|' + fc + '|' + bd : '';
+  }
+  function myCos(m, k) {   // その日(k)に えらんだ仮装 'かぶりもの|メガネ|たすき'。まだ えらんでいなければ null(仮装は お祝いの日ごとに 覚える)
+    var c = String((m && m.costume) || ''), i = c.indexOf('/');
+    return i > 0 && c.slice(0, i) === k ? c.slice(i + 1) : null;
+  }
+  function withCos(av, cos) { return cos && av ? Object.assign({}, av, { costume: cos }) : av; }
+  function celebNames() { var c = celeb(), ms = members(); return c && c.kind === 'birthday' ? (c.who || []).map(function (u) { return ms[u] ? honor(ms[u].name) : ''; }).filter(Boolean) : []; }
+  var lastCeleb = null;
+  function applyCeleb() {
+    var k = celebKind(), names = celebNames();
+    scene.setCelebrate(k, { names: names });
+    document.body.classList.toggle('celeb', !!k);
+    ['xmas', 'newyear', 'birthday'].forEach(function (x) { document.body.classList.toggle('celeb-' + x, k === x); });
+    $('bCos').classList.toggle('hidden', !k || !inside);
+    var lbl = $('tbCeleb'); if (lbl) { lbl.innerHTML = k ? SHOP.CELEBRATE[k].emoji + '<i>' + esc(SHOP.CELEBRATE[k].name) + '</i>' : ''; lbl.classList.toggle('hidden', !k); }
+    if (lastCeleb === null) { lastCeleb = k; return; }
+    if (k !== lastCeleb) {
+      lastCeleb = k;
+      if (inside) { buildPhrases(); if (sheetKind === 'menu' || sheetKind === 'seat' || sheetKind === 'phrases') refreshSheet(true); }
+      if (k && inside) { menuCat = 'gentei'; toast(SHOP.CELEBRATE[k].hello, 6000, OWNER_MODE ? '' : '🎭 仮装する', OWNER_MODE ? null : function () { openSheet('costume'); }); withScene(function (s) { s.confetti(k); }); }
+    }
+  }
+  function celebSheetHTML() {
+    var k = celebKind(), c = celeb(), h = '<div class="sh-sec">🎉 お祝いモード</div><div class="ph-chips cel-pick">';
+    h += '<button data-cel=""' + (k ? '' : ' class="on"') + '>なし</button>';
+    Object.keys(SHOP.CELEBRATE).forEach(function (id) { var d = SHOP.CELEBRATE[id]; h += '<button data-cel="' + id + '"' + (k === id ? ' class="on"' : '') + '>' + d.emoji + ' ' + esc(d.name) + '</button>'; });
+    h += '</div>';
+    if (k === 'birthday') {
+      var ms = members(), who = c.who || [], chips = '';
+      for (var i = 0; i < N; i++) { var u = seatUid(i), m = u && ms[u]; if (m && fresh(m)) chips += '<button data-bd="' + esc(u) + '"' + (who.indexOf(u) >= 0 ? ' class="on"' : '') + '>🎂 ' + esc(honor(m.name)) + '</button>'; }
+      h += '<p class="small-note">今日の主役(押して えらぶ・何人でも)。名前が飾りに出て、王冠とたすきが付きます。</p><div class="ph-chips cel-pick">' + (chips || '<span class="small-note">まだ だれも座っていません</span>') + '</div>';
+    }
+    if (k) h += '<div class="btn-row"><button id="celBoom">🎉 お祝いの合図(紙吹雪)</button>' + (k === 'newyear' ? '<button id="celCount" class="red">⏱ カウントダウン(10秒)</button>' : '') + '</div>' +
+      '<p class="small-note">' + (k === 'newyear' ? '大みそかの 23時59分50秒になると、カウントダウンが自動で始まります(お店が開いているとき)。' : 'みんなの画面に紙吹雪が舞います。') + '</p>';
+    else h += '<p class="small-note">えらぶと、お店の飾り・限定メニュー・お祝いの言葉・その日だけの仮装が出ます。</p>';
+    return h;
+  }
+  function wireCeleb(q) {
+    document.querySelectorAll('#shBody [data-cel]').forEach(function (b) { b.onclick = function () {
+      var id = b.getAttribute('data-cel');
+      net.update('state', { celebrate: id ? { kind: id, who: [], at: TS } : null });
+      sys(id ? SHOP.CELEBRATE[id].emoji + ' ' + SHOP.CELEBRATE[id].name + 'の特別営業がはじまりました' : 'お祝いモードを終わりました');
+      setTimeout(function () { refreshSheet(true); }, 200);
+    }; });
+    document.querySelectorAll('#shBody [data-bd]').forEach(function (b) { b.onclick = function () {
+      var c = celeb(); if (!c) return; var u = b.getAttribute('data-bd'), who = (c.who || []).slice(), i = who.indexOf(u);
+      if (i >= 0) who.splice(i, 1); else who.push(u);
+      net.update('state', { celebrate: Object.assign({}, c, { who: who }) });
+      setTimeout(function () { refreshSheet(true); }, 200);
+    }; });
+    var bb = q('#celBoom'); if (bb) bb.onclick = function () { event({ type: 'boom' }); closeSheet(); };
+    var bc = q('#celCount'); if (bc) bc.onclick = function () { event({ type: 'countdown', to: now() + 10500 }); closeSheet(); };
+  }
+  function costumeHTML() {
+    var k = celebKind(); if (!k) return '<p class="small-note">いまは お祝いの日ではありません。</p>';
+    var d = SHOP.CELEBRATE[k], m = members()[ME.uid] || {}, p = (cosOf(ME.uid, m) || '').split('|');
+    var row = function (title, slot, list) { if (!list || !list.length) return ''; var cur = p[slot] || ''; var h2 = '<div class="sh-sec">' + title + '</div><div class="ph-chips cos-pick">';
+      h2 += '<button data-cos="' + slot + ':"' + (cur ? '' : ' class="on"') + '>なし</button>';
+      list.forEach(function (x) { h2 += '<button data-cos="' + slot + ':' + x[0] + '"' + (cur === x[0] ? ' class="on"' : '') + '>' + esc(x[1]) + '</button>'; });
+      return h2 + '</div>'; };
+    return row('かぶりもの', 0, d.hats) + row('へんなメガネ', 1, SHOP.FACES) + row('たすき', 2, d.bodies) +
+      '<p class="small-note">' + d.emoji + ' ' + esc(d.name) + 'の日だけの仮装です。ふだんのアバターは そのまま。' + (OWNER_MODE ? '' : '自分の姿は「👁」で「後ろ」か「全体」にすると見えます。') + '</p>';
+  }
+  function wireCostume(body) {
+    body.querySelectorAll('[data-cos]').forEach(function (b) { b.onclick = function () {
+      var v = b.getAttribute('data-cos').split(':'), slot = +v[0], m = members()[ME.uid] || {}, p = (cosOf(ME.uid, m) || '||').split('|');   // 今 見えている形(主役の王冠など)から変える
+      while (p.length < 3) p.push(''); p[slot] = v[1] || '';
+      net.update('members/' + ME.uid, { costume: celebKind() + '/' + p.join('|') });
+      setTimeout(function () { refreshSheet(true); }, 150);
+    }; });
+  }
+  function celebBoom() {
+    var k = celebKind(); withScene(function (s) { s.confetti(k); });
+    var bn = $('kpBanner'); bn.textContent = k === 'xmas' ? '🎄 メリークリスマス！' : k === 'newyear' ? '🎍 おめでとう！' : k === 'birthday' ? '🎂 おめでとう！' : '🎉 おめでとう！';
+    bn.classList.remove('hidden'); bn.classList.remove('go'); void bn.offsetWidth; bn.classList.add('go'); setTimeout(function () { bn.classList.add('hidden'); }, 2200);
+    clink(4, true);
+  }
+  /* カウントダウン: to(時刻)に 0。みんなの画面で同じ時刻に。0 で「あけましておめでとう！」と紙吹雪 */
+  var cdTimer = null;
+  function showCountdown(to) {
+    var el = $('countdown'); clearInterval(cdTimer);
+    if (to - now() < -3000) return;
+    el.classList.remove('hidden');
+    var step = function () {
+      var r = Math.ceil((to - now()) / 1000);
+      if (r > 0) { if (el.textContent !== String(r)) { el.textContent = r; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); } return; }
+      clearInterval(cdTimer); el.classList.add('done'); el.innerHTML = celebKind() === 'newyear' ? '🎍<br>あけまして<br>おめでとう！' : '🎉<br>おめでとう！';
+      withScene(function (s) { s.confetti(celebKind() || 'birthday'); }); clink(6, true);
+      setTimeout(function () { el.classList.add('hidden'); el.classList.remove('done'); el.textContent = ''; }, 5000);
+    };
+    step(); cdTimer = setInterval(step, 100);
+  }
+  var cdSent = {};
+  function autoCountdown(n) {   // 大みそかの 23:59:50 に 自動で(まとめ役のスマホが1台だけ出す)
+    if (celebKind() !== 'newyear') return;
+    var d = new Date(n); if (d.getMonth() !== 11 || d.getDate() !== 31 || d.getHours() !== 23 || d.getMinutes() !== 59 || d.getSeconds() < 50) return;
+    var y = d.getFullYear(); if (cdSent[y]) return; cdSent[y] = 1;
+    var to = new Date(y + 1, 0, 1, 0, 0, 0).getTime();
+    if (!Object.keys(tree.events || {}).some(function (k) { return tree.events[k].type === 'countdown' && Math.abs((tree.events[k].to || 0) - to) < 2000; })) event({ type: 'countdown', to: to });
+  }
+  $('bCos').onclick = function () { openSheet('costume'); };
 
   /* ---------------- 記念撮影(大将の自撮り風) ----------------
      お客さんが「📸 撮影」でリクエスト → 大将が「撮影する」→ 全員の画面でカウントダウン。
@@ -1783,6 +1945,7 @@
     withScene(function (s) { if (s.photoEnd) s.photoEnd(); });
   }
   function shutter() {
+    if (DEMO) return;
     if (!actx) return;
     try {
       var t = actx.currentTime, len = 0.12, buf = actx.createBuffer(1, actx.sampleRate * len, actx.sampleRate), d = buf.getChannelData(0);
@@ -1901,6 +2064,10 @@
   }
   function botTick() {
     Object.keys(bots).forEach(function (uid) { if (members()[uid]) net.update('members/' + uid, { seen: TS }); else delete bots[uid]; });
+    var ck = celebKind();   // おためし客も お祝いの日は 仮装する
+    if (ck) Object.keys(bots).forEach(function (uid) { var m = members()[uid], d = SHOP.CELEBRATE[ck]; if (!m || cosOf(uid, m) || Math.random() < 0.3) return;
+      var h = d.hats[Math.floor(Math.random() * d.hats.length)][0], fc = Math.random() < 0.4 ? SHOP.FACES[Math.floor(Math.random() * SHOP.FACES.length)][0] : '';
+      net.update('members/' + uid, { costume: ck + '/' + h + '|' + fc + '|' }); });
   }
   setInterval(function () {
     if (!inside) return;
@@ -1910,7 +2077,7 @@
       b.next = t + 7000 + Math.random() * 9000;
       var r = Math.random();
       if (r < 0.62) net.push('chat', { uid: uid, name: b.name, seat: b.seat, text: BOT_LINES[Math.floor(Math.random() * BOT_LINES.length)], at: TS });
-      else if (r < 0.82) { var it = SHOP.MENU[Math.floor(Math.random() * SHOP.MENU.length)]; if (whyNot(b.seat, it.id)) return; net.push('orders', { uid: uid, name: b.name, seat: b.seat, item: it.id, at: TS }); net.push('events', { type: 'order', seat: b.seat, item: it.id, at: TS, by: uid }); }
+      else if (r < 0.82) { var ML = SHOP.MENU.filter(inMode), it = ML[Math.floor(Math.random() * ML.length)]; if (whyNot(b.seat, it.id)) return; net.push('orders', { uid: uid, name: b.name, seat: b.seat, item: it.id, at: TS }); net.push('events', { type: 'order', seat: b.seat, item: it.id, at: TS, by: uid }); }
       else net.push('events', { type: 'phrase', id: Math.random() < 0.6 ? 'kanpai' : 'umai', seat: b.seat, at: TS, by: uid, voice: (members()[uid] && members()[uid].voice) || '' });
     });
   }, 1000);

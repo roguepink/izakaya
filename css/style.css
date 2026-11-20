@@ -431,3 +431,33 @@ body.photo-mode .kp, body.photo-mode .kp-banner { display: none; }
 .to-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .to-chip button { flex: none; background: #8c1d16; color: #fff; border-radius: 999px; padding: 7px 12px; font-size: 13.5px; font-weight: 800; }
 body.kp-on .tag.serve { visibility: hidden; }
+
+/* お祝いモード */
+.tb-celeb { margin-left: 6px; font-size: 12px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: #c8202a; color: #fff3c8; white-space: nowrap; }
+.tb-celeb.hidden { display: none; }
+body.celeb-xmas .tb-celeb { background: linear-gradient(90deg, #c8202a, #1f7a3c); }
+body.celeb-newyear .tb-celeb { background: linear-gradient(90deg, #c8202a, #c8a040); }
+body.celeb-birthday .tb-celeb { background: linear-gradient(90deg, #ff4a8a, #ffb02a); }
+.cel-pick, .cos-pick { flex-wrap: wrap; }
+.countdown { position: fixed; inset: 0; z-index: 70; display: flex; align-items: center; justify-content: center; text-align: center; pointer-events: none;
+  font-size: min(42vw, 260px); font-weight: 900; color: #fff3c8; text-shadow: 0 0 24px rgba(255,180,60,.9), 0 6px 0 #8c1d16, 0 0 2px #000; background: radial-gradient(circle, rgba(20,8,4,.35), rgba(20,8,4,0) 70%); }
+.countdown.hidden { display: none; }
+.countdown.pop { animation: cdPop .9s ease-out; }
+.countdown.done { font-size: min(12vw, 72px); line-height: 1.25; animation: cdPop 1.2s ease-out; }
+@keyframes cdPop { 0% { transform: scale(1.8); opacity: 0; } 25% { transform: scale(1); opacity: 1; } 100% { transform: scale(.92); opacity: .95; } }
+.tb-celeb i { font-style: normal; margin-left: 3px; }
+@media (max-width: 560px) { .tb-celeb { padding: 1px 5px; margin-left: 4px; } .tb-celeb i { display: none; } }
+
+/* 見本(#demo): 入力やボタンは出さない。会話は見える。説明の札 */
+.demo-note { display: none; }
+body.demo .demo-note { display: block; position: fixed; left: 50%; transform: translateX(-50%); top: calc(96px + env(safe-area-inset-top)); z-index: 12; width: min(92vw, 460px);
+  background: rgba(20,12,8,.82); color: #fff3d6; border: 1px solid rgba(255,214,140,.45); border-radius: 14px; padding: 10px 14px; font-size: 13px; line-height: 1.55; pointer-events: none; }
+body.demo .demo-note b { display: block; font-size: 15px; color: #ffd27a; margin-bottom: 2px; }
+body.demo .demo-note .dn-try { display: block; margin-top: 4px; font-weight: 800; color: #ffe7b0; }
+body.demo .demo-note i { font-style: normal; }
+body.demo .chat, body.demo #phrases, body.demo #toChip, body.demo #pickHint, body.demo #mine, body.demo #npSkip, body.demo .tb-right { display: none !important; }
+body.demo .side > .sbtn:not(#bView) { display: none !important; }
+body.demo #bView { box-shadow: 0 0 0 3px #ffd27a, 0 0 18px rgba(255,210,122,.8); animation: demoPulse 1.6s ease-in-out infinite; }
+@keyframes demoPulse { 50% { box-shadow: 0 0 0 5px #ffd27a, 0 0 26px rgba(255,210,122,1); } }
+body.demo .log { font-size: 12px; }
+@media (orientation: landscape) and (max-height: 520px) { body.demo .demo-note { top: auto; bottom: 12px; left: auto; right: 12px; transform: none; width: min(40vw, 380px); font-size: 12px; padding: 7px 12px; line-height: 1.45; } body.demo .demo-note b { display: inline; font-size: 13px; margin-right: 6px; } }

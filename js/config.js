@@ -55,7 +55,8 @@ var SHOP = {
     { id: 'niku',     name: '肉',       emoji: '🥩' },
     { id: 'nabe',     name: '鍋・煮物', emoji: '🍲' },
     { id: 'salad',    name: 'サラダ',   emoji: '🥗' },
-    { id: 'gohan',    name: 'ご飯・麺', emoji: '🍚' }
+    { id: 'gohan',    name: 'ご飯・麺', emoji: '🍚' },
+    { id: 'gentei',   name: '限定',     emoji: '🎉', only: true }   // お祝いモードの日だけ出る(いちばん前に)
   ],
   FOOD_LIMIT: 3,       // 1人の前に置ける料理の数(カウンター1人分 幅60cm・奥行き45cm に 皿3枚)
   DRINK_LIMIT: 1,      // 飲み物は1杯まで
@@ -113,7 +114,20 @@ var SHOP = {
     { id: 'daikonsalad', cat: 'salad', kind: 'food', name: '大根サラダ', emoji: '🥗', model: 'daikonsalad', desc: 'のり と ごまだれ' },
     /* ご飯・麺 */
     { id: 'onigiri',  cat: 'gohan', kind: 'food', name: 'おにぎり',   emoji: '🍙', model: 'onigiri',  desc: '鮭・梅' },
-    { id: 'ochazuke', cat: 'gohan', kind: 'food', name: 'お茶漬け',   emoji: '🍵', model: 'ochazuke', desc: 'しめに' }
+    { id: 'ochazuke', cat: 'gohan', kind: 'food', name: 'お茶漬け',   emoji: '🍵', model: 'ochazuke', desc: 'しめに' },
+    /* お祝いモードの限定(only の日だけ出る) */
+    { id: 'x_chicken', cat: 'gentei', only: 'xmas',     kind: 'food', name: 'フライドチキン',     emoji: '🍗', model: 'chicken',   desc: 'クリスマスの定番。骨つき' },
+    { id: 'x_cake',    cat: 'gentei', only: 'xmas',     kind: 'food', name: 'クリスマスケーキ',   emoji: '🍰', model: 'cake',      desc: 'いちごのショートケーキ' },
+    { id: 'x_champ',   cat: 'gentei', only: 'xmas',     kind: 'drink', name: 'シャンパン',     emoji: '🥂', model: 'champagne', color: '#f2d98a', desc: 'しゅわっと乾杯' },
+    { id: 'x_champ0',  cat: 'gentei', only: 'xmas',     kind: 'drink', name: 'ノンアルシャンパン', emoji: '🥂', model: 'champagne', color: '#f6e6b0', desc: 'アルコール0%' },
+    { id: 'n_soba',    cat: 'gentei', only: 'newyear',  kind: 'food', name: '年越しそば',         emoji: '🍜', model: 'soba',      desc: 'えび天のせ。細く長く' },
+    { id: 'n_ozoni',   cat: 'gentei', only: 'newyear',  kind: 'food', name: 'お雑煮',             emoji: '🍲', model: 'ozoni',     desc: '角もちのすまし' },
+    { id: 'n_osechi',  cat: 'gentei', only: 'newyear',  kind: 'food', name: 'おせち',             emoji: '🍱', model: 'osechi',    desc: 'お重に いろいろ' },
+    { id: 'n_iwaizake',cat: 'gentei', only: 'newyear',  kind: 'drink', name: '祝い酒(升)',     emoji: '🍶', model: 'masu',      desc: '新年のお祝いに' },
+    { id: 'n_amazake', cat: 'gentei', only: 'newyear',  kind: 'drink', name: '甘酒',           emoji: '🍵', model: 'amazake',   desc: 'アルコールなし。あったか' },
+    { id: 'b_cake',    cat: 'gentei', only: 'birthday', kind: 'food', name: 'バースデーケーキ',   emoji: '🎂', model: 'bdcake',    desc: 'ろうそくつき。主役に' },
+    { id: 'b_champ',   cat: 'gentei', only: 'birthday', kind: 'drink', name: 'シャンパン',     emoji: '🥂', model: 'champagne', color: '#f2d98a', desc: 'お祝いの乾杯に' },
+    { id: 'b_champ0',  cat: 'gentei', only: 'birthday', kind: 'drink', name: 'ノンアルシャンパン', emoji: '🥂', model: 'champagne', color: '#f6e6b0', desc: 'アルコール0%' }
   ],
 
   /* ---------------- 曲 ----------------
@@ -163,6 +177,9 @@ var SHOP = {
      id を変えると声のファイルが使われなくなるので、言葉を変えたら声も作り直す */
   GUEST_PHRASES: [
     { id: 'kanpai',      cat: 'のむ',     say: 'かんぱーい！',       emoji: '🍻', main: true },
+    { id: 'g_merry',     cat: 'おいわい', say: 'メリークリスマス！',   emoji: '🎄', main: true, only: 'xmas' },
+    { id: 'g_akeome',    cat: 'おいわい', say: 'あけましておめでとう！', emoji: '🎍', main: true, only: 'newyear' },
+    { id: 'g_hbd',       cat: 'おいわい', say: 'お誕生日おめでとう！', emoji: '🎂', main: true, only: 'birthday' },
     { id: 'okawari',     cat: 'のむ',     say: 'おかわり！',         emoji: '🙋', main: true },
     { id: 'umai',        cat: 'のむ',     say: 'うまい！',           emoji: '😋', main: true },
     { id: 'g_oishii',    cat: 'のむ',     say: 'おいしい〜！',       emoji: '🤤' },
@@ -191,6 +208,9 @@ var SHOP = {
   /* 大将用の決まり文句(大将の画面にだけ出る)。auto: 店が自動で言うもの(ボタンにも出る) */
   OWNER_PHRASES: [
     { id: 'irasshai',   cat: 'むかえる', say: 'いらっしゃい！',               main: true },
+    { id: 'o_merry',    cat: 'おいわい', say: 'メリークリスマス！',            emoji: '🎄', main: true, only: 'xmas' },
+    { id: 'o_akeome',   cat: 'おいわい', say: 'あけましておめでとうございます！', emoji: '🎍', main: true, only: 'newyear' },
+    { id: 'o_hbd',      cat: 'おいわい', say: 'お誕生日おめでとうございます！', emoji: '🎂', main: true, only: 'birthday' },
     { id: 'o_okaeri',   cat: 'むかえる', say: 'おかえりなさい！' },
     { id: 'o_nani',     cat: 'むかえる', say: '何にします？',                 main: true },
     { id: 'haiyo',      cat: 'だす',     say: 'はいよ！',                     main: true },
@@ -217,6 +237,18 @@ var SHOP = {
   /* 記念撮影(大将の自撮り風)。SEC: カウントダウンの秒数 / PICK_FROM〜PICK_TO: ポーズと表情を選べる残り秒数 /
      KEEP_DAYS: 大将のスマホに写真を とっておく日数(すぎたら自動で消す)。秒数は まだ決めている途中(ノブさん 2026-11-19) */
   PHOTO: { SEC: 20, PICK_FROM: 15, PICK_TO: 3, KEEP_DAYS: 30, LAYOUT: 'N4' },   // LAYOUT: 並び方(js/scene3d.js の PHOTO_LAYOUTS。N1〜N4。ノブさんが N4 すき間に顔 に決めた 2026-11-20)
+
+  /* お祝いモード(大将が ☰ → 🏮店主 で切りかえる)。飾り・限定メニュー(MENU の only)・限定の決まり文句(PHRASES の only)・仮装。
+     hats / bodies: その日だけの かぶりもの・たすき。FACES: どの日でも使える 変なメガネ */
+  CELEBRATE: {
+    xmas:     { name: 'クリスマス', emoji: '🎄', hello: '🎄 今夜はクリスマスの特別営業！ 🎭仮装 で サンタやトナカイになれます',
+                hats: [['santa', '🎅 サンタ帽'], ['reindeer', '🦌 トナカイ'], ['treehat', '🎄 ツリー帽']], bodies: [] },
+    newyear:  { name: 'お正月',     emoji: '🎍', hello: '🎍 新年の特別営業！ 🎭仮装 で ひつじ(2027年は未年)や鏡餅になれます',
+                hats: [['sheep', '🐑 ひつじ耳'], ['mochi', '🍊 鏡餅'], ['iwai', '🎌 祝はちまき']], bodies: [] },
+    birthday: { name: '誕生日',     emoji: '🎂', hello: '🎂 今夜は誕生日のお祝い！ 🎭仮装 で とんがり帽や王冠をどうぞ',
+                hats: [['party', '🥳 とんがり帽'], ['crown', '👑 王冠']], bodies: [['sash', '🎗 本日の主役']] }
+  },
+  FACES: [['nosegl', '🥸 鼻メガネ'], ['starglass', '⭐ 星メガネ'], ['heartglass', '💖 ハートメガネ']],
 
   /* ノブさんの声を録音してある言葉の id(大将の声「ノブの声(録音)」で使う)。録音ページ rec.html で録って、voice/nobu/ に置く。
      ここにない言葉は、代わりの声(落ち着いた男性)で読む */

@@ -106,7 +106,7 @@
 
 <section id="shop" class="hidden">
   <div class="topbar">
-    <div class="tb-left"><b id="tbName">居酒屋ノブ</b><span id="tbState"></span></div>
+    <div class="tb-left"><b id="tbName">居酒屋ノブ</b><span id="tbState"></span><span id="tbCeleb" class="tb-celeb hidden"></span></div>
     <div class="tb-right"><span id="tbCount"></span></div>
   </div>
   <div class="np-row"><button id="nowPlaying" class="np">🎵 <span id="npTitle">—</span></button><button id="npSkip" class="np-skip owner-only">⏭ 次へ</button></div>
@@ -116,6 +116,7 @@
     <button id="bMusic" class="sbtn"><span>🎵</span><small>曲</small></button>
     <button id="bMenu" class="sbtn"><span>🍺</span><small>注文</small></button>
     <button id="bPhoto" class="sbtn"><span>📸</span><small>撮影</small></button>
+    <button id="bCos" class="sbtn hidden"><span>🎭</span><small>仮装</small></button>
     <button id="bOrders" class="sbtn owner-only"><span>📋</span><small>注文票</small><i id="ordBadge" class="badge hidden">0</i></button>
     <button id="bOwner" class="sbtn owner-only"><span>🏮</span><small>店主</small></button>
     <button id="bBot" class="sbtn hidden"><span>🤖</span><small>おためし客</small></button>
@@ -166,6 +167,8 @@
 </div>
 <div id="toast" class="toast hidden"></div>
 <div id="whoPick" class="hidden"></div>
+<div id="countdown" class="countdown hidden"></div>
+<div id="demoNote" class="demo-note"><b>👀 見本です</b>お客さん4人と大将が、お店の中で話しています。実際のお店では、視点を変えたり・話しかけたり・注文したりできます。<span class="dn-try">右の <i>👁</i> を押して、視点を変えて試してみてください</span></div>
 <div id="closing" class="screen hidden">
   <div class="closing-box">
     <div class="closing-moon">🌙</div>

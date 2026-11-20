@@ -485,7 +485,7 @@ function hairTint(geo, R) {
   return geo;
 }
 function buildHair(head, a, R, D) {
-  const HAT = !a.owner && (a.acc === 'cap' || a.acc === 'beanie' || a.acc === 'beret');   // 帽子をかぶっているときは、帽子の中に入る てっぺんの毛は作らない(帽子から突きぬけないように)
+  const HAT = (!a.owner && (a.acc === 'cap' || a.acc === 'beanie' || a.acc === 'beret')) || a._cosHat;   // 帽子をかぶっているときは、帽子の中に入る てっぺんの毛は作らない(帽子から突きぬけないように)
   const hc = AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor);
   const dark = shade(hc, 0.78);
   const F = a.sex === 'f';
@@ -827,6 +827,7 @@ function bakeAvatar(root, pivots, skip) {
 }
 function buildAvatar(raw, opt = {}) {
   const a = AVATAR.fix(raw) || AVATAR.fallback(1);
+  const cos = raw && raw.costume; costumePrep(a, cos);   // お祝いモードの かぶりもの
   const f = a.sex === 'f';
   const skinC = AVATAR.color(AVATAR.SKIN, a.skin); SKIN_SET.add(String(skinC).toLowerCase());
   const def = TOP_DEF[a.top] || { sleeve: 'long' };
@@ -924,6 +925,7 @@ function buildAvatar(raw, opt = {}) {
   buildHair(skull, a, R, D);
   const hairObjs = skull.children.slice(nHair0);
   buildAcc(skull, body, a, R, f);
+  buildCostume(skull, body, a, R, f, cos, skinC);
   tuckHair(skull, hairObjs);
   root.scale.setScalar(a.size);
   root.userData = { body, head, arms, fores, hands, legs, cheerMug, torso, t: Math.random() * 10, cheer: 0, talk: 0, face, faceA: a, skin: skinC };
@@ -975,6 +977,105 @@ function tuckHair(skull, hairObjs) {
     // 押しこんだあとに もう一度 数える(確認用)
     for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(toSkull); for (const X of H) { const [out] = hatOut(X.h, v.clone().applyMatrix4(X.toHat)); if (out > 0.0005) HAT_STATS.after++; } }
   }));
+}
+
+/* ---------- お祝いモードの限定のかぶりもの・メガネ・たすき ----------
+   cos = 'かぶりもの|メガネ|たすき'(どれも なしでよい)。その日だけ。保存したアバターは変えない */
+const COS_HATS = ['santa', 'reindeer', 'treehat', 'sheep', 'mochi', 'iwai', 'party', 'crown'];
+function parseCos(cos) { const p = String(cos || '').split('|'); return { head: p[0] || '', face: p[1] || '', body: p[2] || '' }; }
+function costumePrep(a, cos) {   // 髪や ふだんの小物と ぶつからないように 先に整える
+  const c = parseCos(cos); if (!c.head && !c.face) return;
+  if (c.head) { if (a.owner) a.head = 'none'; else if (['cap', 'beanie', 'beret', 'band', 'ribbon'].includes(a.acc)) a.acc = 'none'; }
+  if (c.head === 'santa') a._cosHat = true;
+  if (c.face && !a.owner && ['glasses', 'thin', 'sun'].includes(a.acc)) a.acc = 'none';
+}
+function buildCostume(head, body, a, R, f, cos, skinC) {
+  const c = parseCos(cos); if (!c.head && !c.face && !c.body) return;
+  const HR = head.userData.hairR || R * 1.12, LN = 0.003, top = HR * 0.98;
+  const bm = (col) => new THREE.MeshBasicMaterial({ color: col });
+  const starShape = (r) => { const sh = new THREE.Shape(); for (let k = 0; k < 10; k++) { const an = Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * 0.45 : r; const x = Math.cos(an) * rr, y = Math.sin(an) * rr; if (k) sh.lineTo(x, y); else sh.moveTo(x, y); } return sh; };
+  const heartShape = (r) => { const sh = new THREE.Shape(); for (let k = 0; k <= 28; k++) { const t = (k / 28) * Math.PI * 2, x = 16 * Math.pow(Math.sin(t), 3) * r / 17, y = (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * r / 17; if (k) sh.lineTo(x, y); else sh.moveTo(x, y); } return sh; };
+  const band = (col) => { const h = new THREE.Group(); h.rotation.x = 0.25; h.position.y = R * 0.05; h.add(new THREE.Mesh(new THREE.TorusGeometry(HR * 1.02, 0.012, 6, 30, Math.PI), toon(col))); head.add(h); return h; };
+  switch (c.head) {
+    case 'santa': {   // サンタ帽: 赤い帽子 + 白いふち + 先が横にたれる + ぼんぼり
+      const g = new THREE.Group(); g.position.set(0, R * 0.06, -R * 0.03); g.rotation.x = -0.12; head.add(g); regHat(head, g, { kind: 'dome', r: HR * 1.12, sy: 1.06, th: 1.3 });
+      const dome = tm(new THREE.SphereGeometry(HR * 1.12, 26, 14, 0, Math.PI * 2, 0, 1.3), '#d42a2a', 0, 0, 0, LN); dome.scale.y = 1.06; g.add(dome);
+      const brim = tm(new THREE.TorusGeometry(HR * 1.13, 0.034, 10, 30), '#fbfaf4', 0, Math.cos(1.3) * HR * 1.12 * 1.06, 0, LN); brim.rotation.x = Math.PI / 2; brim.scale.set(1, 1, 0.9); g.add(brim);
+      const tip = new THREE.Group(); tip.position.set(0, HR * 1.0, 0); tip.rotation.z = -0.9; g.add(tip);
+      tip.add(tm(new THREE.ConeGeometry(HR * 0.62, HR * 1.0, 18), '#d42a2a', 0, HR * 0.45, 0, LN));
+      tip.add(tm(new THREE.SphereGeometry(0.035, 12, 10), '#fbfaf4', 0, HR * 0.98, 0, LN));
+      break; }
+    case 'reindeer': {   // トナカイ: 茶色のカチューシャ + 枝分かれの角 + 赤い鼻
+      band('#6a4428');
+      [-1, 1].forEach((s) => { const g = new THREE.Group(); g.position.set(s * HR * 0.62, HR * 0.78, 0); g.rotation.z = -s * 0.35; head.add(g);
+        g.add(tm(new THREE.CylinderGeometry(0.011, 0.015, 0.16, 8), '#8a5a30', 0, 0.08, 0, LN));
+        [[0.05, 0.6], [0.11, -0.7], [0.14, 0.5]].forEach(([y, rz]) => { const br = tm(new THREE.CylinderGeometry(0.008, 0.01, 0.07, 6), '#8a5a30', Math.sin(rz) * 0.03, y + 0.03, 0, LN); br.rotation.z = -rz; g.add(br); });
+        const ear = tm(new THREE.SphereGeometry(0.03, 10, 8), '#8a5a30', -s * 0.03, -0.02, 0, LN); ear.scale.set(1.5, 0.6, 0.5); g.add(ear); });
+      head.add(tm(new THREE.SphereGeometry(R * 0.13, 14, 10), '#e01818', 0, -R * 0.2, R * 1.0, LN));
+      break; }
+    case 'treehat': {   // ツリーの帽子: 緑の三角 + 飾り玉 + 金の星
+      const g = new THREE.Group(); g.position.set(0, top, 0); head.add(g);
+      [[0.13, 0.12, 0.05], [0.1, 0.1, 0.12], [0.07, 0.09, 0.18]].forEach(([r, h, y]) => g.add(tm(new THREE.ConeGeometry(r, h, 14), '#237a3c', 0, y, 0, LN)));
+      for (let k = 0; k < 9; k++) { const an = k * 2.2, y = 0.02 + (k / 9) * 0.17, r = 0.11 - (k / 9) * 0.07; g.add(mesh(new THREE.SphereGeometry(0.011, 8, 6), bm(['#ff3b3b', '#ffd23b', '#3bb8ff'][k % 3]), Math.cos(an) * r, y, Math.sin(an) * r)); }
+      const st = mesh(new THREE.ExtrudeGeometry(starShape(0.035), { depth: 0.008, bevelEnabled: false }), bm('#ffd23b'), 0, 0.25, -0.004); g.add(st);
+      break; }
+    case 'sheep': {   // ひつじの耳(2027年は未年): 白いカチューシャ + もこもこ + 横に出る耳 + くるっとした角
+      band('#f6f2e6');
+      for (let k = 0; k < 7; k++) { const an = -0.9 + k * 0.3; head.add(tm(new THREE.SphereGeometry(0.03, 10, 8), '#fbf8f0', Math.sin(an) * HR * 1.0, Math.cos(an) * HR * 1.0 + R * 0.05, R * 0.15, LN)); }
+      [-1, 1].forEach((s) => { const ear = tm(new THREE.SphereGeometry(0.05, 12, 8), '#f4ead8', s * HR * 1.05, HR * 0.35, 0, LN); ear.scale.set(1.3, 0.45, 0.7); ear.rotation.z = s * 0.3; head.add(ear);
+        const horn = tm(new THREE.TorusGeometry(0.04, 0.014, 8, 16, Math.PI * 1.5), '#c8a070', s * HR * 0.9, HR * 0.62, -R * 0.05, LN); horn.rotation.y = s * Math.PI / 2; head.add(horn); });
+      break; }
+    case 'mochi': {   // 鏡餅の帽子: 白いおもち2段 + だいだい + 葉っぱ
+      const g = new THREE.Group(); g.position.set(0, top - 0.01, 0); head.add(g);
+      const m1 = tm(new THREE.SphereGeometry(0.11, 18, 10), '#fbf6e8', 0, 0.03, 0, LN); m1.scale.y = 0.45; g.add(m1);
+      const m2 = tm(new THREE.SphereGeometry(0.085, 18, 10), '#fbf6e8', 0, 0.085, 0, LN); m2.scale.y = 0.5; g.add(m2);
+      g.add(tm(new THREE.SphereGeometry(0.045, 14, 10), '#f08a1a', 0, 0.14, 0, LN));
+      const lf = tm(new THREE.SphereGeometry(0.03, 8, 6), '#2a7a3a', 0.025, 0.185, 0, LN); lf.scale.set(1.2, 0.3, 0.6); g.add(lf);
+      break; }
+    case 'iwai': {   // 紅白のはちまき「祝」
+      const Rb = f ? R * 0.98 : R;
+      const b = tm(new THREE.TorusGeometry(Rb * 1.04, 0.018, 8, 36), '#fbfaf4', 0, Rb * 0.3, 0, LN); b.rotation.x = Math.PI / 2 + 0.15; head.add(b);
+      const b2 = tm(new THREE.TorusGeometry(Rb * 1.045, 0.007, 6, 36), '#d01e28', 0, Rb * 0.3, 0); b2.rotation.x = Math.PI / 2 + 0.15; head.add(b2);
+      const t = canvasTex(128, 128, (g) => { g.fillStyle = '#fbfaf4'; g.fillRect(0, 0, 128, 128); g.fillStyle = '#d01e28'; g.font = 'bold 100px ' + FONT_JP; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('祝', 64, 70); });
+      const lab = mesh(new THREE.PlaneGeometry(0.075, 0.075), new THREE.MeshBasicMaterial({ map: t }), 0, Rb * 0.42, Rb * 1.03); lab.rotation.x = -0.18; head.add(lab);
+      [-1, 1].forEach((s) => { const tl = tm(new THREE.BoxGeometry(0.03, 0.1, 0.006), s > 0 ? '#d01e28' : '#fbfaf4', s * 0.03, Rb * 0.12, -Rb * 1.05); tl.rotation.z = s * 0.4; head.add(tl); });
+      break; }
+    case 'party': {   // とんがり帽子: しま模様 + ぼんぼり(少しななめ)
+      const t = canvasTex(128, 128, (g) => { const C = ['#ff4a8a', '#ffd23b', '#4ac8ff', '#8ae04a']; for (let k = 0; k < 8; k++) { g.fillStyle = C[k % 4]; g.fillRect(0, k * 16, 128, 16); } });
+      const g = new THREE.Group(); g.position.set(R * 0.15, top - 0.02, 0); g.rotation.z = -0.3; head.add(g);
+      g.add(mesh(new THREE.ConeGeometry(0.075, 0.2, 18), toon('#ffffff', { map: t }), 0, 0.1, 0));
+      g.add(tm(new THREE.SphereGeometry(0.025, 10, 8), '#ffd23b', 0, 0.21, 0, LN));
+      const rim = tm(new THREE.TorusGeometry(0.075, 0.008, 6, 18), '#ffffff', 0, 0, 0); rim.rotation.x = Math.PI / 2; g.add(rim);
+      const strap = mesh(new THREE.TorusGeometry(R * 1.02, 0.0015, 4, 30, Math.PI), new THREE.MeshBasicMaterial({ color: '#f6f4ee' })); strap.rotation.set(Math.PI, Math.PI / 2, 0); head.add(strap);   // あごひも
+      break; }
+    case 'crown': {   // 王冠: 金の輪 + とがった山 + 宝石
+      const g = new THREE.Group(); g.position.set(0, top - 0.015, 0); head.add(g);
+      g.add(tm(new THREE.CylinderGeometry(0.085, 0.08, 0.05, 20, 1, true), '#e8b830', 0, 0.025, 0, LN));
+      for (let k = 0; k < 8; k++) { const an = k / 8 * Math.PI * 2; g.add(tm(new THREE.ConeGeometry(0.018, 0.045, 6), '#e8b830', Math.cos(an) * 0.08, 0.07, Math.sin(an) * 0.08)); g.add(mesh(new THREE.SphereGeometry(0.009, 8, 6), bm(['#e0203a', '#2a8ae0', '#2ac860'][k % 3]), Math.cos(an) * 0.086, 0.025, Math.sin(an) * 0.086)); }
+      break; }
+  }
+  const ex = R * 0.29, ez = R * 0.97 + 0.014;
+  switch (c.face) {
+    case 'nosegl': {   // 鼻メガネ: 黒ぶち + 大きな鼻 + ふさふさの ひげ
+      [-1, 1].forEach((s) => { const rim = new THREE.Mesh(new THREE.TorusGeometry(R * 0.21, 0.008, 6, 22), bm('#141414')); rim.position.set(ex * s, -R * 0.02, ez); head.add(rim);
+        const tp = mesh(new THREE.BoxGeometry(0.005, 0.005, R * 0.8), bm('#141414'), s * R * 0.52, 0, R * 0.55); tp.rotation.y = s * 0.25; head.add(tp); });
+      head.add(mesh(new THREE.BoxGeometry(R * 0.16, 0.006, 0.006), bm('#141414'), 0, 0, ez + 0.002));
+      const nose = tm(new THREE.SphereGeometry(R * 0.16, 14, 10), shade(skinC, 0.95), 0, -R * 0.2, R * 1.04, LN); nose.scale.set(0.9, 1.2, 1.1); head.add(nose);
+      [-1, 1].forEach((s) => { const mu = tm(new THREE.CapsuleGeometry(0.014, 0.05, 4, 8), '#1e1612', s * 0.032, -R * 0.38, R * 0.98, LN); mu.rotation.z = s * 1.25; head.add(mu); });
+      break; }
+    case 'starglass': case 'heartglass': {   // 星メガネ・ハートメガネ(パーティー用)
+      const star = c.face === 'starglass', col = star ? '#ffd23b' : '#ff4a8a';
+      [-1, 1].forEach((s) => {
+        const fr = mesh(new THREE.ExtrudeGeometry(star ? starShape(R * 0.34) : heartShape(R * 0.32), { depth: 0.006, bevelEnabled: false }), bm(col), ex * s * 1.15, -R * 0.02 + (star ? 0 : R * 0.04), ez - 0.004); head.add(fr);
+        const ln = mesh(new THREE.ShapeGeometry(star ? starShape(R * 0.22) : heartShape(R * 0.2)), new THREE.MeshBasicMaterial({ color: star ? '#3a2a6a' : '#5a1030', transparent: true, opacity: 0.7 }), ex * s * 1.15, -R * 0.02 + (star ? 0 : R * 0.04), ez + 0.004); head.add(ln);
+        const tp = mesh(new THREE.BoxGeometry(0.005, 0.005, R * 0.8), bm(col), s * R * 0.55, 0, R * 0.55); tp.rotation.y = s * 0.25; head.add(tp); });
+      break; }
+  }
+  if (c.body === 'sash') {   // たすき「本日の主役」: 右肩から左の腰へ
+    const t = canvasTex(64, 512, (g) => { g.fillStyle = '#d01e28'; g.fillRect(0, 0, 64, 512); g.fillStyle = '#ffe9a8'; g.fillRect(4, 0, 4, 512); g.fillRect(56, 0, 4, 512); g.fillStyle = '#ffffff'; g.font = 'bold 50px ' + FONT_JP; g.textAlign = 'center'; g.textBaseline = 'middle'; Array.from('本日の主役').forEach((ch, k) => g.fillText(ch, 32, 70 + k * 80)); });
+    const sw = mesh(new THREE.PlaneGeometry(0.055, 0.42), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide }), 0, 0.2, f ? 0.125 : 0.14); sw.rotation.z = 0.62; sw.rotation.x = -0.12; body.add(sw);
+    const bk = mesh(new THREE.PlaneGeometry(0.055, 0.42), new THREE.MeshBasicMaterial({ color: '#d01e28', side: THREE.DoubleSide }), 0, 0.2, -(f ? 0.12 : 0.135)); bk.rotation.z = -0.62; body.add(bk);
+  }
 }
 
 /* ---------- 小物(お客さん)・頭のもの(大将) ---------- */
@@ -1472,6 +1573,70 @@ function buildItem(item, empty, half) {
       break;
 
     /* ---------- 揚げ物 ---------- */
+    /* ---------- お祝いモードの限定 ---------- */
+    case 'champagne': {   // シャンパン(細長いグラス + 泡)
+      g.add(mesh(new THREE.CylinderGeometry(0.03, 0.006, 0.02, 14), glassM, 0, 0.003, 0));
+      g.add(mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.07, 8), glassM, 0, 0.04, 0));
+      g.add(mesh(new THREE.CylinderGeometry(0.026, 0.016, 0.1, 16, 1, true), glassM, 0, 0.12, 0));
+      food.add(mesh(new THREE.CylinderGeometry(0.024, 0.015, 0.08, 16), liquid(item.color || '#f2d98a'), 0, 0.112, 0));
+      for (let k = 0; k < 6; k++) food.add(blob(0.0035, 1, 1, 1, '#fffbe8', Math.sin(k * 2) * 0.01, 0.085 + k * 0.009, Math.cos(k * 2) * 0.01));
+      left.add(mesh(new THREE.CylinderGeometry(0.016, 0.015, 0.006, 12), liquid(item.color || '#f2d98a'), 0, 0.075, 0));
+      break; }
+    case 'amazake':   // 甘酒(湯のみ + 白い甘酒 + しょうが)
+      g.add(mesh(new THREE.CylinderGeometry(0.036, 0.03, 0.075, 16), mat('#e8dcc8'), 0, 0.038, 0));
+      food.add(mesh(new THREE.CylinderGeometry(0.033, 0.033, 0.006, 16), mat('#fbf6ea'), 0, 0.068, 0));
+      food.add(blob(0.007, 1, 0.4, 1, '#f2c84a', 0.008, 0.072, 0));
+      left.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.003, 16), mat('#efe6d6'), 0, 0.012, 0));
+      break;
+    case 'chicken': {   // フライドチキン(骨つき + 紙のひらひら)
+      g.add(P(0.1));
+      [[-0.025, -0.01, 0.4], [0.03, 0.02, -0.5]].forEach(([x, z, r]) => { const c = new THREE.Group(); c.position.set(x, 0.03, z); c.rotation.y = r; food.add(c);
+        c.add(blob(0.034, 1.25, 0.8, 0.95, '#a85a20')); c.add(mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.05, 8), mat('#f6efe0'), 0.05, 0.004, 0)).children; });
+      food.children.forEach((c) => { if (c.children[1]) c.children[1].rotation.z = Math.PI / 2; });
+      food.add(blob(0.022, 1.3, 0.4, 1, '#9ad06a', 0.0, 0.016, 0.055));
+      left.add(mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.05, 8), mat('#f6efe0'), 0, 0.015, 0)); left.children[0].rotation.z = Math.PI / 2;
+      break; }
+    case 'cake': {   // ショートケーキ(三角 + いちご)
+      g.add(P(0.08, '#fbfaf6'));
+      const w = mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.06, 16, 1, false, 0, Math.PI / 3.2), mat('#fbf6ec'), -0.03, 0.045, -0.02); food.add(w);
+      const sp = mesh(new THREE.CylinderGeometry(0.0755, 0.0755, 0.012, 16, 1, false, 0, Math.PI / 3.2), mat('#f2d48a'), -0.03, 0.038, -0.02); food.add(sp);
+      const st = mesh(new THREE.ConeGeometry(0.014, 0.026, 10), mat('#e0283a'), 0.0, 0.088, 0.02); food.add(st);
+      food.add(blob(0.012, 1, 0.6, 1, '#fbfaf2', 0.0, 0.078, 0.02));
+      left.add(blob(0.012, 1.4, 0.3, 1, '#fbf6ec', 0, 0.015, 0));
+      break; }
+    case 'bdcake': {   // バースデーケーキ(丸いホール + いちご + ろうそく + 火)
+      g.add(P(0.12, '#fbfaf6'));
+      food.add(mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.07, 24), mat('#fbf6ec'), 0, 0.05, 0));
+      food.add(mesh(new THREE.TorusGeometry(0.088, 0.008, 6, 24), mat('#fffaf0'), 0, 0.086, 0)).children; food.children[food.children.length - 1].rotation.x = Math.PI / 2;
+      for (let k = 0; k < 8; k++) { const an = k / 8 * Math.PI * 2; food.add(mesh(new THREE.ConeGeometry(0.011, 0.02, 8), mat('#e0283a'), Math.cos(an) * 0.068, 0.096, Math.sin(an) * 0.068)); }
+      for (let k = 0; k < 5; k++) { const an = k / 5 * Math.PI * 2 + 0.3; const x = Math.cos(an) * 0.035, z = Math.sin(an) * 0.035;
+        food.add(mesh(new THREE.CylinderGeometry(0.004, 0.004, 0.045, 6), mat(['#ff7aa8', '#7ac8ff', '#ffd23b', '#9ae07a', '#c8a0ff'][k]), x, 0.108, z));
+        food.add(mesh(new THREE.ConeGeometry(0.006, 0.016, 8), new THREE.MeshBasicMaterial({ color: '#ffb02a' }), x, 0.139, z)); }
+      left.add(mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.02, 16, 1, false, 0, Math.PI / 2.5), mat('#fbf6ec'), 0, 0.02, 0));
+      break; }
+    case 'soba': {   // 年越しそば(どんぶり + そば + えび天)
+      g.add(bowl(0.085, 0.06, '#1f1a18', '#1f1a18'));
+      food.add(disc(0.076, 0.048, '#6a3a1a'));
+      food.add(noodles(8, 0.068, 0.05, '#8a7a66', 0.0035));
+      const ebi = mesh(new THREE.CapsuleGeometry(0.016, 0.07, 4, 10), mat('#e8a040'), 0.0, 0.062, 0.0); ebi.rotation.z = Math.PI / 2; ebi.rotation.y = 0.5; food.add(ebi);
+      food.add(blob(0.01, 1.3, 0.4, 1, '#e03a2a', 0.045, 0.062, -0.022));
+      for (let k = 0; k < 5; k++) food.add(blob(0.006, 1, 0.3, 1, '#5aa83a', -0.03 + k * 0.012, 0.058, 0.035));
+      left.add(disc(0.045, 0.018, '#6a3a1a'));
+      break; }
+    case 'ozoni': {   // お雑煮(赤いおわん + 角もち + 青み + にんじん)
+      g.add(bowl(0.075, 0.05, '#a01a1a', '#2a0c0c'));
+      food.add(disc(0.068, 0.04, '#e8dcc0'));
+      food.add(box(0.04, 0.02, 0.035, '#fbf8f0', -0.01, 0.048, 0, 0.3));
+      food.add(blob(0.015, 1.4, 0.3, 1, '#3a9a3a', 0.03, 0.046, 0.02)); food.add(blob(0.01, 1.2, 0.4, 1, '#f08a2a', 0.025, 0.046, -0.025));
+      left.add(disc(0.04, 0.012, '#e8dcc0'));
+      break; }
+    case 'osechi': {   // おせち(重箱: 黒い箱・赤い内がわ・しきりに色とりどり)
+      g.add(box(0.15, 0.05, 0.15, '#141012', 0, 0.025, 0));
+      g.add(box(0.14, 0.004, 0.14, '#a01a1a', 0, 0.05, 0));
+      const C = [['#f2c84a', 'kuri'], ['#e8303a', 'ebi'], ['#1a1a1a', 'kuromame'], ['#fbf4e0', 'kamaboko'], ['#f5d64a', 'datemaki'], ['#3a8a3a', 'ao'], ['#c85a2a', 'ninjin'], ['#f0e0c0', 'renkon'], ['#e86a8a', 'kohaku']];
+      C.forEach(([col], k) => { const x = (k % 3 - 1) * 0.045, z = (Math.floor(k / 3) - 1) * 0.045; for (let j = 0; j < 3; j++) food.add(blob(0.011, 1, 0.7, 1, col, x + (j - 1) * 0.011, 0.06, z + (j % 2) * 0.008)); });
+      left.add(box(0.13, 0.002, 0.13, '#a01a1a', 0, 0.052, 0));
+      break; }
     case 'karaage':
       g.add(P(0.1));
       for (let k = 0; k < 5; k++) { const c = mesh(new THREE.DodecahedronGeometry(0.024, 0), mat('#b5682a'), Math.cos(k * 1.3) * 0.04, 0.035, Math.sin(k * 1.3) * 0.04); c.rotation.set(k, k * 2, 0); food.add(c); }
@@ -1744,7 +1909,7 @@ function createShop(canvas, opts) {
   const tagXs = [];
   for (let x = TV_GAP + 0.06 + tagW / 2; x < L / 2 - 0.2 - tagW / 2 + 0.001; x += tagW + 0.03) tagXs.push(x, -x);
   const must = (SHOP.TAG_ALWAYS || []).map((id) => SHOP.MENU.find((m) => m.id === id)).filter(Boolean);
-  const items = must.concat(SHOP.MENU.filter((m) => m.pun), SHOP.MENU.filter((m) => !m.pun && m.kind !== 'drink'), SHOP.MENU.filter((m) => m.kind === 'drink'))
+  const items = must.concat(SHOP.MENU.filter((m) => m.pun), SHOP.MENU.filter((m) => !m.pun && m.kind !== 'drink'), SHOP.MENU.filter((m) => m.kind === 'drink')).filter((m) => !m.only)   // お祝いの日だけの品は 木札にしない
     .filter((m, i, a) => a.indexOf(m) === i).slice(0, tagXs.length);
   items.forEach((it, i) => {
     const t = canvasTex(64, 200, (g) => {
@@ -2046,6 +2211,8 @@ function createShop(canvas, opts) {
     const ov = view.mode === 'owner' && !photo;   // 大将の目線では、ちょうちんと壁のモニターは出さない(動画は左上の小窓)
     lanterns.forEach((l, i) => { l.visible = !ov; l.rotation.z = Math.sin(clock.elapsedTime * 0.8 + i) * 0.03; });
     tv2.visible = !ov;
+    if (celeb) celeb.tick(clock.elapsedTime, dt);
+    confettiStep(dt);
     renderer.render(scene, camera);
     if (api.onFrame) api.onFrame();
   }
@@ -2089,6 +2256,161 @@ function createShop(canvas, opts) {
     return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height, d: camera.position.distanceTo(tmp) };
   }
 
+  /* ---------- お祝いモードの飾り(クリスマス・お正月・誕生日) ----------
+     奥の壁(お客さんから見える)と、入口の壁(大将から見える)の両方に飾る。派手に。
+     back: 奥の壁ぎわの物(大将の画面で 壁の向こうから映すときは隠す) */
+  const BULB = ['#ff3b3b', '#ffd23b', '#3bff6a', '#3bb8ff', '#ff6ae0'];
+  let celeb = null, celebKey = '';
+  function makeCeleb(kind, opts) {
+    const back = new THREE.Group(), front = new THREE.Group(), mid = new THREE.Group(), blink = [], bob = [], fall = [];
+    const bm = (c) => new THREE.MeshBasicMaterial({ color: c });
+    const ZB = -2.0, ZF = 3.5, top = 2.9;
+    const sagPts = (x0, x1, y, z, drop, segs = 10) => { const p = []; for (let k = 0; k <= segs; k++) { const t = k / segs; p.push(new THREE.Vector3(x0 + (x1 - x0) * t, y - Math.sin(t * Math.PI) * drop, z)); } return p; };
+    // 電球のひも(たるんだ形を いくつも)
+    const lights = (g, x0, x1, y, z, swags, drop) => {
+      const w = (x1 - x0) / swags;
+      for (let s = 0; s < swags; s++) {
+        const curve = new THREE.CatmullRomCurve3(sagPts(x0 + s * w, x0 + (s + 1) * w, y, z, drop));
+        g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 0.006, 4, false), mat('#203a20')));
+        const n = 7; for (let k = 0; k < n; k++) { const p = curve.getPointAt((k + 0.5) / n), c = BULB[(k + s * 2) % BULB.length]; const b = mesh(new THREE.SphereGeometry(0.032, 8, 6), bm(c), p.x, p.y - 0.035, p.z); b.scale.y = 1.3; b.userData = { c: new THREE.Color(c), ph: k + s * 3 }; g.add(b); blink.push(b); }
+      }
+    };
+    // 字の札(横書き)
+    const banner = (g, text, x, y, z, w, h, bg, fg, ry = 0, font = 'bold 120px ' + FONT_JP) => {
+      const t = canvasTex(1024, Math.round(1024 * h / w), (c) => { c.fillStyle = bg; c.fillRect(0, 0, c.canvas.width, c.canvas.height); c.fillStyle = fg; c.textAlign = 'center'; c.textBaseline = 'middle';
+        let fs = parseInt(font.match(/(\d+)px/)[1], 10); c.font = font; while (c.measureText(text).width > c.canvas.width * 0.92 && fs > 20) { fs -= 6; c.font = font.replace(/\d+px/, fs + 'px'); } c.fillText(text, 512, c.canvas.height / 2 + 4); });
+      const m = mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide }), x, y, z); m.rotation.y = ry; g.add(m);
+      [-1, 1].forEach((s) => g.add(mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.25, 4), mat('#222'), x + s * w * 0.42, y + h / 2 + 0.12, z)));
+      return m;
+    };
+    // 舞い落ちる物(雪・金の粉)
+    const flakes = (color, n, size, speed) => {
+      const pos = new Float32Array(n * 3); for (let k = 0; k < n; k++) { pos[k * 3] = (Math.random() - 0.5) * L; pos[k * 3 + 1] = 0.9 + Math.random() * 2.0; pos[k * 3 + 2] = -1.6 + Math.random() * 4.6; }
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const dot = canvasTex(32, 32, (c) => { const gr = c.createRadialGradient(16, 16, 0, 16, 16, 15); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.6, 'rgba(255,255,255,0.8)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, 32, 32); });
+      const pts = new THREE.Points(g, new THREE.PointsMaterial({ color, size, map: dot, transparent: true, opacity: 0.95, depthWrite: false }));
+      pts.userData.speed = speed; mid.add(pts); fall.push(pts);
+    };
+    const shelves = (fn) => { [-1, 1].forEach((sd) => { const x0 = sd * TV_GAP, x1 = sd * (TV_GAP + shelfLen); [1.47, 1.92].forEach((y) => fn(Math.min(x0, x1), Math.max(x0, x1), y, -1.785)); }); };   // 棚のふち(お客さんの正面)
+    const star = (r, depth) => { const sh = new THREE.Shape(); for (let k = 0; k < 10; k++) { const an = Math.PI / 2 + k * Math.PI / 5, rr = k % 2 ? r * 0.45 : r; const x = Math.cos(an) * rr, y = Math.sin(an) * rr; if (k) sh.lineTo(x, y); else sh.moveTo(x, y); } return new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: false }); };
+
+    if (kind === 'xmas') {
+      const tree = (x, z, h) => {
+        const g = new THREE.Group(); g.position.set(x, 0, z); const s = h / 1.9;
+        g.add(mesh(new THREE.CylinderGeometry(0.2 * s, 0.24 * s, 0.26 * s, 14), mat('#a82a22'), 0, 0.13 * s, 0));
+        for (let k = 0; k < 4; k++) { const r = (0.62 - k * 0.13) * s, hh = 0.62 * s, y = (0.45 + k * 0.33) * s + hh / 2; g.add(mesh(new THREE.ConeGeometry(r, hh, 16), mat(k % 2 ? '#1d6b34' : '#237a3c'), 0, y, 0)); }
+        for (let k = 0; k < 30; k++) { const t = k / 30, y = (0.55 + t * 1.25) * s, r = (0.6 - t * 0.5) * s * 0.92, an = k * 2.39; const o = mesh(new THREE.SphereGeometry(0.035 * s, 8, 6), bm(BULB[k % 5]), Math.cos(an) * r, y, Math.sin(an) * r); o.userData = { c: new THREE.Color(BULB[k % 5]), ph: k }; g.add(o); blink.push(o); }
+        const st = mesh(star(0.14 * s, 0.03 * s), bm('#ffd23b'), 0, 1.98 * s, -0.015 * s); g.add(st); st.userData = { spin: 1 }; bob.push(st);
+        [['#d8302a', '#f2d64a'], ['#2a6ad8', '#f6f4ee'], ['#f2d64a', '#d8302a'], ['#ea7ac0', '#f6f4ee']].forEach((c, k) => { const w = 0.22 + (k % 2) * 0.08, hb = 0.16 + (k % 3) * 0.05, an = k * 1.6 + 0.4, b = mesh(new THREE.BoxGeometry(w, hb, w), mat(c[0]), Math.cos(an) * 0.42 * s, hb / 2, Math.sin(an) * 0.42 * s); b.rotation.y = an; g.add(b);
+          b.add(mesh(new THREE.BoxGeometry(w * 1.02, hb * 1.02, 0.04), mat(c[1]))); b.add(mesh(new THREE.BoxGeometry(0.04, hb * 1.02, w * 1.02), mat(c[1]))); });
+        return g;
+      };
+      const wreath = (g, x, y, z, r, ry = 0) => { const w = new THREE.Group(); w.position.set(x, y, z); w.rotation.y = ry;
+        w.add(new THREE.Mesh(new THREE.TorusGeometry(r, r * 0.28, 8, 24), mat('#1f6a32')));
+        for (let k = 0; k < 12; k++) { const an = k / 12 * Math.PI * 2; w.add(mesh(new THREE.SphereGeometry(r * 0.12, 8, 6), bm(k % 3 ? '#e02a2a' : '#ffd23b'), Math.cos(an) * r, Math.sin(an) * r, r * 0.2)); }
+        [-1, 1].forEach((s2) => { const lp = mesh(new THREE.ConeGeometry(r * 0.25, r * 0.5, 4), mat('#d8202a'), s2 * r * 0.25, -r, r * 0.25); lp.rotation.z = s2 * Math.PI / 2; w.add(lp); }); g.add(w); };
+      back.add(tree(-L / 2 - 0.55, -1.45, 2.1)); back.add(tree(L / 2 + 0.55, -1.45, 1.6));
+      lights(back, -W / 2 + 0.3, W / 2 - 0.3, top, ZB, 6, 0.16);
+      banner(back, 'Merry Christmas', 0, 2.72, ZB + 0.02, 1.4, 0.26, '#a8181c', '#fff3c8', 0, 'bold italic 150px Georgia, serif');
+      wreath(back, 0, 1.68, ZB + 0.06, 0.13);
+      front.add(tree(-W / 2 + 0.75, 3.0, 1.9));
+      lights(front, -W / 2 + 0.3, W / 2 - 0.3, 2.85, ZF, 6, 0.16);
+      banner(front, 'Merry Christmas', 0, 2.72, ZF, 1.6, 0.3, '#a8181c', '#fff3c8', Math.PI, 'bold italic 150px Georgia, serif');
+      wreath(front, -1.35, 2.05, ZF - 0.04, 0.2, Math.PI); wreath(front, 1.35, 2.05, ZF - 0.04, 0.2, Math.PI);
+      shelves((x0, x1, y, z) => { const curve = new THREE.CatmullRomCurve3(sagPts(x0, x1, y - 0.01, z, 0.05, 12)); back.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 24, 0.022, 6, false), mat('#1f6a32'))); lights(back, x0, x1, y - 0.02, z + 0.025, 2, 0.05); });
+      flakes('#ffffff', 260, 0.05, 0.28);
+    } else if (kind === 'newyear') {
+      const kadomatsu = (x, z) => { const g = new THREE.Group(); g.position.set(x, 0, z);
+        g.add(mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.42, 16), mat('#8a6a3a'), 0, 0.21, 0));   // 台(わらで巻いた桶)
+        for (let k = 0; k < 3; k++) { const rg = mesh(new THREE.TorusGeometry(0.215, 0.012, 6, 20), mat('#3a2a14'), 0, 0.08 + k * 0.13, 0); rg.rotation.x = Math.PI / 2; g.add(rg); }
+        [[0, 1.25, 0], [-0.08, 1.0, 0.06], [0.08, 0.85, 0.06]].forEach(([dx, h, dz]) => { const b = mesh(new THREE.CylinderGeometry(0.045, 0.05, h, 12), mat('#4a8a3a'), dx, 0.4 + h / 2, dz); g.add(b);
+          const cut = mesh(new THREE.CircleGeometry(0.046, 12), mat('#d8e8b0'), dx, 0.4 + h + 0.005, dz); cut.rotation.x = -Math.PI / 2 + 0.7; g.add(cut); });
+        for (let k = 0; k < 14; k++) { const an = k / 14 * Math.PI * 2, n = mesh(new THREE.ConeGeometry(0.05, 0.22, 5), mat('#1f5a2a'), Math.cos(an) * 0.17, 0.5, Math.sin(an) * 0.17); n.rotation.z = Math.cos(an) * 0.9; n.rotation.x = -Math.sin(an) * 0.9; g.add(n); }   // 松
+        for (let k = 0; k < 4; k++) { const an = k * 1.7, u = mesh(new THREE.SphereGeometry(0.03, 8, 6), mat('#e02a2a'), Math.cos(an) * 0.13, 0.55, Math.sin(an) * 0.13); g.add(u); }   // 南天
+        return g; };
+      const shime = (g, x, y, z, ry = 0) => { const s = new THREE.Group(); s.position.set(x, y, z); s.rotation.y = ry;
+        const rope = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.035, 8, 24), mat('#d8b860')); s.add(rope);
+        for (let k = 0; k < 3; k++) s.add(mesh(new THREE.BoxGeometry(0.06, 0.18, 0.005), mat('#fbfaf4'), -0.1 + k * 0.1, -0.24, 0.03));   // 紙垂
+        s.add(mesh(new THREE.SphereGeometry(0.07, 12, 10), mat('#f08a1a'), 0, 0.05, 0.05));   // だいだい
+        [-1, 1].forEach((s2) => { const lf = mesh(new THREE.SphereGeometry(0.06, 8, 6), mat('#2a7a3a'), s2 * 0.08, 0.12, 0.03); lf.scale.set(1, 0.4, 0.3); lf.rotation.z = s2 * 0.6; s.add(lf); });
+        s.add(mesh(new THREE.BoxGeometry(0.22, 0.05, 0.01), mat('#c8202a'), 0, -0.1, 0.04)); g.add(s); };
+      const kohaku = (g, y, z, ry) => { const t = canvasTex(512, 64, (c) => { for (let k = 0; k < 16; k++) { c.fillStyle = k % 2 ? '#fbfaf4' : '#d01e28'; c.fillRect(k * 32, 0, 32, 64); } });
+        t.wrapS = THREE.RepeatWrapping; t.repeat.set(W / 1.2, 1); const m = mesh(new THREE.PlaneGeometry(W - 0.1, 0.3), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide }), 0, y, z); m.rotation.y = ry; g.add(m);
+        for (let k = 0; k < 12; k++) { const sw = mesh(new THREE.SphereGeometry(0.035, 6, 5), mat('#d8b860'), -W / 2 + 0.4 + k * (W - 0.8) / 11, y + 0.15, z + (ry ? -0.02 : 0.02)); g.add(sw); } };
+      const mochi = (x, y, z, s = 1) => { const g = new THREE.Group(); g.position.set(x, y, z); g.scale.setScalar(s);
+        g.add(mesh(new THREE.BoxGeometry(0.26, 0.06, 0.26), mat('#c8a060'), 0, 0.03, 0));   // 三方
+        g.add(mesh(new THREE.BoxGeometry(0.24, 0.006, 0.24), mat('#fbfaf4'), 0, 0.063, 0));
+        const m1 = mesh(new THREE.SphereGeometry(0.1, 16, 10), mat('#fbf6e8'), 0, 0.1, 0); m1.scale.y = 0.5; g.add(m1);
+        const m2 = mesh(new THREE.SphereGeometry(0.075, 16, 10), mat('#fbf6e8'), 0, 0.15, 0); m2.scale.y = 0.55; g.add(m2);
+        g.add(mesh(new THREE.SphereGeometry(0.04, 12, 10), mat('#f08a1a'), 0, 0.2, 0)); const lf = mesh(new THREE.SphereGeometry(0.03, 8, 6), mat('#2a7a3a'), 0.02, 0.24, 0); lf.scale.set(1, 0.3, 0.6); g.add(lf); return g; };
+      const sheep = (x, y, z) => { const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = -0.6;   // 2027年は未(ひつじ)年
+        for (let k = 0; k < 9; k++) g.add(mesh(new THREE.SphereGeometry(0.055, 10, 8), mat('#fbf8f0'), (k % 3 - 1) * 0.05, 0.1 + Math.floor(k / 3) * 0.02, (Math.floor(k / 3) - 1) * 0.04));
+        g.add(mesh(new THREE.SphereGeometry(0.045, 12, 10), mat('#3a2a24'), 0.1, 0.13, 0)); [-1, 1].forEach((s2) => { const hn = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.009, 6, 12, Math.PI * 1.4), mat('#c8a070')); hn.position.set(0.1, 0.16, s2 * 0.035); g.add(hn); });
+        [-1, 1].forEach((sx) => [-1, 1].forEach((sz) => g.add(mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.07, 6), mat('#3a2a24'), sx * 0.05, 0.035, sz * 0.03)))); return g; };
+      back.add(kadomatsu(-L / 2 - 0.5, -1.6)); back.add(kadomatsu(L / 2 + 0.5, -1.6));
+      shime(back, 0, 2.72, ZB + 0.04); kohaku(back, 2.88, ZB + 0.01, 0);
+      banner(back, '謹賀新年', -0.0, 1.55, ZB + 0.04, 0.6, 0.16, '#c8202a', '#ffe9a8');
+      mid.add(mochi(-L / 2 + 0.3, COUNTER_Y, 0)); mid.add(sheep(L / 2 - 0.3, COUNTER_Y, 0.02));
+      front.add(kadomatsu(-1.05, 3.25)); front.add(kadomatsu(1.05, 3.25));
+      shime(front, 0, 2.72, ZF - 0.05, Math.PI); kohaku(front, 2.9, ZF - 0.02, Math.PI);
+      banner(front, '謹賀新年', -2.3, 2.55, ZF - 0.02, 1.2, 0.34, '#c8202a', '#ffe9a8', Math.PI); banner(front, '2027', 2.3, 2.55, ZF - 0.02, 0.9, 0.34, '#1a1a1e', '#f2d64a', Math.PI);
+      shelves((x0, x1, y, z) => { const t = canvasTex(256, 32, (c) => { for (let k = 0; k < 16; k++) { c.fillStyle = k % 2 ? '#fbfaf4' : '#d01e28'; c.fillRect(k * 16, 0, 16, 32); } }); t.wrapS = THREE.RepeatWrapping; t.repeat.set((x1 - x0) / 0.5, 1);
+        back.add(mesh(new THREE.PlaneGeometry(x1 - x0, 0.07), new THREE.MeshBasicMaterial({ map: t }), (x0 + x1) / 2, y - 0.05, z + 0.012));
+        for (let k = 0; k < 3; k++) { const xx = x0 + (k + 0.5) * (x1 - x0) / 3; back.add(mesh(new THREE.SphereGeometry(0.025, 8, 6), mat('#d8b860'), xx, y - 0.05, z + 0.03)); back.add(mesh(new THREE.CylinderGeometry(0.004, 0.012, 0.09, 6), mat('#d8b860'), xx, y - 0.11, z + 0.03)); } });
+      flakes('#ffd86a', 140, 0.045, 0.18);
+    } else if (kind === 'birthday') {
+      const COL = ['#ff4a6a', '#ffd23b', '#4ac8ff', '#8ae04a', '#c87aff', '#ff9a3a'];
+      const balloons = (g, x, y, z, n) => { const cl = new THREE.Group(); cl.position.set(x, y, z);
+        for (let k = 0; k < n; k++) { const an = k / n * Math.PI * 2, bx = Math.cos(an) * 0.13, bz = Math.sin(an) * 0.1, by = (k % 2) * 0.12;
+          const b = mesh(new THREE.SphereGeometry(0.12, 14, 10), new THREE.MeshPhongMaterial({ color: COL[k % COL.length], shininess: 80 }), bx, by, bz); b.scale.y = 1.18; cl.add(b);
+          const pts = [new THREE.Vector3(bx, by - 0.14, bz), new THREE.Vector3(bx * 0.4, by - 0.4, bz * 0.4), new THREE.Vector3(0, -0.75, 0)];
+          cl.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 6, 0.002, 3), mat('#f6f4ee'))); }
+        cl.userData = { y0: y, ph: x }; bob.push(cl); g.add(cl); };
+      const flags = (g, x0, x1, y, z, ry, drop = 0.18, sz = 1) => { const n = Math.max(2, Math.round((x1 - x0) / (0.24 * sz))); const curve = new THREE.CatmullRomCurve3(sagPts(x0, x1, y, z, drop, 12));
+        g.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 20, 0.004, 3), mat('#f6f4ee')));
+        for (let k = 0; k < n; k++) { const p = curve.getPointAt((k + 0.5) / n), tri = mesh(new THREE.ConeGeometry(0.08 * sz, 0.16 * sz, 3), mat(COL[k % COL.length]), p.x, p.y - 0.08 * sz, p.z); tri.rotation.set(Math.PI, ry, 0); tri.scale.z = 0.12; g.add(tri); } };
+      balloons(back, -L / 2 - 0.35, 2.25, -1.75, 6); balloons(back, L / 2 + 0.35, 2.3, -1.75, 6); balloons(back, -1.0, 2.55, -1.9, 3); balloons(back, 1.0, 2.55, -1.9, 3);
+      flags(back, -W / 2 + 0.3, -0.75, 2.92, ZB + 0.02, 0); flags(back, 0.75, W / 2 - 0.3, 2.92, ZB + 0.02, 0);
+      banner(back, 'HAPPY BIRTHDAY', 0, 2.72, ZB + 0.02, 1.4, 0.24, '#ff4a8a', '#ffffff', 0, 'bold 150px "Arial Rounded MT Bold", Arial, sans-serif');
+      const names = (opts.names || []).filter(Boolean).slice(0, 3);
+      if (names.length) banner(back, names.join('・') + ' おめでとう！', 0, 1.62, ZB + 0.05, 1.3, 0.2, '#fff3c8', '#c8203a');
+      balloons(front, -2.6, 2.3, 3.25, 6); balloons(front, 2.0, 2.3, 3.25, 6); balloons(front, -1.25, 2.5, 3.3, 3); balloons(front, 1.25, 2.5, 3.3, 3);
+      flags(front, -W / 2 + 0.3, W / 2 - 0.3, 2.92, ZF - 0.02, Math.PI);
+      banner(front, 'HAPPY BIRTHDAY', 0, 2.65, ZF - 0.02, 1.9, 0.32, '#ff4a8a', '#ffffff', Math.PI, 'bold 150px "Arial Rounded MT Bold", Arial, sans-serif');
+      if (names.length) banner(front, names.join('・') + ' おめでとう！', -2.3, 2.0, ZF - 0.02, 1.4, 0.26, '#fff3c8', '#c8203a', Math.PI);
+      shelves((x0, x1, y, z) => flags(back, x0, x1, y + 0.01, z + 0.02, 0, 0.04, 0.6));
+      flakes('#ff9ad0', 90, 0.045, 0.12);
+    }
+    scene.add(back); scene.add(front); scene.add(mid);
+    return {
+      back, front, mid,
+      tick(t, dt) {
+        back.visible = !backHidden;
+        blink.forEach((b) => { const on = Math.sin(t * 3 + b.userData.ph * 1.7) > -0.2; b.material.color.copy(b.userData.c).multiplyScalar(on ? 1 : 0.28); });
+        bob.forEach((o) => { if (o.userData.spin) o.rotation.y = t * 1.2; else o.position.y = o.userData.y0 + Math.sin(t * 1.3 + o.userData.ph) * 0.04; });
+        fall.forEach((p) => { const a = p.geometry.attributes.position; for (let k = 0; k < a.count; k++) { let y = a.getY(k) - p.userData.speed * dt; if (y < 0.9) y = 2.9; a.setY(k, y); a.setX(k, a.getX(k) + Math.sin(t + k) * 0.002); } a.needsUpdate = true; });
+      },
+      dispose() { [back, front, mid].forEach((g) => { scene.remove(g); g.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map) o.material.map.dispose(); }); }); }
+    };
+  }
+  /* 紙吹雪(お祝いの合図・カウントダウンの0) */
+  let confetti = null;
+  function confettiBurst(colors) {
+    if (confetti) { scene.remove(confetti.m); confetti.m.geometry.dispose(); }
+    const n = 220, m = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.035, 0.05), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }), n);
+    const P = []; const col = new THREE.Color();
+    for (let k = 0; k < n; k++) { P.push({ x: (Math.random() - 0.5) * L, y: 2.9 + Math.random() * 1.2, z: -1.5 + Math.random() * 4.2, vy: 0.5 + Math.random() * 0.6, r: Math.random() * 6, vr: 2 + Math.random() * 6 }); m.setColorAt(k, col.set(colors[k % colors.length])); }
+    m.instanceColor.needsUpdate = true; scene.add(m); confetti = { m, P, t: 0 };
+  }
+  const _cm = new THREE.Matrix4(), _cq = new THREE.Quaternion(), _ce = new THREE.Euler(), _cs = new THREE.Vector3(1, 1, 1), _cp = new THREE.Vector3();
+  function confettiStep(dt) {
+    if (!confetti) return;
+    confetti.t += dt;
+    confetti.P.forEach((p, k) => { p.y -= p.vy * dt; p.x += Math.sin(confetti.t * 2 + k) * 0.004; p.r += p.vr * dt; _ce.set(p.r, p.r * 0.7, 0); _cq.setFromEuler(_ce); _cp.set(p.x, p.y, p.z); _cm.compose(_cp, _cq, _cs); confetti.m.setMatrixAt(k, _cm); });
+    confetti.m.instanceMatrix.needsUpdate = true;
+    if (confetti.t > 6.5) { scene.remove(confetti.m); confetti.m.geometry.dispose(); confetti = null; }
+  }
+
   const api = {
     /* 重さの物差し(確認用): 1回の絵で描いた三角の数・描く回数・アバター1体ごとの三角の数 */
     weight() {
@@ -2097,6 +2419,15 @@ function createShop(canvas, opts) {
                owner: owner ? tri(owner) : 0, seats: seatAvatars.map((a) => a ? tri(a) : 0) };
     },
     onTap: null, onFrame: null, onItemTap: null, onTagTap: null, onAvatarTap: null, onTableTap: null,
+    /* お祝いモード: kind = 'xmas' | 'newyear' | 'birthday' | ''(なし)。opts.names = 誕生日の人の名前 */
+    setCelebrate(kind, opts = {}) {
+      const key = (kind || '') + '|' + JSON.stringify(opts.names || []);
+      if (key === celebKey) return; celebKey = key;
+      if (celeb) { celeb.dispose(); celeb = null; }
+      if (kind) celeb = makeCeleb(kind, opts);
+    },
+    setZoom(z) { view.zoom = z; },   // 見本: 全体を少し遠めに(1より小さいと広く見える)
+    confetti(kind) { confettiBurst(kind === 'xmas' ? ['#ff3b3b', '#3bff6a', '#ffffff', '#ffd23b'] : kind === 'newyear' ? ['#ffd23b', '#d01e28', '#ffffff', '#f2c14a'] : ['#ff4a6a', '#ffd23b', '#4ac8ff', '#8ae04a', '#c87aff', '#ff9a3a']); },
     /* 確認用: 料理の画面上の位置 */
     _tagScreens() { const r = canvas.getBoundingClientRect(); return tagList.map((t) => { const v = new THREE.Vector3(); t.getWorldPosition(v); v.project(camera); return { id: t.userData.menuId, x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height, z: v.z }; }); },   // 確認用
     itemPos(key) { const h = itemHitList.find((x) => x.userData.key === key); if (!h) return null; const v = new THREE.Vector3(); h.getWorldPosition(v); v.y += 0.02; v.project(camera); const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; },

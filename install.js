@@ -47,7 +47,7 @@
   window.addEventListener('appinstalled', function () { deferred = null; showDone(); });
 
   function hidden() { try { return localStorage.getItem(KEY) === '1'; } catch (e) { return false; } }
-  if (standalone || /play|auto|noinstall/.test(hash) || hidden()) return;
+  if (standalone || /play|auto|noinstall|demo/.test(hash) || hidden()) return;
 
   // shield: はじめの画面・案内にふれても、うしろのアプリ(window で pointerup などを見ているもの)に伝えない。
   // 「このまま…」のボタン(igPlay / igHelpPlay)だけは伝える → そのタップで アプリが始まり、iPhone でも音を出せる
