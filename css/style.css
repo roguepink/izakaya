@@ -424,3 +424,9 @@ body.photo-mode .kp, body.photo-mode .kp-banner { display: none; }
 
 .tag.serve.mini { padding: 6px 9px; font-size: 15px; }
 .seat-serve { flex-wrap: wrap; }
+
+/* 入力欄の上の「〇〇さんへ ✕ 消す」 */
+.to-chip { display: flex; align-items: center; gap: 8px; margin: 0 0 6px 6px; align-self: flex-start; background: rgba(255,232,170,.95); color: var(--ink); border-radius: 999px; padding: 4px 4px 4px 12px; font-size: 13.5px; font-weight: 800; max-width: calc(100% - 12px); }
+.to-chip.hidden { display: none; }
+.to-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.to-chip button { flex: none; background: #8c1d16; color: #fff; border-radius: 999px; padding: 7px 12px; font-size: 13.5px; font-weight: 800; }

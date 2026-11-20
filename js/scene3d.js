@@ -1982,10 +1982,12 @@ function createShop(canvas, opts) {
         const th = ray.intersectObjects(tableHits.filter((h) => seatAvatars[h.userData.seat]), false);
         if (th.length) cand.push({ d: th[0].distance - 0.02, go: () => api.onTableTap(th[0].object.userData.seat) });
       }
-      if (api.onAvatarTap) {   // 人を押す → その人あてに書く
+      if (api.onAvatarTap) {   // 人を押す → その人あてに書く(見えている部品だけ。帽子の中の髪など 見えない部品には当たらない)
+        const shown = (h) => { if (h.object.material && h.object.material.visible === false) return false; for (let o = h.object; o; o = o.parent) if (!o.visible) return false; return true; };
         const ppl = seatAvatars.map((a, i) => (a && a.visible ? { a, k: i } : null)).filter(Boolean);
         if (owner && owner.visible) ppl.push({ a: owner, k: 'owner' });
-        ppl.forEach((pp) => { const h = ray.intersectObject(pp.a, true); if (h.length) cand.push({ d: h[0].distance, go: () => api.onAvatarTap(pp.k) }); });
+        const tagFirst = tagHits.length && api.onTagTap;   // 木札と大将が重なっている所は 木札(注文)を先に(大将あては 大将だけを押した時)
+        ppl.forEach((pp) => { if (pp.k === 'owner' && tagFirst) return; const h = ray.intersectObject(pp.a, true).filter(shown); if (h.length) cand.push({ d: h[0].distance, go: () => api.onAvatarTap(pp.k) }); });
       }
       if (cand.length) { cand.sort((x, y) => x.d - y.d); cand[0].go(); drag = null; return; }
       const hits = ray.intersectObjects(stools.map((s) => s.hit));
@@ -2096,6 +2098,7 @@ function createShop(canvas, opts) {
     },
     onTap: null, onFrame: null, onItemTap: null, onTagTap: null, onAvatarTap: null, onTableTap: null,
     /* 確認用: 料理の画面上の位置 */
+    _tagScreens() { const r = canvas.getBoundingClientRect(); return tagList.map((t) => { const v = new THREE.Vector3(); t.getWorldPosition(v); v.project(camera); return { id: t.userData.menuId, x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height, z: v.z }; }); },   // 確認用
     itemPos(key) { const h = itemHitList.find((x) => x.userData.key === key); if (!h) return null; const v = new THREE.Vector3(); h.getWorldPosition(v); v.y += 0.02; v.project(camera); const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; },
     /* 押した料理を はねさせる(作りなおしたあとでも はねるように 覚えておく) */
     bump(key) { bumpKey = key; bumpAt = performance.now(); tableGroups.forEach((tg) => tg.children.forEach((m) => { if (m.userData.key === key) m.userData.bump = bumpAt; })); },

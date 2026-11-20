@@ -808,7 +808,20 @@
   var lastSent = 0;
   /* 書く欄: 長く書くと下に広がる(5行くらいまで。それ以上は欄の中で動かす) */
   var chatIn = $('chatInput');
-  function growInput() { chatIn.style.height = 'auto'; chatIn.style.height = Math.min(chatIn.scrollHeight, 140) + 'px'; }
+  function growInput() { chatIn.style.height = 'auto'; chatIn.style.height = Math.min(chatIn.scrollHeight, 140) + 'px'; toChip(); }
+  /* だれかあてに書いているときは 入力欄の上に「〇〇さんへ ✕ 消す」。✕ で あて先を消す(まちがえて押した時にすぐ消せる) */
+  var CALL_RE = /^(大将|マスター|[^、\s]{1,20}(さん|くん|君|ちゃん|様|さま|先生))、/;
+  function toChip() {
+    var m = chatIn.value.match(CALL_RE), c = $('toChip');
+    if (!m) { if (!c.classList.contains('hidden')) c.classList.add('hidden'); return; }
+    $('toName').textContent = '💬 ' + m[1] + 'へ';
+    c.classList.remove('hidden');
+  }
+  $('toClear').addEventListener('pointerdown', function (e) { e.preventDefault(); });   // 押しても入力欄から外れないように(そのあと自分で閉じる)
+  $('toClear').onclick = function () {
+    chatIn.value = chatIn.value.replace(CALL_RE, ''); replyPick = null; growInput();
+    if (!chatIn.value.trim()) { chatIn.value = ''; growInput(); try { chatIn.blur(); } catch (e) {} }   // 何も書いていなければ キーボードも閉じる
+  };
   chatIn.addEventListener('input', growInput);
   chatIn.addEventListener('keydown', function (e) {   // パソコンは Enter で送る(Shift+Enter で改行)。スマホの改行キーは改行
     var touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
