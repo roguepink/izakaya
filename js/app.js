@@ -452,7 +452,7 @@
       if (q && wpx > 56 && seen > 0.72 && seen * (1 - hiddenByHead(q, headHull)) > 0.6) { css = quadMatrix(q); mode = 'monitor'; }   // 帯や大将の頭で半分近く隠れるなら小窓
       else {   // モニターが見えない向きは左上の小窓
         var sat = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sat')) || 0;
-        var small = OWNER_MODE && view === 'owner' && window.innerWidth > window.innerHeight && window.innerHeight < 520;   // 横向きの大将の画面は 小さめ(下に会話の欄)
+        var small = ownerCam() && window.innerWidth > window.innerHeight && window.innerHeight < 520;   // 横向きの大将の画面は 小さめ(下に会話の欄)
         css = 'translate(10px,' + Math.round(sat + (small ? 84 : 92)) + 'px) scale(' + ((tvTall ? (small ? 60 : 100) : (small ? 136 : 168)) / TVW).toFixed(4) + ')'; mode = 'pip';
       }
     }
@@ -585,6 +585,7 @@
     if (s2 !== mySeat) { mySeat = s2; if (!OWNER_MODE) setView(mySeat >= 0 ? (view === 'overview' ? 'first' : view) : 'overview'); }
     $('pickHint').classList.toggle('hidden', OWNER_MODE || mySeat >= 0);
     var cnt = seats.filter(Boolean).length;
+    $('emptyNote').classList.toggle('hidden', !(OWNER_MODE && cnt === 0));   // 大将の画面: だれもいないときの ひとこと
     $('tbCount').textContent = '👥 ' + cnt + '/' + N + (ownerPresent() ? ((tree.state || {}).ownerRole === 'master' ? ' ・マスターあり' : ' ・大将あり') : '');
     // 閉店
     if (st.closedAt && st.closedAt > joinAt && !$('closing').classList.contains('show')) showClosing();
@@ -717,8 +718,8 @@
     $('entrance').classList.add('hidden');
     $('shop').classList.remove('hidden');
     $('bBot').classList.toggle('hidden', !LOCAL);
-    // 大将の画面は いつも「接客の目線」(みんなの顔が見える)。お客さん用の 視点の切りかえ・注文 は出さない
-    $('bView').classList.toggle('hidden', OWNER_MODE); $('bMenu').classList.toggle('hidden', OWNER_MODE);
+    // 大将の画面: 視点は 大将用の「接客」「全体」だけ(お客さんの目線にはならない)。お客さん用の 注文 は出さない
+    $('bMenu').classList.toggle('hidden', OWNER_MODE);
     setView(OWNER_MODE ? 'owner' : (mySeat >= 0 ? 'first' : 'overview'));   // もとの席に戻ったときは 目線で
     buildPhrases();
     hbTimer = setInterval(function () { if (inside && members()[ME.uid]) net.update('members/' + ME.uid, { seen: TS }); botTick(); }, 15000);
@@ -742,7 +743,7 @@
     audio.pause(); hideYT(); curKey = '';
     closeSheet();
     $('bubbles').innerHTML = ''; bubbles = {}; $('log').innerHTML = ''; $('log')._h = ''; toggleLog(false);
-    $('shop').classList.add('hidden'); $('entrance').classList.remove('hidden');
+    $('shop').classList.add('hidden'); $('entrance').classList.remove('hidden'); $('emptyNote').classList.add('hidden');
     setView('overview');
   }
   /* 「帰る」を押さずに画面を閉じた: すぐには帰さず「席を外しています」にする(3分は席と料理が残る。戻ればそのまま座れる) */
@@ -791,13 +792,14 @@
   }
 
   /* ---------------- 視点 ---------------- */
-  var VIEW_NAMES = { first: '目線', back: '後ろ', overview: '全体', owner: '大将' };
-  function setView(v) { view = v; document.body.classList.toggle('owner-view', OWNER_MODE && v === 'owner'); withScene(function (s) { s.setView(v, mySeat); }); $('bViewLbl').textContent = VIEW_NAMES[v] || '目線'; }
+  var VIEW_NAMES = { first: '目線', back: '後ろ', overview: '全体', owner: '接客', ownerAll: '全体' };
+  /* 大将の目線か(接客 = 座っている人だけ大きく / 全体 = お店ぜんぶ)。どちらも 会話の欄は大きく、ボタンはたたむ */
+  function ownerCam() { return OWNER_MODE && (view === 'owner' || view === 'ownerAll'); }
+  function setView(v) { if (OWNER_MODE && inside && v !== 'owner' && v !== 'ownerAll') v = 'owner'; view = v; document.body.classList.toggle('owner-view', ownerCam()); withScene(function (s) { s.setView(v, mySeat); }); $('bViewLbl').textContent = VIEW_NAMES[v] || '目線'; }
   $('bView').onclick = function () {
-    if (OWNER_MODE) { setView('owner'); return; }
-    var order = OWNER_MODE ? ['owner', 'overview'] : (mySeat >= 0 ? ['first', 'back', 'overview'] : ['overview']);
+    var order = OWNER_MODE ? ['owner', 'ownerAll'] : (mySeat >= 0 ? ['first', 'back', 'overview'] : ['overview']);
     var i = order.indexOf(view); setView(order[(i + 1) % order.length]);
-    toast('視点: ' + VIEW_NAMES[view], 1200);
+    toast('視点: ' + VIEW_NAMES[view] + (view === 'owner' ? '(座っている人を大きく)' : view === 'ownerAll' ? '(お店ぜんぶ)' : ''), 1500);
   };
 
   /* ---------------- 会話 ---------------- */
@@ -953,7 +955,7 @@
     var put = function (key, cls, text, p, click) { if (!p) return; var t = tagEl(key, cls, text, click); t.style.left = p.x + 'px'; t.style.top = p.y + 'px'; t.style.display = ''; used[key] = 1; };
     if (showTags) {
       var st = tree.state || {};
-      if (!(OWNER_MODE && view === 'owner')) put('owner', OWNER_MODE ? 'owner' : 'owner tap', ownerLabel() + (ownerPresent() ? '' : '(おまかせ中)'), a.owner);   // おまかせ中でも 押すと大将あてに書ける
+      if (!(ownerCam())) put('owner', OWNER_MODE ? 'owner' : 'owner tap', ownerLabel() + (ownerPresent() ? '' : '(おまかせ中)'), a.owner);   // おまかせ中でも 押すと大将あてに書ける
       if (tagEls.owner) { if (OWNER_MODE) tagEls.owner.removeAttribute('data-seat'); else tagEls.owner.setAttribute('data-seat', 'owner'); }
       var resv = reservationsNow();
       for (var i = 0; i < N; i++) {
@@ -984,7 +986,7 @@
     if (npEl && npEl.offsetParent && npEl.getBoundingClientRect().height) topLimit = Math.max(topLimit, npEl.getBoundingClientRect().bottom + 4);
     var list = [];
     Object.keys(bubbles).forEach(function (k) {
-      var b = bubbles[k], p = k === 'owner' ? (OWNER_MODE && view === 'owner' ? null : a.owner) : a.seats[+k];
+      var b = bubbles[k], p = k === 'owner' ? (ownerCam() ? null : a.owner) : a.seats[+k];
       if (!p || t > b.until + 500) { b.el.remove(); delete bubbles[k]; return; }
       list.push({ k: k, b: b, p: p });
     });
@@ -1002,7 +1004,7 @@
       b.el.classList.remove('moved');   // 測る前に、名前の行を消しておく(ずらすときに付けて、測りなおす)
       // まず、頭の上から上の端までを使える高さにして、自然な大きさを測る
       var T = p.y;                                   // 吹き出しの「しっぽの先」の位置
-      var ov = OWNER_MODE && view === 'owner';   // 大将の接客画面: 吹き出しは3行まで(全文は下の会話の欄)
+      var ov = ownerCam();   // 大将の接客画面: 吹き出しは3行まで(全文は下の会話の欄)
       b.bt.style.maxHeight = (ov ? 62 : Math.max(MIN_TEXT, Math.min(T - TAIL - topLimit - 16, share - 16))) + 'px';
       b.el.classList.toggle('clamp', ov);
       var w = b.el.offsetWidth, h = b.el.offsetHeight;

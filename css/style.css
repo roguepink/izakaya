@@ -402,3 +402,10 @@ body.photo-mode .kp, body.photo-mode .kp-banner { display: none; }
 .vc b { display: block; font-size: 15px; margin-bottom: 6px; }
 .vc-btns { display: flex; gap: 5px; flex-wrap: wrap; }
 .vc-btns button { background: #5a3a22; color: #fff; border-radius: 999px; padding: 5px 9px; font-size: 12.5px; font-weight: 800; }
+
+/* 大将の画面: だれもいないときの ひとこと(真ん中より少し上) */
+#emptyNote { position: fixed; left: 50%; top: 34%; transform: translateX(-50%); z-index: 8; pointer-events: none; text-align: center;
+  background: rgba(20,12,8,.72); color: #fff3d6; border: 1px solid rgba(255,214,140,.45); border-radius: 14px; padding: 12px 18px; font-size: 16px; font-weight: 700; white-space: nowrap; }
+#emptyNote small { display: block; margin-top: 4px; font-size: 12.5px; font-weight: 400; opacity: .85; }
+#emptyNote.hidden, body:not(.owner-view) #emptyNote { display: none; }
+@media (orientation: landscape) and (max-height: 520px) { body.owner-view #emptyNote { left: 69%; } }

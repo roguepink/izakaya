@@ -1868,10 +1868,10 @@ function createShop(canvas, opts) {
   /* カメラの置き場所。縦向き(スマホを立てて持つ)は横に7人が入らないので、カウンターの端から斜めに見る。
      横向きは正面から、7人全員が入る広さに自動で合わせる */
   let wantFov = 60;
-  function fitFov(dist) {   // カウンターの端から端までが横に入る広さ
+  function fitFov(dist, k = 1) {   // カウンターの端から端までが横に入る広さ(k: 使える横はばの割合)
     const half = L / 2 - 0.15;
     const h = 2 * Math.atan(half / dist);
-    return THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(h / 2) / baseAspect)), 42, 78);
+    return THREE.MathUtils.clamp(THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(h / 2) / (baseAspect * k))), 42, 88);
   }
   /* 大将の目線(接客用): 座っている人だけが入るように、正面から寄ったり引いたりする。
      1人なら その人を大きく、2〜3人なら横一列、多いときは全体(縦向きで正面に入りきらないときは、はしから斜めに) */
@@ -1879,6 +1879,7 @@ function createShop(canvas, opts) {
   let viewShift = 0, baseAspect = 1, viewApplied = -1;   // 横向きの大将の画面: 左に会話の欄があるので、絵の中心を右へずらす(0 = ずらさない)
   function ownerFrame(portrait) {
     const xs = []; seatAvatars.forEach((a, i) => { if (a) xs.push(seatX(i, N)); });
+    if (!xs.length) xs.push(seatX(0, N), seatX(N - 1, N));   // だれも座っていないときは 空いている席を全部
     const x0 = xs.length ? Math.min(...xs) : -SEAT_GAP, x1 = xs.length ? Math.max(...xs) : SEAT_GAP;
     const span = x1 - x0, cx = (x0 + x1) / 2;
     viewShift = portrait ? 0 : 0.69;
@@ -1916,9 +1917,11 @@ function createShop(canvas, opts) {
       case 'first': wantPos.set(x, 1.5, GUEST_Z + 0.22); wantLook.set(x, portrait ? 1.08 : 1.24, -0.95); break;   // 勝手に動かさない(大将がほかの席へ行っても まっすぐ前のまま)   // 横向きは少し上を見る(モニターが入るように)   // 向きすぎると となりの頭でふさがる
       case 'back': wantPos.set(x * 0.85, 2.3, GUEST_Z + 1.35); wantLook.set(x * 0.75, 1.0, -0.45); break;   // 頭ごしに 自分の料理が見える高さ
       case 'owner': ownerFrame(portrait); break;
+      case 'ownerAll': viewShift = portrait ? 0 : 0.69;   // 大将の「全体」: お客さんの全体と同じ映し方。横向きは左の会話の欄の分 右へずらす
+      // fall through
       default:
         if (portrait) { const ex = Math.max(0, N - 7) * 0.32; wantPos.set(L / 2 + 0.75 + ex * 0.4, 2.55 + ex * 0.35, 2.75 + ex); wantLook.set(-L * 0.12, 1.0, -0.35); wantFov = 64 + Math.max(0, N - 7) * 1.5; }
-        else { wantPos.set(0, 2.6, 3.25); wantLook.set(0, 1.0, -0.8); wantFov = fitFov(3.25); }
+        else { wantPos.set(0, 2.6, 3.25); wantLook.set(0, 1.0, -0.8); wantFov = fitFov(3.25, view.mode === 'ownerAll' ? 0.62 : 1); }
     }
     // 指でぐるっと見回す分
     const dir = wantLook.clone().sub(wantPos);
@@ -2013,7 +2016,7 @@ function createShop(canvas, opts) {
     if (window.__cam) { camera.position.set(...window.__cam[0]); camera.lookAt(...window.__cam[1]); camera.fov = window.__cam[2] || camera.fov; camera.updateProjectionMatrix(); }   // 確認用(棚などを近くで撮る)
     if (!photo) { const zf = THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(wantFov / 2)) / view.zoom));   // アップ = 見る広さをせまく
       if (Math.abs(camera.fov - zf) > 0.05) { camera.fov += (zf - camera.fov) * Math.min(1, k * 2.5); camera.updateProjectionMatrix(); } }
-    if (!photo) { const sh = view.mode === 'owner' ? viewShift : 0;   // 絵の中心を 画面の横 sh の位置へ(ゆがまないように、広い絵の左側を切りとる)
+    if (!photo) { const sh = (view.mode === 'owner' || view.mode === 'ownerAll') ? viewShift : 0;   // 絵の中心を 画面の横 sh の位置へ(ゆがまないように、広い絵の左側を切りとる)
       if (sh !== viewApplied) { viewApplied = sh; const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
         if (sh) { camera.aspect = baseAspect * sh * 2; camera.setViewOffset(w * sh * 2, h, 0, 0, w, h); } else { camera.aspect = baseAspect; camera.clearViewOffset(); } } }
     { const hb = camPos.z < -1.8; if (hb !== backHidden) { backHidden = hb; backList().forEach((o) => { o.visible = !hb; }); scene.fog.near = hb ? 9 : 7; scene.fog.far = hb ? 18 : 14; } }
