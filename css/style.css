@@ -457,7 +457,7 @@ body.demo .demo-note b { display: block; font-size: 15px; color: #ffd27a; margin
 body.demo .demo-note .dn-try { display: block; margin-top: 4px; font-weight: 800; color: #ffe7b0; }
 body.demo .demo-note i { font-style: normal; }
 body.demo .chat, body.demo #phrases, body.demo #toChip, body.demo #pickHint, body.demo #mine, body.demo #npSkip, body.demo .tb-right { display: none !important; }
-body.demo .side > .sbtn:not(#bView) { pointer-events: none; opacity: .45; filter: grayscale(.5); }   /* 見本: 右のボタンは 見せるだけ(押せない)。押せるのは 👁 だけ */
+body.demo .side > .sbtn:not(#bView) { pointer-events: none; }   /* 見本: 右のボタンは ふつうの色で見せるだけ(押せない)。押せるのは 👁 だけ(2026-11-21 ノブさん「薄くしなくていい」) */
 body.demo #bView { box-shadow: 0 0 0 3px #ffd27a, 0 0 18px rgba(255,210,122,.8); animation: demoPulse 1.6s ease-in-out infinite; }
 @keyframes demoPulse { 50% { box-shadow: 0 0 0 5px #ffd27a, 0 0 26px rgba(255,210,122,1); } }
 body.demo .log { font-size: 12px; }
