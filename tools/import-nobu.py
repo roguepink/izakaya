@@ -55,9 +55,14 @@ def items(path):
 
 def convert(src, dst):
     # 前後の無音(-50dB より小さい所)を切り(言葉の頭が切れないよう 前に0.15秒・後に0.2秒 残す)、大きさをそろえて、AAC 40k モノラルに
+    # 2026-11-21 ノブさん「大将の声にエコーがかかっている」→ 部屋の響きを抑える:
+    #   低いうなり(90Hz 以下)を切る・さーっという音を減らす・言葉のあとの響きを ゆるいゲートで下げる。
+    #   ゲートを強くすると「いいねえ」「帰って」の頭が欠けた(文字起こしで確認)ので、この強さ(0.025)まで。
     af = ('silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.15,'
           'areverse,silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.2,areverse,'
-          'loudnorm=I=-16:TP=-1.5:LRA=11')
+          'highpass=f=90,afftdn=nr=12:nf=-40,'
+          'loudnorm=I=-16:TP=-1.5:LRA=11,'
+          'agate=threshold=0.025:ratio=5:range=0.06:attack=1:release=60:knee=3,alimiter=limit=0.85')
     subprocess.run(['ffmpeg', '-nostdin', '-loglevel', 'error', '-y', '-i', src, '-vn', '-map_metadata', '-1',
                     '-af', af, '-ac', '1', '-ar', '44100', '-c:a', 'aac', '-b:a', '40k', '-movflags', '+faststart', dst],
                    check=True)

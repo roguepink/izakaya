@@ -421,6 +421,7 @@ body.photo-mode .kp, body.photo-mode .kp-banner { display: none; }
 #whoPick .wp-name { font-weight: 800; font-size: 14px; color: #8a6a3a; text-align: center; }
 #whoPick button { font-size: 16px; font-weight: 800; padding: 12px 14px; border-radius: 12px; background: #f3e6cc; color: var(--ink); }
 #whoPick button[data-w=serve] { background: #ffd27a; }
+#whoPick button[data-w=look] { background: #ffd27a; }
 
 .tag.serve.mini { padding: 6px 9px; font-size: 15px; }
 .seat-serve { flex-wrap: wrap; }
@@ -456,7 +457,7 @@ body.demo .demo-note b { display: block; font-size: 15px; color: #ffd27a; margin
 body.demo .demo-note .dn-try { display: block; margin-top: 4px; font-weight: 800; color: #ffe7b0; }
 body.demo .demo-note i { font-style: normal; }
 body.demo .chat, body.demo #phrases, body.demo #toChip, body.demo #pickHint, body.demo #mine, body.demo #npSkip, body.demo .tb-right { display: none !important; }
-body.demo .side > .sbtn:not(#bView) { display: none !important; }
+body.demo .side > .sbtn:not(#bView) { pointer-events: none; opacity: .45; filter: grayscale(.5); }   /* 見本: 右のボタンは 見せるだけ(押せない)。押せるのは 👁 だけ */
 body.demo #bView { box-shadow: 0 0 0 3px #ffd27a, 0 0 18px rgba(255,210,122,.8); animation: demoPulse 1.6s ease-in-out infinite; }
 @keyframes demoPulse { 50% { box-shadow: 0 0 0 5px #ffd27a, 0 0 26px rgba(255,210,122,1); } }
 body.demo .log { font-size: 12px; }
@@ -477,3 +478,16 @@ body.demo .demo-note.mini b { display: inline; font-size: 13px; margin-right: 6p
 body.demo .demo-note.mini .dn-try { display: inline; margin-top: 0; }
 @media (orientation: landscape) and (max-height: 520px) { body.demo .demo-note.mini { top: auto; bottom: 12px; left: auto; right: 12px; max-width: 36vw; } }
 @media (orientation: portrait) and (max-height: 700px) { body.demo .demo-note.mini { display: none; } }   /* 小さいスマホは 小さくしたあと しまう(👁 は光っている) */
+
+/* 着がえ中の名札(2026-11-21 ノブさん「かわいらしく」) */
+.tag.kigae { background: #ffd1e3 !important; color: #8a2d55 !important; border: 2px dashed #ff8fbd; animation: kigaeWiggle 1.2s ease-in-out infinite; }
+@keyframes kigaeWiggle { 0%,100% { rotate: -3deg; } 50% { rotate: 3deg; } }
+body.demo .side > #bCos { display: none !important; }
+body.demo .side > #bBot { display: none !important; }   /* おためし客は 見本では出さない */
+/* 着がえ中は、上に重なるもの(乾杯・撮影・カウントダウン・小窓)を出さない。撮影の写真は 着がえが終わってから見える */
+body.kigae-on #kpUi, body.kigae-on #kpBanner, body.kigae-on #photoUi, body.kigae-on #flash, body.kigae-on #photoBox, body.kigae-on #countdown, body.kigae-on #whoPick, body.kigae-on #sheet, body.kigae-on #sheetBack { display: none !important; }
+/* 自分の名札も押せる(押すと 着がえ) */
+.tag.me { pointer-events: auto; cursor: pointer; }
+.tag.me::after { content: ' 👕'; font-size: 9px; }
+body.is-owner .tag.owner { pointer-events: auto; cursor: pointer; }
+.tag.kigae::after { content: "" !important; }   /* 着がえ中は 💬・👕 の印を出さない */
