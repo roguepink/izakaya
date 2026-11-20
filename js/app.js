@@ -555,6 +555,7 @@
   function seatUid(i) { var s = tree.seats || {}; return s[i] || null; }
   function amLeader() {
     if (!inside) return false;
+    if (DEMO) return true;   // 見本: 作りものの大将は動かないので、見ている人の画面が お店を回す(料理を出す・下げる)
     var ms = members(), best = null;
     Object.keys(ms).forEach(function (uid) {
       var m = ms[uid]; if (!fresh(m) || m.bot) return;
@@ -586,12 +587,14 @@
     if (!inside) return;
 
     // 自分が店から出された(大将に帰ってもらった・閉店で片づけられた)
-    if (ms[ME.uid]) seenMine = true;
+    if (ms[ME.uid] && !ms[ME.uid].name) { net.remove('members/' + ME.uid); if (seenMine) { leave(true); toast('お店を出ました'); return; } }   // 消されたあとに「いるよ」だけが書きこまれた 名前のない記録(帰ってもらった・閉店のあと)
+    if (ms[ME.uid] && ms[ME.uid].name) seenMine = true;
     else if (seenMine) { leave(true); toast('お店を出ました'); return; }
     // 自分の席
     var s2 = -1; for (var k = 0; k < N; k++) if (seatUid(k) === ME.uid) s2 = k;
     if (s2 !== mySeat) { mySeat = s2; if (!OWNER_MODE) setView(mySeat >= 0 ? (view === 'overview' ? 'first' : view) : 'overview'); }
     $('pickHint').classList.toggle('hidden', OWNER_MODE || mySeat >= 0);
+    document.body.classList.toggle('picking', inside && !OWNER_MODE && !DEMO && mySeat < 0);   // 座る前(横向きは 会話の欄をしまって 席を押せるように)
     var cnt = seats.filter(Boolean).length;
     $('emptyNote').classList.toggle('hidden', !(OWNER_MODE && cnt === 0));   // 大将の画面: だれもいないときの ひとこと
     $('tbCount').textContent = '👥 ' + cnt + '/' + N + (ownerPresent() ? ((tree.state || {}).ownerRole === 'master' ? ' ・マスターあり' : ' ・大将あり') : '');
@@ -721,7 +724,7 @@
     net.set('members/' + ME.uid, { name: name, avatar: myAvatar(), owner: OWNER_MODE, at: TS, seen: TS, voice: myAvatar().voice || '' });
     if (OWNER_MODE) {
       net.update('state', { ownerAvatar: ownerAvatar, ownerName: name, ownerRole: ROLE });
-      sys(ROLE === 'master' ? '🏮 今回のマスター ' + honor(name) + 'が店に立ちました' : '🏮 大将の' + name + 'が店に立ちました');
+      sys(ROLE === 'master' ? '🏮 今回のマスター ' + honor(name) + 'が店に立ちました' : '🏮 ' + (/^大将/.test(name) ? '' : '大将の') + name + 'が店に立ちました');
     }
     document.body.classList.toggle('is-nobu', OWNER_MODE && ROLE === 'nobu');
     $('entrance').classList.add('hidden');
@@ -731,7 +734,7 @@
     $('bMenu').classList.toggle('hidden', OWNER_MODE);
     setView(OWNER_MODE ? 'owner' : (mySeat >= 0 ? 'first' : 'overview'));   // もとの席に戻ったときは 目線で
     buildPhrases();
-    hbTimer = setInterval(function () { if (inside && members()[ME.uid]) net.update('members/' + ME.uid, { seen: TS }); botTick(); }, 15000);
+    hbTimer = setInterval(function () { var mm = members()[ME.uid]; if (inside && mm && mm.name) net.update('members/' + ME.uid, { seen: TS }); botTick(); }, 15000);   // 名前のある自分の記録があるときだけ(消されたあとに作らない)
     var back = -1; for (var bi = 0; bi < N; bi++) if (seatUid(bi) === ME.uid) back = bi;
     if (back >= 0 && !OWNER_MODE) setTimeout(function () { toast('おかえりなさい。もとの席にもどりました'); }, 600);
     if (!OWNER_MODE && back < 0) {
@@ -744,7 +747,7 @@
     if (!inside) return;
     if (!kicked) {
       if (mySeat >= 0) { event({ type: 'phrase', id: 'mataokoshi', seat: mySeat }); net.remove('seats/' + mySeat); net.remove('tables/' + mySeat); }
-      sys(OWNER_MODE ? '大将の' + currentName() + 'が奥に下がりました' : honor(currentName()) + 'がお帰りになりました');
+      sys(OWNER_MODE ? (/^大将/.test(currentName()) ? '' : '大将の') + currentName() + 'が奥に下がりました' : honor(currentName()) + 'がお帰りになりました');
       net.remove('members/' + ME.uid);
       botsLeave();
     }
@@ -756,7 +759,7 @@
     setView('overview');
   }
   /* 「帰る」を押さずに画面を閉じた: すぐには帰さず「席を外しています」にする(3分は席と料理が残る。戻ればそのまま座れる) */
-  var hereNow = function () { if (inside && net && document.visibilityState !== 'hidden' && members()[ME.uid]) net.update('members/' + ME.uid, { seen: TS }); };   // 画面にもどったら すぐ「いるよ」(席を外している扱いから もどす)
+  var hereNow = function () { var mm = members()[ME.uid]; if (inside && net && document.visibilityState !== 'hidden' && mm && mm.name) net.update('members/' + ME.uid, { seen: TS }); };   // 画面にもどったら すぐ「いるよ」(席を外している扱いから もどす)
   document.addEventListener('visibilitychange', hereNow); window.addEventListener('pageshow', hereNow);
   window.addEventListener('pagehide', function () {
     if (!inside || !net) return;
@@ -818,7 +821,7 @@
   var chatIn = $('chatInput');
   function growInput() { chatIn.style.height = 'auto'; chatIn.style.height = Math.min(chatIn.scrollHeight, 140) + 'px'; toChip(); }
   /* だれかあてに書いているときは 入力欄の上に「〇〇さんへ ✕ 消す」。✕ で あて先を消す(まちがえて押した時にすぐ消せる) */
-  var CALL_RE = /^(大将|マスター|[^、\s]{1,20}(さん|くん|君|ちゃん|様|さま|先生))、/;
+  var CALL_RE = /^(大将|マスター|[^、\n]{1,24}?(さん|くん|君|ちゃん|様|さま|先生))、/;   // 名前に空白があってもよい(「タロウ ヤマダさん、」)
   function toChip() {
     var m = chatIn.value.match(CALL_RE), c = $('toChip');
     if (!m) { if (!c.classList.contains('hidden')) c.classList.add('hidden'); return; }
@@ -888,10 +891,10 @@
     return null;
   }
   function replyTo(name, isOwner) {
-    if (!name || !inside) return;
+    if (!name || !inside || DEMO) return;   // 見本は 見るだけ
     if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return; }
     var call = isOwner ? ((tree.state || {}).ownerRole === 'master' ? 'マスター、' : '大将、') : honor(name) + '、';
-    var v = chatIn.value.replace(/^(大将|マスター|[^、\s]{1,20}(さん|くん|君|ちゃん|様|さま|先生))、/, '');
+    var v = chatIn.value.replace(CALL_RE, '');
     chatIn.value = call + v; growInput();
     try { chatIn.focus(); chatIn.setSelectionRange(chatIn.value.length, chatIn.value.length); } catch (e) {}
     chatIn.classList.remove('to-flash'); void chatIn.offsetWidth; chatIn.classList.add('to-flash');
@@ -1024,7 +1027,11 @@
     if (!scene) return;
     var a = scene.anchors(), ms = members(), used = {};
     var showTags = inside || true;
-    var put = function (key, cls, text, p, click) { if (!p) return; var t = tagEl(key, cls, text, click); t.style.left = p.x + 'px'; t.style.top = p.y + 'px'; t.style.display = ''; used[key] = 1; };
+    var edgeR = innerWidth - (document.body.classList.contains('owner-view') ? 8 : 78);   // 右のボタンの列に かからないように
+    var put = function (key, cls, text, p, click) { if (!p) return; var t = tagEl(key, cls, text, click); t.style.display = '';
+      if (t._wt !== text) { t._wt = text; t._w = t.offsetWidth; }   // 名札の はば(文字が変わったときだけ測る)
+      var hw = (t._w || 60) / 2, x = Math.max(6 + hw, Math.min(edgeR - hw, p.x));   // 画面のはしで切れないように
+      t.style.left = x + 'px'; t.style.top = p.y + 'px'; used[key] = 1; };
     if (showTags) {
       var st = tree.state || {};
       if (!(ownerCam())) put('owner', OWNER_MODE ? 'owner' : 'owner tap', ownerLabel() + (ownerPresent() ? '' : '(おまかせ中)'), a.owner);   // おまかせ中でも 押すと大将あてに書ける
@@ -1311,7 +1318,7 @@
     autoCountdown(n);
     // いなくなった人の片づけ
     Object.keys(ms).forEach(function (uid) {
-      if (fresh(ms[uid]) || away(ms[uid]) || (ms[uid].bot && bots[uid])) return;
+      if (ms[uid].name && (fresh(ms[uid]) || away(ms[uid]) || (ms[uid].bot && bots[uid]))) return;   // 名前のない記録(消されたあとの「いるよ」だけ)も片づける
       net.remove('members/' + uid);
       for (var i = 0; i < N; i++) if (seatUid(i) === uid) { net.remove('seats/' + i); net.remove('tables/' + i); }
     });
@@ -1657,11 +1664,15 @@
   function pushYT(url, title) {
     var id = ytId(url); if (!id) return false;
     var isShort = /\/shorts\//.test(url);
-    ytMeta(id, isShort, function (t, tall) { pushQueue({ kind: 'yt', id: 'yt-' + id, src: 'https://youtu.be/' + id, title: title || t || 'YouTube の動画', tall: !!tall }); });
+    if (ytWaiting[id]) return true;
+    ytWaiting[id] = 1; toast('動画を調べています…', 2500);
+    ytMeta(id, isShort, function (t, tall) { delete ytWaiting[id]; pushQueue({ kind: 'yt', id: 'yt-' + id, src: 'https://youtu.be/' + id, title: title || t || 'YouTube の動画', tall: !!tall }); });
     return true;
   }
+  var ytWaiting = {};
   function pushQueue(item) {
     var q = tree.queue || {}, keys = Object.keys(q);
+    if (keys.some(function (k) { return q[k].src === item.src; })) { toast('その曲は もう順番待ちに入っています', 1800); return; }   // 同じ曲を2つ入れない
     if (keys.length >= SHOP.MAX_QUEUE) { toast('順番待ちがいっぱいです'); return; }
     if (!OWNER_MODE && keys.filter(function (k) { return q[k].by === ME.uid; }).length >= 3) { toast('リクエストは1人3つまでです'); return; }
     item.by = ME.uid; item.byName = currentName(); item.at = TS;
@@ -1732,10 +1743,11 @@
   /* ---------------- 見本(#demo。ホームページの「覗いてみる」) ----------------
      このスマホの中だけ(ほかの人には つながらない)。お客さん4人・大将・後ろのモニターにハンターカブの PV。
      会話は流れるが、入力・注文などのボタンは出さない。👁 で 全体 → 席から → 後ろから と 視点を変えて試せる */
-  var DEMO_SEAT = 4;
+  var DEMO_SEAT = 1;   // 見本の「目線」「後ろ」は 2番の人の席から(空いた席からだと 何も映らない)
   function demoVideo() { var v = SHOP.VIDEOS.filter(function (x) { return x.id === 'v-hunter'; })[0]; if (v) net.set('state/music', { kind: 'yt', id: v.id + '-' + Date.now(), src: v.src, title: v.title, by: '', byName: '', start: TS }); }
   function startDemo() {
     document.body.classList.add('demo');
+    setTimeout(function () { $('demoNote').classList.add('mini'); }, 10000);   // 10秒たったら 説明を1行に(お店が よく見えるように)
     try { localStorage.removeItem('iz-local-demo'); } catch (e) {}
     ME = { uid: 'demo-viewer', name: '見学の人', avatar: AVATAR.random() };   // 見ている人(座らない・保存しない)
     connect('demo');
@@ -1745,6 +1757,11 @@
       net.update('state', { ownerAvatar: AVATAR.OWNER, ownerName: SHOP.OWNER_NAME, ownerRole: 'nobu', autoServe: 'mix' });
       [0, 900, 1800, 2700].forEach(function (t) { setTimeout(addBot, 600 + t); });
       setTimeout(demoVideo, 1500);
+      setTimeout(function () {   // はじめから 4人の前に 飲み物と料理(開いてすぐ にぎやかに)
+        var D = ['beer', 'highball', 'lemon', 'beer'], F = ['yakitori', 'karaage', 'edamame', 'oden'];
+        for (var i = 0; i < N; i++) { var u = seatUid(i); if (!u || !bots[u]) continue; var k = Object.keys(bots).indexOf(u);
+          [D[k % 4], F[k % 4]].forEach(function (id) { if (menuItem(id)) net.set('tables/' + i + '/' + net.newKey(), { id: id, at: TS }); }); }
+      }, 4500);
       setView('overview');
       setInterval(function () {   // 大将も ときどき話す(作りもの)
         net.update('members/demo-owner', { seen: TS });
@@ -1806,6 +1823,7 @@
     document.querySelectorAll('#shBody [data-cel]').forEach(function (b) { b.onclick = function () {
       var id = b.getAttribute('data-cel');
       net.update('state', { celebrate: id ? { kind: id, who: [], at: TS } : null });
+      var od = tree.orders || {}; Object.keys(od).forEach(function (k) { var it = menuItem(od[k].item); if (it && it.only && it.only !== id) net.remove('orders/' + k); });   // ほかの日の限定料理の注文は 取り下げる
       sys(id ? SHOP.CELEBRATE[id].emoji + ' ' + SHOP.CELEBRATE[id].name + 'の特別営業がはじまりました' : 'お祝いモードを終わりました');
       setTimeout(function () { refreshSheet(true); }, 200);
     }; });
@@ -1845,7 +1863,7 @@
   /* カウントダウン: to(時刻)に 0。みんなの画面で同じ時刻に。0 で「あけましておめでとう！」と紙吹雪 */
   var cdTimer = null;
   function showCountdown(to) {
-    var el = $('countdown'); clearInterval(cdTimer);
+    var el = $('countdown'); clearInterval(cdTimer); document.body.classList.add('cd-on');
     if (to - now() < -3000) return;
     el.classList.remove('hidden');
     var step = function () {
@@ -1853,7 +1871,7 @@
       if (r > 0) { if (el.textContent !== String(r)) { el.textContent = r; el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); } return; }
       clearInterval(cdTimer); el.classList.add('done'); el.innerHTML = celebKind() === 'newyear' ? '🎍<br>あけまして<br>おめでとう！' : '🎉<br>おめでとう！';
       withScene(function (s) { s.confetti(celebKind() || 'birthday'); }); clink(6, true);
-      setTimeout(function () { el.classList.add('hidden'); el.classList.remove('done'); el.textContent = ''; }, 5000);
+      setTimeout(function () { el.classList.add('hidden'); el.classList.remove('done'); el.textContent = ''; document.body.classList.remove('cd-on'); }, 5000);
     };
     step(); cdTimer = setInterval(step, 100);
   }

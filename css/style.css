@@ -450,7 +450,7 @@ body.celeb-birthday .tb-celeb { background: linear-gradient(90deg, #ff4a8a, #ffb
 
 /* 見本(#demo): 入力やボタンは出さない。会話は見える。説明の札 */
 .demo-note { display: none; }
-body.demo .demo-note { display: block; position: fixed; left: 50%; transform: translateX(-50%); top: calc(96px + env(safe-area-inset-top)); z-index: 12; width: min(92vw, 460px);
+body.demo .demo-note { display: block; position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(54px + env(safe-area-inset-bottom)); z-index: 12; width: min(92vw, 460px);
   background: rgba(20,12,8,.82); color: #fff3d6; border: 1px solid rgba(255,214,140,.45); border-radius: 14px; padding: 10px 14px; font-size: 13px; line-height: 1.55; pointer-events: none; }
 body.demo .demo-note b { display: block; font-size: 15px; color: #ffd27a; margin-bottom: 2px; }
 body.demo .demo-note .dn-try { display: block; margin-top: 4px; font-weight: 800; color: #ffe7b0; }
@@ -461,3 +461,19 @@ body.demo #bView { box-shadow: 0 0 0 3px #ffd27a, 0 0 18px rgba(255,210,122,.8);
 @keyframes demoPulse { 50% { box-shadow: 0 0 0 5px #ffd27a, 0 0 26px rgba(255,210,122,1); } }
 body.demo .log { font-size: 12px; }
 @media (orientation: landscape) and (max-height: 520px) { body.demo .demo-note { top: auto; bottom: 12px; left: auto; right: 12px; transform: none; width: min(40vw, 380px); font-size: 12px; padding: 7px 12px; line-height: 1.45; } body.demo .demo-note b { display: inline; font-size: 13px; margin-right: 6px; } }
+
+/* 座る前(横向き): 会話の欄をしまって 1〜4番の席も押せるように。案内の帯は 上へ */
+@media (orientation: landscape) and (max-height: 520px) {
+  body.picking #phrases, body.picking .log-wrap, body.picking .chat, body.picking #toChip { display: none !important; }
+  body.picking #pickHint { position: fixed; top: calc(52px + env(safe-area-inset-top)); left: 0; right: 0; margin: 0 auto; width: max-content; z-index: 20; }
+}
+/* 乾杯の人数が 決まり文句に重ならないように / カウントダウン中は 乾杯の帯を出さない */
+@media (orientation: portrait) { .kp { bottom: calc(250px + env(safe-area-inset-bottom)); } }
+body.cd-on #kpBanner, body.cd-on #kpUi { display: none !important; }
+@media (orientation: landscape) and (max-height: 520px) { body.demo .log { display: flex; max-height: 30vh; } }   /* 見本は 横向きでも会話の行を見せる */
+body.demo .demo-note.mini .dn-body { display: none; }   /* 10秒たったら 1行に */
+body.demo .demo-note.mini { padding: 6px 12px; bottom: auto; top: calc(96px + env(safe-area-inset-top)); width: auto; max-width: min(78vw, 460px); left: 12px; transform: none; }
+body.demo .demo-note.mini b { display: inline; font-size: 13px; margin-right: 6px; }
+body.demo .demo-note.mini .dn-try { display: inline; margin-top: 0; }
+@media (orientation: landscape) and (max-height: 520px) { body.demo .demo-note.mini { top: auto; bottom: 12px; left: auto; right: 12px; max-width: 36vw; } }
+@media (orientation: portrait) and (max-height: 700px) { body.demo .demo-note.mini { display: none; } }   /* 小さいスマホは 小さくしたあと しまう(👁 は光っている) */
