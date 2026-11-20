@@ -212,8 +212,10 @@ def main():
                 cands = sorted(RAW.glob(f"{v['id']}-*.wav"), key=lambda x: x.stat().st_mtime)
                 raw = cands[-1] if cands else raw
             if not raw.exists():
-                if os.path.exists(HITO):
-                    subprocess.run(["python3", HITO, "--wait"], check=False)
+                if os.path.exists(HITO):   # 人のペース。見張りが「あけて」と止めたら、ここでやめる(2026-11-21 合図を無視して 1時間に85回 頼んでしまった反省)
+                    if subprocess.run(["python3", HITO, "--wait"], check=False).returncode != 0:
+                        print(f"人のペースの決まりで止まりました。ここまで {calls} 回・{chars} 字。時間をあけて、もう一度動かすと続きから作ります", flush=True)
+                        sys.exit(2)
                 style = v["style"] + " これは一行ずつ別々の場面のひとことです。行と行のあいだは、たっぷり一秒ほど間をあけてください。番号や記号は読まないでください。"
                 print(f"{v['id']} ({v['tts']}): {len(texts)} 個を注文中…", flush=True)
                 raw.write_bytes(request(SEP.join(texts), v["tts"], style, v.get("model")))
