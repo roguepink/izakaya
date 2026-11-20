@@ -820,19 +820,21 @@
     if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return; }
     if (Date.now() - lastSent < 1500) { toast('少し間をあけて送ってください', 1500); return; }
     lastSent = Date.now();
-    var msg = { uid: ME.uid, name: currentName(), seat: OWNER_MODE ? 'owner' : mySeat, owner: OWNER_MODE, text: t, at: TS }, to = addressee(t);
+    var msg = { uid: ME.uid, name: currentName(), seat: OWNER_MODE ? 'owner' : mySeat, owner: OWNER_MODE, text: t, at: TS };
+    var to = replyPick && t.indexOf(replyPick.call) === 0 && (replyPick.seat === 'owner' || nameOfSeat(replyPick.seat)) ? replyPick.seat : addressee(t);
+    replyPick = null;
     if (to !== null && to !== msg.seat) msg.to = to;
     net.push('chat', msg);
     $('chatInput').value = ''; growInput();
   });
   /* その人あてに書く: 入力欄の頭に「〇〇さん、」を入れる(前に別の人あてが入っていれば入れかえる)。みんなにも だれあてか分かる */
   function nameOfSeat(k) {
-    if (k === 'owner') return ownerPresent() ? ((tree.state || {}).ownerName || SHOP.OWNER_NAME) : '';
+    if (k === 'owner') return (tree.state || {}).ownerName || SHOP.OWNER_NAME;   // 大将が おまかせ中でも 話しかけられる
     var u = seatUid(+k), m = u && members()[u]; return m && fresh(m) ? m.name : '';
   }
   /* だれあてか(文の頭の「〇〇さん、」「大将、」「マスター、」)。席の番号か 'owner'。だれでもなければ null */
   function addressee(t) {
-    if (/^(大将|マスター)[、,]/.test(t)) return ownerPresent() ? 'owner' : null;
+    if (/^(大将|マスター)[、,]/.test(t)) return 'owner';
     for (var i = 0; i < N; i++) { if (i === mySeat && !OWNER_MODE) continue; var nm = nameOfSeat(i); if (nm && (t.indexOf(honor(nm) + '、') === 0 || t.indexOf(honor(nm) + ',') === 0)) return i; }
     return null;
   }
@@ -845,11 +847,13 @@
     try { chatIn.focus(); chatIn.setSelectionRange(chatIn.value.length, chatIn.value.length); } catch (e) {}
     chatIn.classList.remove('to-flash'); void chatIn.offsetWidth; chatIn.classList.add('to-flash');
   }
+  var replyPick = null;   // 押した人(名前が同じ人がいても、押した席の人あてにする)
   function replyToSeat(k, fromAvatar) {
     if (k === mySeat && !OWNER_MODE) return;
     if (k === 'owner' && OWNER_MODE) return;
     var nm = nameOfSeat(k); if (!nm) return;
     replyTo(nm, k === 'owner');
+    replyPick = { seat: k, call: chatIn.value.split('、')[0] + '、' };
     if (OWNER_MODE && fromAvatar && typeof k === 'number') toast(honor(nm) + 'へ書けます', 2600, '🍶 料理を出す', function () { openSheet('seat', k); });
   }
   var SEAT_COLORS = ['#7ec8ff', '#ff9ec4', '#8fe39a', '#ffd36a', '#c9a8ff', '#7fe0d8', '#ffb07a', '#b8d86a', '#f0a0a0', '#a0c0f0'];
@@ -876,7 +880,9 @@
         s.talk(m.seat);
         // 話しかけられた人が、話しかけた人のほうを数秒向く(話した人も相手を見る)
         if ((okSeat(m.to) || m.to === 'owner') && (okSeat(m.seat) || m.seat === 'owner') && m.to !== m.seat) { s.lookAt(m.to, m.seat, 4); s.lookAt(m.seat, m.to, 3); }
-      }); if (!ownerPresent()) ownerTo(m.seat, false);
+      });
+      if (m.to === 'owner' && okSeat(m.seat)) ownerTo(m.seat, true);   // 大将あて: 大将が その人の前へ来て、向いて笑顔
+      else if (!ownerPresent()) ownerTo(m.seat, false);
     });
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]; }); }
@@ -927,8 +933,8 @@
     var put = function (key, cls, text, p, click) { if (!p) return; var t = tagEl(key, cls, text, click); t.style.left = p.x + 'px'; t.style.top = p.y + 'px'; t.style.display = ''; used[key] = 1; };
     if (showTags) {
       var st = tree.state || {};
-      if (!(OWNER_MODE && view === 'owner')) put('owner', OWNER_MODE || !ownerPresent() ? 'owner' : 'owner tap', ownerLabel() + (ownerPresent() ? '' : '(おまかせ中)'), a.owner);
-      if (tagEls.owner) { if (OWNER_MODE || !ownerPresent()) tagEls.owner.removeAttribute('data-seat'); else tagEls.owner.setAttribute('data-seat', 'owner'); }
+      if (!(OWNER_MODE && view === 'owner')) put('owner', OWNER_MODE ? 'owner' : 'owner tap', ownerLabel() + (ownerPresent() ? '' : '(おまかせ中)'), a.owner);   // おまかせ中でも 押すと大将あてに書ける
+      if (tagEls.owner) { if (OWNER_MODE) tagEls.owner.removeAttribute('data-seat'); else tagEls.owner.setAttribute('data-seat', 'owner'); }
       var resv = reservationsNow();
       for (var i = 0; i < N; i++) {
         var uid = seatUid(i), m = uid && ms[uid];
@@ -1769,7 +1775,8 @@
     var free = []; for (var i = 0; i < N; i++) if (!seatUid(i) || !fresh(members()[seatUid(i)])) free.push(i);
     if (!free.length) { toast('満席です'); return; }
     var seat = free[0], uid = 'bot-' + Math.random().toString(36).slice(2, 8);
-    var name = BOT_NAMES[Math.floor(Math.random() * BOT_NAMES.length)];
+    var used = {}; Object.keys(members()).forEach(function (u) { used[members()[u].name] = 1; });
+    var free2 = BOT_NAMES.filter(function (n) { return !used[n]; }), name = (free2.length ? free2 : BOT_NAMES)[Math.floor(Math.random() * (free2.length || BOT_NAMES.length))];   // 名前は かぶらせない
     var av = AVATAR.random();
     bots[uid] = { seat: seat, name: name, next: Date.now() + 3000 + Math.random() * 5000 };
     net.set('members/' + uid, { name: name, avatar: av, at: TS, seen: TS, seat: seat, bot: true, voice: av.voice });

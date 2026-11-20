@@ -2045,8 +2045,13 @@ function createShop(canvas, opts) {
     while (yaw > Math.PI) yaw -= Math.PI * 2; while (yaw < -Math.PI) yaw += Math.PI * 2;
     a.userData.lookYaw = Math.max(-1.75, Math.min(1.75, yaw)); a.userData.lookT = secs; a.userData.lookTo = target;
   }
-  function lookNext(a) {   // 向き終わったら、順番待ちの次の人へ(正面に戻らず そのまま向きかえる)
-    const u = a && a.userData; if (!u || !u.lookQ || !u.lookQ.length || u.lookT > 0) return;
+  function lookNext(a) {   // 向いている間は 相手の いまの場所へ向きなおす(大将が歩いて来るときも)。向き終わったら 順番待ちの次の人へ
+    const u = a && a.userData; if (!u) return;
+    if (u.lookT > 0 && u.lookTo != null && !photo) {
+      const t = u.lookTo === 'owner' ? owner : seatAvatars[u.lookTo];
+      if (t && t !== a) { let yaw = Math.atan2(t.position.x - a.position.x, t.position.z - a.position.z) - a.rotation.y; while (yaw > Math.PI) yaw -= Math.PI * 2; while (yaw < -Math.PI) yaw += Math.PI * 2; u.lookYaw = Math.max(-1.75, Math.min(1.75, yaw)); }
+    }
+    if (!u.lookQ || !u.lookQ.length || u.lookT > 0) return;
     const q = u.lookQ.shift(); lookStart(a, q.target, q.secs);
   }
   /* 記念撮影のカメラ(大将のスマホの位置)。みんなの顔が横いっぱいに入る広さ */
