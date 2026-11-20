@@ -220,7 +220,7 @@ var SHOP = {
 
   /* ノブさんの声を録音してある言葉の id(大将の声「ノブの声(録音)」で使う)。録音ページ rec.html で録って、voice/nobu/ に置く。
      ここにない言葉は、代わりの声(落ち着いた男性)で読む */
-  NOBU_VOICE: ['irasshai', 'o_okaeri', 'o_nani', 'haiyo', 'omachi', 'o_shosho', 'o_atsui', 'o_kanpai', 'o_iine', 'o_moriagari', 'o_omedeto', 'o_okawari', 'o_arigato', 'o_maido', 'o_goyukkuri', 'lastcall', 'mataokoshi', 'o_kiwotsukete', 'oyasumi', 'o_photo', 'o_cheese']
+  NOBU_VOICE: ['irasshai', 'o_okaeri', 'o_nani', 'haiyo', 'omachi', 'o_service', 'o_shosho', 'o_atsui', 'o_kanpai', 'o_iine', 'o_moriagari', 'o_omedeto', 'o_okawari', 'o_arigato', 'o_maido', 'o_goyukkuri', 'lastcall', 'mataokoshi', 'o_kiwotsukete', 'oyasumi', 'o_photo', 'o_cheese']
 };
 SHOP.GUEST_PHRASES.forEach(function (p) { p.who = 'guest'; });
 SHOP.OWNER_PHRASES.forEach(function (p) { p.who = 'owner'; });

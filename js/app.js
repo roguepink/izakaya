@@ -1673,7 +1673,7 @@
     kp = { key: key, by: e.by, joined: {}, n: 1 }; kp.joined[who] = 1;
     var canJoin = e.by !== ME.uid && (OWNER_MODE || mySeat >= 0) && !document.body.classList.contains('photo-mode');
     $('kpJoin').classList.toggle('hidden', !canJoin);
-    $('kpUi').classList.remove('hidden'); kpCount();
+    $('kpUi').classList.remove('hidden'); document.body.classList.add('kp-on'); kpCount();   // kp-on: 乾杯の間は「🍶 出す」を隠す(ボタンが重なる)
     clearTimeout(kpT); kpT = setTimeout(function () { kpEnd(false); }, rem);
     // おためし客は 少しずつ続く
     if (LOCAL) Object.keys(bots).forEach(function (u) { var b = bots[u]; if (u === e.by || Math.random() < 0.15) return; setTimeout(function () { if (kp && kp.key === key) net.push('events', { type: 'kanpaiJoin', ref: key, seat: b.seat, at: TS, by: u }); }, 400 + Math.random() * 2000); });
@@ -1697,7 +1697,7 @@
   }
   function kpEnd(quiet) {
     clearTimeout(kpT);
-    var r = kp; kp = null; $('kpUi').classList.add('hidden');
+    var r = kp; kp = null; $('kpUi').classList.add('hidden'); document.body.classList.remove('kp-on');
     if (!r || quiet || r.n < 2) return;
     var bn = $('kpBanner'); bn.textContent = '🍻 ' + r.n + '人で かんぱーい！'; bn.classList.remove('hidden'); bn.classList.remove('go'); void bn.offsetWidth; bn.classList.add('go');
     setTimeout(function () { bn.classList.add('hidden'); }, 1900);
