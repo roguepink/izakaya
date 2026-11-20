@@ -159,8 +159,9 @@
       scene = make2D();
     }
     scene.onTap = function (seat) { if (seat >= 0) onSeatTap(seat); };
-    scene.onAvatarTap = function (k) { replyToSeat(k, true); };
-    scene.onItemTap = function (seat, key) { if (inside && seat === mySeat && !OWNER_MODE) eat(key); };
+    scene.onAvatarTap = function (k) { if (OWNER_MODE && typeof k === 'number') ownerPick(k); else replyToSeat(k, true); };
+    scene.onItemTap = function (seat, key) { if (!inside) return; if (OWNER_MODE) { serveTo(seat); return; } if (seat === mySeat) eat(key); };   // 大将が料理を押す → その席に出す
+    scene.onTableTap = function (seat) { if (inside && OWNER_MODE) serveTo(seat); };   // 大将がその人のテーブルを押す → 料理を出す
     scene.onTagTap = function (id) {   // 壁の木札を押すと、すぐ注文(取り消しもできる)
       if (!inside || OWNER_MODE) return;
       order(id);
@@ -834,7 +835,12 @@
     if (!big) toggleLog(true);
   });
   /* 名札を押しても、その人あてに書ける */
-  $('tags').addEventListener('click', function (e) { var t = e.target.closest && e.target.closest('.tag[data-seat]'); if (t) { var k = t.getAttribute('data-seat'); replyToSeat(k === 'owner' ? 'owner' : +k, false); } });
+  $('tags').addEventListener('click', function (e) {
+    var sv = e.target.closest && e.target.closest('.tag.serve'); if (sv) { serveTo(+sv.getAttribute('data-serve')); return; }   // 大将の「🍶 出す」
+    var t = e.target.closest && e.target.closest('.tag[data-seat]'); if (!t) return;
+    var k = t.getAttribute('data-seat');
+    if (OWNER_MODE && k !== 'owner') ownerPick(+k); else replyToSeat(k === 'owner' ? 'owner' : +k, false);
+  });
   $('chatForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var t = $('chatInput').value.trim().slice(0, 500);
@@ -876,8 +882,32 @@
     var nm = nameOfSeat(k); if (!nm) return;
     replyTo(nm, k === 'owner');
     replyPick = { seat: k, call: chatIn.value.split('、')[0] + '、' };
-    if (OWNER_MODE && fromAvatar && typeof k === 'number') toast(honor(nm) + 'へ書けます', 2600, '🍶 料理を出す', function () { openSheet('seat', k); });
   }
+  /* 大将が お客さんを押したとき: 「話しかける」か「料理を出す」かを選ぶ(すぐ会話にならないように) */
+  var lastTapXY = { x: innerWidth / 2, y: innerHeight / 2 };
+  document.addEventListener('pointerdown', function (e) { lastTapXY = { x: e.clientX, y: e.clientY }; }, true);
+  function serveTo(k) {
+    closeWho();
+    var uid = seatUid(k), m = uid && members()[uid];
+    if (!m || !fresh(m)) { toast(m && away(m) ? 'その席の人は、少し席を外しています' : 'その席には だれもいません', 1800); return; }
+    openSheet('seat', k);
+  }
+  function closeWho() { $('whoPick').classList.add('hidden'); }
+  function ownerPick(k) {
+    var nm = nameOfSeat(k); if (!nm) return;
+    var w = $('whoPick');
+    w.innerHTML = '<div class="wp-name">' + esc(honor(nm)) + '</div><button data-w="talk">💬 話しかける</button><button data-w="serve">🍶 料理を出す</button>';
+    w.classList.remove('hidden'); w._at = Date.now();
+    var bw = w.offsetWidth, bh = w.offsetHeight, x = Math.max(8, Math.min(innerWidth - bw - 8, lastTapXY.x - bw / 2)), y = lastTapXY.y + 14;
+    if (y + bh > innerHeight - 90) y = Math.max(8, lastTapXY.y - bh - 14);
+    w.style.left = x + 'px'; w.style.top = y + 'px';
+    w.querySelector('[data-w=talk]').onclick = function () { closeWho(); replyToSeat(k, false); };
+    w.querySelector('[data-w=serve]').onclick = function () { serveTo(k); };
+  }
+  document.addEventListener('pointerdown', function (e) {   // 外を押したら閉じる(その押した手で 開きなおした時は閉じない)
+    var w = $('whoPick'), t0 = Date.now(); if (w.classList.contains('hidden') || w.contains(e.target)) return;
+    setTimeout(function () { if ((w._at || 0) < t0) closeWho(); }, 350);
+  }, true);
   var SEAT_COLORS = ['#7ec8ff', '#ff9ec4', '#8fe39a', '#ffd36a', '#c9a8ff', '#7fe0d8', '#ffb07a', '#b8d86a', '#f0a0a0', '#a0c0f0'];
   var lastOwnerAt = 0;
   function renderLog() {
@@ -948,6 +978,27 @@
     var c = curSession(); if (c && c.plan && c.plan.master) return 'マスター ' + c.plan.master;
     return SHOP.OWNER_NAME;
   }
+  /* 「🍶 出す」ボタン: 見える所に置く(横向きは 左の会話の欄に かからない所だけ)。
+     となりと重なるときは 小さい「🍶」だけにし、それでも重なるときは 出さない(人やテーブルを押せば出せる) */
+  function placeServe(list, put) {
+    if (!list.length) return;
+    var L = 6, R = innerWidth - 6, lg = document.querySelector('body.owner-view .bottom');
+    if (lg && innerWidth > innerHeight) { var r = lg.getBoundingClientRect(); if (r.width < innerWidth * 0.7) L = Math.max(L, r.right + 4); }
+    var ok = function (bw) {
+      var xs = list.map(function (it) { return { it: it, x: Math.max(L + bw / 2, Math.min(R - bw / 2, it.p.x)), out: it.p.x < L - bw * 0.2 || it.p.x > R + bw * 0.2 }; }).filter(function (q) { return !q.out; });
+      xs.sort(function (p1, p2) { return p1.x - p2.x; });
+      for (var k = 1; k < xs.length; k++) if (xs[k].x - xs[k - 1].x < bw + 4 && Math.abs(xs[k].it.p.y - xs[k - 1].it.p.y) < 34) return null;
+      return xs;
+    };
+    // はしから ななめに見ている時(縦向きで人が多い)は、ボタンが ばらばらの高さになり だれのか分からないので 出さない
+    var ys = list.map(function (it) { return it.p.y; });
+    if (Math.max.apply(null, ys) - Math.min.apply(null, ys) > 40) return;
+    var bt = lg ? lg.getBoundingClientRect().top : innerHeight;
+    if (innerWidth <= innerHeight && ys[0] > bt - 40) return;   // 下の会話の欄に かかる
+    var big = ok(76), xs = big || ok(40);
+    if (!xs) return;
+    xs.forEach(function (q) { put('v' + q.it.i, 'serve' + (big ? '' : ' mini'), big ? '🍶 出す' : '🍶', { x: q.x, y: Math.min(q.it.p.y, innerHeight - 150) }); var sb = tagEls['v' + q.it.i]; if (sb) sb.setAttribute('data-serve', q.it.i); });
+  }
   function placeOverlays() {
     if (!scene) return;
     var a = scene.anchors(), ms = members(), used = {};
@@ -957,10 +1008,11 @@
       var st = tree.state || {};
       if (!(ownerCam())) put('owner', OWNER_MODE ? 'owner' : 'owner tap', ownerLabel() + (ownerPresent() ? '' : '(おまかせ中)'), a.owner);   // おまかせ中でも 押すと大将あてに書ける
       if (tagEls.owner) { if (OWNER_MODE) tagEls.owner.removeAttribute('data-seat'); else tagEls.owner.setAttribute('data-seat', 'owner'); }
-      var resv = reservationsNow();
+      var resv = reservationsNow(), serveList = [];
       for (var i = 0; i < N; i++) {
         var uid = seatUid(i), m = uid && ms[uid];
         if (m && away(m)) { put('s' + i, 'away', m.name + '(席を外しています)', a.seats[i]); var tw = tagEls['s' + i]; if (tw) tw.removeAttribute('data-seat'); continue; }
+        if (m && fresh(m) && OWNER_MODE && view === 'owner' && a.tables && a.tables[i]) serveList.push({ i: i, p: a.seats[i] ? { x: a.seats[i].x, y: a.tables[i].y } : a.tables[i] });   // 横は その人の頭の真下   // 大将の接客の目線: その人のテーブルの前に「出す」(あとで まとめて置く)
         if (m && fresh(m)) { put('s' + i, uid === ME.uid ? 'me' : 'tap', m.name + (uid === ME.uid ? '(あなた)' : ''), a.seats[i]); var tg = tagEls['s' + i]; if (tg) { if (uid === ME.uid) tg.removeAttribute('data-seat'); else tg.setAttribute('data-seat', i); } continue; }
         var r = resv[i];
         if (r) {   // 予約済みの席は、だれにでも名前が見える
@@ -970,6 +1022,7 @@
         }
       }
     }
+    if (showTags) placeServe(serveList, put);
     Object.keys(tagEls).forEach(function (k) { if (!used[k]) tagEls[k].style.display = 'none'; });
     placeBubbles(a, ms);
   }
@@ -1383,7 +1436,12 @@
       html += '<div class="list">';
       if (!ok.length) html += '<div class="li"><div class="t"><small>注文はありません</small></div></div>';
       ok.forEach(function (k) { var it = menuItem(o[k].item) || { emoji: '🍽️', name: o[k].item }; html += '<div class="li"><div class="t">' + it.emoji + ' ' + esc(it.name) + '<small>' + (okSeat(o[k].seat) ? o[k].seat + 1 : '?') + '番 ' + esc(honor(o[k].name)) + '</small></div>' + (OWNER_MODE && am ? '<span class="auto-tag">⏱ 自動</span>' : '') + '<button data-serve="' + esc(k) + '">出す</button></div>'; });
-      html += '</div><p class="small-note">お客さんの席を押すと、注文がなくても好きな物を出せます。</p>';
+      html += '</div>';
+      if (OWNER_MODE) {   // 注文がなくても、席をえらんで出せる
+        var sb2 = ''; for (var si = 0; si < N; si++) { var su = seatUid(si), sm = su && members()[su]; if (sm && fresh(sm)) sb2 += '<button data-seatserve="' + si + '">🍶 ' + (si + 1) + '番 ' + esc(honor(sm.name)) + '</button>'; }
+        html += '<div class="sh-sec">席をえらんで出す(注文がなくても)</div>' + (sb2 ? '<div class="ph-chips seat-serve">' + sb2 + '</div>' : '<p class="small-note">いまは だれも座っていません</p>') +
+          '<p class="small-note">お客さんのテーブル(カウンターの上)や「🍶 出す」を押しても出せます。お客さんを押すと「話しかける」か「料理を出す」を選べます。</p>';
+      }
       if (!force && body._h === html) return;
     } else if (sheetKind === 'owner') {
       if (!force) return;
@@ -1443,6 +1501,7 @@
       body.querySelectorAll('[data-ph]').forEach(function (b) { b.onclick = function () { if (sayPhrase(b.getAttribute('data-ph'))) closeSheet(); }; });
     } else if (sheetKind === 'orders') {
       body.querySelectorAll('[data-serve]').forEach(function (b) { b.onclick = function () { var k = b.getAttribute('data-serve'), o = (tree.orders || {})[k]; if (o) serve(o.seat, o.item, k); }; });
+      body.querySelectorAll('[data-seatserve]').forEach(function (b) { b.onclick = function () { serveTo(+b.getAttribute('data-seatserve')); }; });
       body.querySelectorAll('[data-auto]').forEach(function (b) { b.onclick = function () {
         var id = b.getAttribute('data-auto'); net.update('state', { autoServe: id || null });
         var m = AUTO_MODES.filter(function (x) { return x.id === id; })[0]; toast('料理の出し方: ' + (m ? m.label : '手で出す'), 1800);

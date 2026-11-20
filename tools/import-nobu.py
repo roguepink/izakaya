@@ -50,9 +50,9 @@ def items(path):
 
 
 def convert(src, dst):
-    # 前後の無音(-45dB より小さい所)を切り、大きさをそろえて、AAC 40k モノラルに
-    af = ('silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.05,'
-          'areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.15,areverse,'
+    # 前後の無音(-50dB より小さい所)を切り(言葉の頭が切れないよう 前に0.15秒・後に0.2秒 残す)、大きさをそろえて、AAC 40k モノラルに
+    af = ('silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.15,'
+          'areverse,silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.2,areverse,'
           'loudnorm=I=-16:TP=-1.5:LRA=11')
     subprocess.run(['ffmpeg', '-nostdin', '-loglevel', 'error', '-y', '-i', src, '-vn', '-map_metadata', '-1',
                     '-af', af, '-ac', '1', '-ar', '44100', '-c:a', 'aac', '-b:a', '40k', '-movflags', '+faststart', dst],
@@ -66,7 +66,7 @@ def main():
     srcs = [sys.argv[1]] if len(sys.argv) > 1 else drive_sources()
     ids = owner_ids()
     os.makedirs(OUT, exist_ok=True)
-    got, skip = {}, []
+    got, skip, empty = {}, [], []
     with tempfile.TemporaryDirectory() as tmp:
         for zp in srcs:
             for base, data in items(zp):
@@ -79,7 +79,16 @@ def main():
                 src = os.path.join(tmp, 'in' + ext.lower())
                 with open(src, 'wb') as f:
                     f.write(data)
-                got[pid] = convert(src, os.path.join(OUT, pid + '.m4a'))
+                dst = os.path.join(OUT, pid + '.m4a')
+                tmpdst = os.path.join(tmp, pid + '.m4a')
+                try:
+                    sec = convert(src, tmpdst)
+                except subprocess.CalledProcessError:
+                    sec = 0
+                if sec < 0.3:   # 音が入っていない(マイクが動いていなかった等)。入れない。前に取りこんだ声があれば そのまま
+                    empty.append(pid); continue
+                os.replace(tmpdst, dst)
+                got[pid] = sec
     got = list(got.items())
     have = sorted(f[:-4] for f in os.listdir(OUT) if f.endswith('.m4a'))
     have = [i for i in ids if i in have]   # 言葉の並び順で
@@ -88,7 +97,9 @@ def main():
     open(CONFIG, 'w', encoding='utf-8').write(s2)
     print('取りこみ元:', ', '.join(os.path.basename(x) for x in srcs))
     for pid, sec in got:
-        print('  ○ %-12s %.1f秒%s' % (pid, sec, '  ← 短すぎ(聞いて確かめる)' if sec < 0.4 else ''))
+        print('  ○ %-12s %.1f秒' % (pid, sec))
+    for e in empty:
+        print('  × %-12s 音が入っていなかったので入れない(録りなおしてもらう)' % e)
     for b in skip:
         print('  × %s(大将用の言葉にない名前なので飛ばした)' % b)
     print('ノブの声がある言葉: %d / %d' % (len(have), len(ids)))

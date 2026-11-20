@@ -1857,6 +1857,9 @@ function createShop(canvas, opts) {
   const seatAvatars = new Array(N).fill(null), seatKeys = new Array(N).fill('');
   const tableGroups = [], tableKeys = new Array(N).fill('');
   for (let i = 0; i < N; i++) { const t = new THREE.Group(); t.position.set(seatX(i, N), COUNTER_Y, 0.08); scene.add(t); tableGroups.push(t); }
+  /* その人のテーブル(カウンターの上の、席の前の分)。大将が押すと 料理を出す */
+  const tableHits = [];
+  for (let i = 0; i < N; i++) { const h = new THREE.Mesh(new THREE.BoxGeometry(SEAT_GAP * 0.96, 0.16, 0.76), new THREE.MeshBasicMaterial({ visible: false })); h.position.set(seatX(i, N), COUNTER_Y, 0); h.userData.seat = i; scene.add(h); tableHits.push(h); }
   let owner = null, ownerKey = '', ownerTargetX = 0, ownerHeadPts = null;
   let itemHitList = [], bumpKey = '', bumpAt = 0;
   const HIT_MAT = new THREE.MeshBasicMaterial({ visible: false });
@@ -1972,8 +1975,13 @@ function createShop(canvas, opts) {
       const tagHits = ray.intersectObjects(tagList, false);
       if (tagHits.length && api.onTagTap) { const tg = tagHits[0].object; cand.push({ d: tagHits[0].distance, go: () => { tg.userData.flash = performance.now(); api.onTagTap(tg.userData.menuId); } }); }
       const itemHits = ray.intersectObjects(itemHitList, false);
-      const mine = itemHits.filter((h) => view.mode !== 'owner' && h.object.userData.seat === view.seat);   // 自分の席の料理だけ
+      const ownerCam = view.mode === 'owner' || view.mode === 'ownerAll';
+      const mine = itemHits.filter((h) => ownerCam || h.object.userData.seat === view.seat);   // お客さんは自分の席の料理だけ。大将はどの席の料理でも(押すと その席に出す)
       if (mine.length && api.onItemTap) { const u = mine[0].object.userData; cand.push({ d: mine[0].distance - 0.05, go: () => api.onItemTap(u.seat, u.key) }); }
+      if (ownerCam && api.onTableTap) {   // 大将: その人のテーブルを押す → 料理を出す(人より手前なら こちら)
+        const th = ray.intersectObjects(tableHits.filter((h) => seatAvatars[h.userData.seat]), false);
+        if (th.length) cand.push({ d: th[0].distance - 0.02, go: () => api.onTableTap(th[0].object.userData.seat) });
+      }
       if (api.onAvatarTap) {   // 人を押す → その人あてに書く
         const ppl = seatAvatars.map((a, i) => (a && a.visible ? { a, k: i } : null)).filter(Boolean);
         if (owner && owner.visible) ppl.push({ a: owner, k: 'owner' });
@@ -2086,7 +2094,7 @@ function createShop(canvas, opts) {
       return { tris: renderer.info.render.triangles, calls: renderer.info.render.calls, textures: renderer.info.memory.textures, geometries: renderer.info.memory.geometries,
                owner: owner ? tri(owner) : 0, seats: seatAvatars.map((a) => a ? tri(a) : 0) };
     },
-    onTap: null, onFrame: null, onItemTap: null, onTagTap: null, onAvatarTap: null,
+    onTap: null, onFrame: null, onItemTap: null, onTagTap: null, onAvatarTap: null, onTableTap: null,
     /* 確認用: 料理の画面上の位置 */
     itemPos(key) { const h = itemHitList.find((x) => x.userData.key === key); if (!h) return null; const v = new THREE.Vector3(); h.getWorldPosition(v); v.y += 0.02; v.project(camera); const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; },
     /* 押した料理を はねさせる(作りなおしたあとでも はねるように 覚えておく) */
@@ -2275,7 +2283,9 @@ function createShop(canvas, opts) {
     },
     lookState(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; return a ? { to: a.userData.lookTo, t: +(a.userData.lookT || 0).toFixed(2), wait: (a.userData.lookQ || []).map((q) => q.target) } : null; },   // 確認用
     /* 吹き出しを出す位置(画面の点) */
-    anchors() { return { seats: seatAvatars.map((a, i) => (a && a.visible ? headPos(a) : null)), owner: headPos(owner), empty: stools.map((s, i) => { tmp.set(seatX(i, N), STOOL_Y + 0.25, GUEST_Z); const v = tmp.clone().project(camera); if (v.z > 1) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }) }; },
+    anchors() { const r0 = canvas.getBoundingClientRect(), proj = (x, y, z) => { const v = tmp.set(x, y, z).clone().project(camera); return v.z > 1 || v.z < -1 ? null : { x: r0.left + (v.x + 1) / 2 * r0.width, y: r0.top + (1 - v.y) / 2 * r0.height }; };
+      return { tables: seatAvatars.map((a, i) => (a ? proj(seatX(i, N), COUNTER_Y + 0.01, -0.3) : null)),   // その人のテーブルの手前のふち(大将の「出す」ボタンの高さ。料理にかからない。横は その人の頭に合わせる)
+        seats: seatAvatars.map((a, i) => (a && a.visible ? headPos(a) : null)), owner: headPos(owner), empty: stools.map((s, i) => { tmp.set(seatX(i, N), STOOL_Y + 0.25, GUEST_Z); const v = tmp.clone().project(camera); if (v.z > 1) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }) }; },
     name: SHOPNAME,
     // モニターの画面の四すみ(左上・右上・右下・左下)。見えていなければ null
     monitorQuad() {   // 見えているモニターのうち、いちばん大きく見える1台。main=奥の壁の1台
@@ -2327,7 +2337,7 @@ function createShop(canvas, opts) {
       up.pop(); lo.pop();
       return lo.concat(up).map((p) => ({ x: p[0], y: p[1] }));
     },
-    stop() { running = false; api.onAvatarTap = api.onMonitorTap = api.onTap = api.onItemTap = api.onTagTap = api.onFrame = null; window.removeEventListener('resize', resize); renderer.dispose(); }
+    stop() { running = false; api.onAvatarTap = api.onTableTap = api.onMonitorTap = api.onTap = api.onItemTap = api.onTagTap = api.onFrame = null; window.removeEventListener('resize', resize); renderer.dispose(); }
   };
   return api;
 }
