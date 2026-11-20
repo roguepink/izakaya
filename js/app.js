@@ -717,6 +717,8 @@
     $('entrance').classList.add('hidden');
     $('shop').classList.remove('hidden');
     $('bBot').classList.toggle('hidden', !LOCAL);
+    // 大将の画面は いつも「接客の目線」(みんなの顔が見える)。お客さん用の 視点の切りかえ・注文 は出さない
+    $('bView').classList.toggle('hidden', OWNER_MODE); $('bMenu').classList.toggle('hidden', OWNER_MODE);
     setView(OWNER_MODE ? 'owner' : (mySeat >= 0 ? 'first' : 'overview'));   // もとの席に戻ったときは 目線で
     buildPhrases();
     hbTimer = setInterval(function () { if (inside && members()[ME.uid]) net.update('members/' + ME.uid, { seen: TS }); botTick(); }, 15000);
@@ -792,6 +794,7 @@
   var VIEW_NAMES = { first: '目線', back: '後ろ', overview: '全体', owner: '大将' };
   function setView(v) { view = v; document.body.classList.toggle('owner-view', OWNER_MODE && v === 'owner'); withScene(function (s) { s.setView(v, mySeat); }); $('bViewLbl').textContent = VIEW_NAMES[v] || '目線'; }
   $('bView').onclick = function () {
+    if (OWNER_MODE) { setView('owner'); return; }
     var order = OWNER_MODE ? ['owner', 'overview'] : (mySeat >= 0 ? ['first', 'back', 'overview'] : ['overview']);
     var i = order.indexOf(view); setView(order[(i + 1) % order.length]);
     toast('視点: ' + VIEW_NAMES[view], 1200);
