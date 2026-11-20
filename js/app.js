@@ -1181,7 +1181,7 @@
       } else if (e.type === 'serve') {
         var it = menuItem(e.item);
         ownerTo(e.seat, true);
-        var ph2 = SHOP.PHRASES.filter(function (p) { return p.id === 'omachi'; })[0];
+        var ph2 = SHOP.PHRASES.filter(function (p) { return p.id === (e.svc ? 'o_service' : 'omachi'); })[0];   // サービスのときは「こちらはサービスです！」
         if (ph2) { bubble('owner', ph2.say + ' ' + (it ? it.emoji + ' ' + it.name + (it.pun && it.real ? '(中身は' + it.real + 'です)' : '') : ''), true); playPhrase(ph2); }
       }
     });
@@ -1282,7 +1282,7 @@
     var k = net.newKey();
     net.set('tables/' + seat + '/' + k, { id: id, at: TS });
     if (orderKey) net.remove('orders/' + orderKey);
-    event({ type: 'serve', seat: seat, item: id });
+    event({ type: 'serve', seat: seat, item: id, svc: !orderKey && OWNER_MODE ? 1 : 0 });   // 注文なしで大将が出した = サービス
   }
   function renderOrdersBadge() {
     var o = tree.orders || {}, n = Object.keys(o).length;

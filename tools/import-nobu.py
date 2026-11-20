@@ -14,7 +14,11 @@
 import os, re, subprocess, sys, tempfile, zipfile, glob
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DRIVE = os.path.expanduser('~/Library/CloudStorage/GoogleDrive-*/マイドライブ/居酒屋ノブの声')
+def _drive():   # Google ドライブ(パソコン版)の「マイドライブ/居酒屋ノブの声」。アカウント名は書かない(公開の置き場なので)
+    for d in sorted(glob.glob(os.path.expanduser('~/Library/CloudStorage/GoogleDrive-*/マイドライブ/居酒屋ノブの声'))):
+        return d
+    return os.path.expanduser('~/居酒屋ノブの声')
+DRIVE = _drive()
 OUT = os.path.join(ROOT, 'voice', 'nobu')
 CONFIG = os.path.join(ROOT, 'js', 'config.js')
 

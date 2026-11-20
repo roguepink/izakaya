@@ -195,6 +195,7 @@ var SHOP = {
     { id: 'o_nani',     cat: 'むかえる', say: '何にします？',                 main: true },
     { id: 'haiyo',      cat: 'だす',     say: 'はいよ！',                     main: true },
     { id: 'omachi',     cat: 'だす',     say: 'はい、お待ち！' },
+    { id: 'o_service',  cat: 'だす',     say: 'こちらはサービスです！' },   // 注文がないのに大将が出すとき(自動で言う)
     { id: 'o_shosho',   cat: 'だす',     say: '少々お待ちを！' },
     { id: 'o_atsui',    cat: 'だす',     say: '熱いから気をつけてね' },
     { id: 'o_kanpai',   cat: 'もりあげ', say: 'かんぱーい！',  emoji: '🍻',   main: true },
@@ -219,7 +220,7 @@ var SHOP = {
 
   /* ノブさんの声を録音してある言葉の id(大将の声「ノブの声(録音)」で使う)。録音ページ rec.html で録って、voice/nobu/ に置く。
      ここにない言葉は、代わりの声(落ち着いた男性)で読む */
-  NOBU_VOICE: []
+  NOBU_VOICE: ['irasshai', 'o_okaeri', 'o_nani', 'haiyo', 'omachi', 'o_shosho', 'o_atsui', 'o_kanpai', 'o_iine', 'o_moriagari', 'o_omedeto', 'o_okawari', 'o_arigato', 'o_maido', 'o_goyukkuri', 'lastcall', 'mataokoshi', 'o_kiwotsukete', 'oyasumi', 'o_photo', 'o_cheese']
 };
 SHOP.GUEST_PHRASES.forEach(function (p) { p.who = 'guest'; });
 SHOP.OWNER_PHRASES.forEach(function (p) { p.who = 'owner'; });
