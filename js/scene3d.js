@@ -272,7 +272,7 @@ function faceTexture(a) {
     // まゆ
     const browC = shade(hairC === '#e8e2d8' ? '#9a8a7a' : hairC, 0.85);
     g.strokeStyle = browC; g.fillStyle = browC;
-    const bw = { thick: 11, natural: 7, straight: 8, up: 8, worry: 7, soft: 6, thin: 4, nk1: 11, nk2: 9, nk3: 12 }[a.brows] || 7;
+    const bw = { thick: 11, natural: 7, straight: 8, up: 8, worry: 7, soft: 6, thin: 4, nk1: 11, nk2: 9, nk3: 12, nk4: 11 }[a.brows] || 7;
     g.lineWidth = bw;
     [[LX, -1], [RX, 1]].forEach(([x, s]) => {
       const by = EY - (F ? 92 : 80);
@@ -282,6 +282,7 @@ function faceTexture(a) {
         case 'nk1': g.moveTo(x - 34 * s, by + 10); g.lineTo(x + 8 * s, by - 6); g.quadraticCurveTo(x + 24 * s, by - 10, x + 36 * s, by - 2); break;   // 大将ノブ: きりっ(山のある まゆ)
         case 'nk2': g.moveTo(x - 32 * s, by + 8); g.lineTo(x + 34 * s, by - 8); break;   // 大将ノブ: きりっ(まっすぐ上がる)
         case 'nk3': g.moveTo(x - 34 * s, by + 6); g.quadraticCurveTo(x - 4 * s, by - 8, x + 36 * s, by - 6); break;   // 大将ノブ: きりっ(太く ゆるい弧)
+        case 'nk4': g.moveTo(x - 34 * s, by - 2); g.quadraticCurveTo(x, by - 12, x + 36 * s, by + 7); break;   // 大将ノブ: 太く、ほんの少し ハの字(外がわが 少し下がる。やさしく楽しそう)
         case 'worry': g.moveTo(x - 30 * s, by - 4); g.quadraticCurveTo(x, by - 4, x + 30 * s, by + 10); break;
         case 'straight': g.moveTo(x - 30 * s, by); g.lineTo(x + 30 * s, by - 2); break;
         case 'soft': g.moveTo(x - 28 * s, by + 4); g.quadraticCurveTo(x, by - 10, x + 28 * s, by + 2); break;
@@ -309,6 +310,8 @@ function faceTexture(a) {
       case 'flat': g.beginPath(); g.moveTo(236, MY + 2); g.lineTo(276, MY + 2); g.stroke(); break;
       case 'cat': g.beginPath(); g.moveTo(226, MY - 6); g.quadraticCurveTo(241, MY + 12, 256, MY - 2); g.quadraticCurveTo(271, MY + 12, 286, MY - 6); g.stroke(); break;
       case 'soft': g.beginPath(); g.moveTo(232, MY); g.quadraticCurveTo(256, MY + 12, 280, MY); g.stroke(); break;
+      case 'nsmile': g.beginPath(); g.moveTo(226, MY - 7); g.quadraticCurveTo(256, MY + 15, 286, MY - 7); g.stroke();   // 大将ノブ: 笑顔の手前(口を閉じて 口角を上げる。楽しそう)
+        g.lineWidth = 3.5; [[-1, 226], [1, 286]].forEach(([d, x]) => { g.beginPath(); g.moveTo(x, MY - 7); g.quadraticCurveTo(x + d * 5, MY - 9, x + d * 7, MY - 14); g.stroke(); }); break;
       default: g.beginPath(); g.moveTo(222, MY - 6); g.quadraticCurveTo(256, MY + 26, 290, MY - 6); g.stroke();
     }
     if (F && a.mouth !== 'grin' && a.mouth !== 'open') { g.strokeStyle = lip; g.globalAlpha = 0.75; g.lineWidth = 7; g.beginPath(); g.moveTo(240, MY + 6); g.quadraticCurveTo(256, MY + 14, 272, MY + 6); g.stroke(); g.globalAlpha = 1; }
@@ -373,16 +376,16 @@ function drawEye(g, cx, cy, s, a, eyeC, ink) {
 
 /* ---------- 頭の形(ただの丸ではなく、上が広く あごに向かって細いアニメの頭) ---------- */
 function headDeform(face) {
-  const a = { round: 0.12, egg: 0.21, sharp: 0.29, square: 0.08 }[face] ?? 0.18;
-  const sq = face === 'square';
+  const a = { round: 0.12, egg: 0.21, sharp: 0.29, square: 0.08, long: 0.2 }[face] ?? 0.18;
+  const sq = face === 'square', lg = face === 'long';   // long: 面長(大将ノブ専用。11-21 ノブさん)
   return (x, y, z, R) => {
     const ny = y / R;
     if (ny < 0) {
       const t = Math.min(1, -ny);
       x *= (1 - a * Math.pow(t, 1.5)) * (sq ? 1 + 0.05 * t : 1);
       z *= z > 0 ? 1 - 0.06 * t : 1 - 0.22 * t;
-      y *= 1 + (sq ? 0.02 : 0.1) * t;
-    } else { x *= 1 + 0.035 * ny; y *= 1.02; z *= 1 + 0.02 * ny; }
+      y *= 1 + (sq ? 0.02 : lg ? 0.16 : 0.1) * t; if (lg) x *= 0.96;
+    } else { x *= (1 + 0.035 * ny) * (lg ? 0.96 : 1); y *= lg ? 1.03 : 1.02; z *= 1 + 0.02 * ny; }
     return [x, y, z];
   };
 }
@@ -973,7 +976,7 @@ function buildAvatar(raw, opt = {}) {
   if (raw && raw.special === 'nobu' && a.owner && a.sex === 'm') {   // 大将ノブ専用の顔・髪型(ノブさん 2026-11-21)。お客さんは選べない。服・頭の手ぬぐい等は これまでどおり選べる。小物は付けない
     const N = Object.assign({ hair: 'n1', brow: 'k1', eye: 'e1', nose: 1, beard: 'b1', face: 'egg', skin: 2 }, (window.SHOP && SHOP.NOBU_FACE) || {}, raw.nobuFace || {});
     a.special = 'nobu'; a.hair = 'nobu'; a.nHair = N.hair; a.hairColor = 0; a.brows = 'n' + N.brow; a.eyes = 'n' + N.eye; a.beard = 'chin'; a.nBeard = N.beard; a.nNose = N.nose;
-    if (['round', 'egg', 'sharp', 'square'].includes(N.face)) a.face = N.face; if (N.skin >= 0 && N.skin <= 5) a.skin = N.skin; a.acc = 'none';
+    if (['round', 'egg', 'sharp', 'square', 'long'].includes(N.face)) a.face = N.face; if (N.mouth) a.mouth = N.mouth; if (N.skin >= 0 && N.skin <= 5) a.skin = N.skin; a.acc = 'none';
   }
   const cos = raw && raw.costume; costumePrep(a, cos);   // お祝いモードの かぶりもの
   const f = a.sex === 'f';
@@ -1065,8 +1068,8 @@ function buildAvatar(raw, opt = {}) {
     nose.scale.set(0.6, 1.3, 1.25); nose.rotation.x = -0.3; skull.add(nose);
   }
   if (!f && a.beard && a.beard !== 'none' && a.beard !== 'mustache') {   // ひげ: あごの形に そった殻(あごひげ=あごの先、フル=もみあげから あご全体、ぶしょう=うすく)
-    const hcB = shade(AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor), 0.92);
-    const kind = a.beard, ph = kind === 'chin' ? (a.nBeard === 'b4' ? 0.95 : 0.62) : 1.45, th0 = kind === 'chin' ? (a.nBeard === 'b4' ? 2.18 : 2.25) : kind === 'full' ? 1.95 : 1.9;   // b4: 大将ノブの 広めの あごひげ
+    const hcB = a.nBeard === 'b5' ? '#5a4a40' : shade(AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor), 0.92);   // b5 は うすい色(地肌が少し すける感じ)
+    const kind = a.beard, ph = kind === 'chin' ? (a.nBeard === 'b4' ? 0.95 : a.nBeard === 'b5' ? 0.46 : 0.62) : 1.45, th0 = kind === 'chin' ? (a.nBeard === 'b4' ? 2.18 : a.nBeard === 'b5' ? 2.36 : 2.25) : kind === 'full' ? 1.95 : 1.9;   // b5: 大将ノブの うすく小さい あごひげ   // b4: 大将ノブの 広めの あごひげ
     const bg = new THREE.SphereGeometry(R * (kind === 'stubble' ? 1.006 : 1.03), 28, 14, Math.PI / 2 - ph, ph * 2, th0, Math.PI - 0.1 - th0), bp = bg.attributes.position;
     for (let i = 0; i < bp.count; i++) {   // 上のふちを ぎざぎざに、あご先は 少し ふくらませる
       const x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i), th = Math.acos(Math.max(-1, Math.min(1, y / (R * 1.03))));
@@ -1075,6 +1078,7 @@ function buildAvatar(raw, opt = {}) {
     }
     deformGeo(bg, D, R);
     if (kind === 'stubble') skull.add(new THREE.Mesh(bg, new THREE.MeshBasicMaterial({ color: '#3a2a24', transparent: true, opacity: 0.2, depthWrite: false })));
+    else if (a.nBeard === 'b5') skull.add(new THREE.Mesh(bg, new THREE.MeshBasicMaterial({ color: '#2a1e18', transparent: true, opacity: 0.5, depthWrite: false })));   // 大将ノブ: うすい あごひげ(地肌が すける)
     else { const bm = tm(bg, hcB, 0, 0, 0, LN); skull.add(bm); }
   }
   const nHair0 = skull.children.length;
@@ -1387,8 +1391,8 @@ function buildAcc(head, body, a, R, f) {
   if (a.owner) {
     const Rh = f ? R * 1.2 : R;   // 女性は髪がふくらんでいるので、頭の飾りを ひとまわり大きく(髪にうもれないように)
     switch (a.head) {
-      case 'hachimaki': case 'nejiri': { const Rb = f ? R * 0.98 : R, up = a.special === 'nobu' ? 0.14 : 0, tlt = a.special === 'nobu' ? 0.04 : 0.15;   // 大将ノブ: おでこを出した髪なので 少し上に巻く(まゆを隠さない)
-        const band = tm(new THREE.TorusGeometry(Rb * (1.03 + up * 0.1), a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), '#f6f4ee', 0, Rb * (0.3 + up), 0, 0.003); band.rotation.x = Math.PI / 2 + tlt; head.add(band);
+      case 'hachimaki': case 'nejiri': { const Rb = f ? R * 0.98 : R, up = a.special === 'nobu' ? 0.07 : 0, tlt = a.special === 'nobu' ? 0.06 : 0.15;   // 大将ノブ: おでこを出した髪なので 少し上に巻く(まゆを隠さない)
+        const band = tm(new THREE.TorusGeometry(Rb * (a.special === 'nobu' ? 0.97 : 1.03), a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), '#f6f4ee', 0, Rb * (0.3 + up), 0, 0.003); band.rotation.x = Math.PI / 2 + tlt; if (a.special === 'nobu') band.scale.x = 0.93; head.add(band);   // 大将ノブは面長で横はばが せまいので、横を少し しぼる(浮かないように)
         if (a.head === 'nejiri') for (let k = 0; k < 24; k++) { const ang = k / 24 * Math.PI * 2; head.add(tm(new THREE.BoxGeometry(0.006, 0.03, 0.01), '#2a3a6a', Math.sin(ang) * Rb * 1.04, Rb * (0.3 + up) + Math.cos(ang) * Rb * tlt * 0.98, Math.cos(ang) * Rb * 1.04)); }
         const knot = tm(new THREE.SphereGeometry(0.025, 8, 6), '#f6f4ee', 0, Rb * (0.25 + up), -Rb * 1.02, 0.003); head.add(knot);
         [-1, 1].forEach((s) => { const tl = tm(new THREE.BoxGeometry(0.03, 0.09, 0.006), '#f6f4ee', s * 0.03, Rb * (0.12 + up), -Rb * 1.04); tl.rotation.z = s * 0.4; head.add(tl); });

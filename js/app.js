@@ -2670,7 +2670,16 @@
     { name: '頭と前掛け', build: function () { return opts('頭', 'head') + opts('前掛け', 'apron'); } },
     GUEST_TABS[6]
   ];
-  function tabs() { return OWNER_MODE ? OWNER_TABS : GUEST_TABS; }
+  var NOBU_TABS = [   // 大将ノブ(ノブさん本人): 顔・目・髪は 決まっているので出さない(11-21 ノブさん)。服・頭と前掛け・声だけ
+    { name: 'おまかせ', build: function () {
+      var h = '<div class="mk-sex">大将ノブのアバター</div><div class="mk-sec">大将の着こなし</div><div class="presets">';
+      OWNER_PRESETS.forEach(function (p, i) { h += '<button data-opreset="' + i + '">' + esc(p.name) + '</button>'; });
+      return h + '</div><div class="mk-sec">顔と髪型は 大将ノブ専用に決まっています(お客さんとは かぶりません)。服・頭・前掛け・声を選べます</div>';
+    } },
+    OWNER_TABS[4], OWNER_TABS[5], OWNER_TABS[6]
+  ];
+  function nobuFixed() { return OWNER_MODE && ROLE === 'nobu' && !!SHOP.NOBU_FACE && !!draft && draft.sex === 'm'; }
+  function tabs() { return nobuFixed() ? NOBU_TABS : OWNER_MODE ? OWNER_TABS : GUEST_TABS; }
   var voiceTab = null;
   function voiceLabel(v) { return v.rec ? v.name : (v.sex === 'm' ? '男性・' : v.sex === 'f' ? '女性・' : 'キャラ・') + v.name; }
   function sizeVoice() {
@@ -2723,7 +2732,7 @@
     var startPreview = function () {
       if (!window.IZ3D) return;
       if (!preview) preview = window.IZ3D.createPreview($('preview'));
-      if (draft) preview.setAvatar(draft); else preview.setAvatar(null);
+      if (draft) preview.setAvatar(OWNER_MODE ? nobuLook(draft) : draft); else preview.setAvatar(null);
     };
     if (window.IZ3D) startPreview(); else window.addEventListener('iz3d-ready', startPreview, { once: true });
     renderMaker();
@@ -2741,7 +2750,7 @@
       return;
     }
     var T = tabs();
-    if (tbox.children.length !== T.length) {
+    if (tbox.children.length !== T.length || tbox._set !== T) { tbox._set = T; if (mkTab >= T.length) mkTab = 0;
       tbox.innerHTML = '';
       T.forEach(function (t, i) { var b = document.createElement('button'); b.textContent = t.name; b.onclick = function () { mkTab = i; renderMaker(); }; tbox.appendChild(b); });
     }
@@ -2776,7 +2785,7 @@
     });
     var sz = $('mkSize'); if (sz) sz.oninput = function () { draft.size = +sz.value; updateDraft(); };
   }
-  function updateDraft() { if (preview && draft) preview.setAvatar(draft); }
+  function updateDraft() { if (preview && draft) preview.setAvatar(OWNER_MODE ? nobuLook(draft) : draft); }
   $('makerBtn').onclick = function () { unlockAudio(); openMaker(); };
   $('mkRandom').onclick = function () {
     if (!draft) return;
