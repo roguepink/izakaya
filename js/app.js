@@ -774,6 +774,7 @@
   }
   function leave(kicked) {
     if (!inside) return;
+    if (window.IZGAME && IZGAME.isOpen()) IZGAME.abort();   // ゲーム中に帰ったら ゲームは終わり
     if (!kicked) {
       if (mySeat >= 0) { event({ type: 'phrase', id: 'mataokoshi', seat: mySeat }); net.remove('seats/' + mySeat); net.remove('tables/' + mySeat); }
       sys(OWNER_MODE ? (/^大将/.test(currentName()) ? '' : '大将の') + currentName() + 'が奥に下がりました' : honor(currentName()) + 'がお帰りになりました');
@@ -786,7 +787,7 @@
     audio.pause(); hideYT(); curKey = '';
     closeSheet();
     $('bubbles').innerHTML = ''; bubbles = {}; $('log').innerHTML = ''; $('log')._h = ''; toggleLog(false);
-    $('shop').classList.add('hidden'); $('entrance').classList.remove('hidden'); $('emptyNote').classList.add('hidden'); $('bCos').classList.add('hidden');
+    $('shop').classList.add('hidden'); $('entrance').classList.remove('hidden'); $('emptyNote').classList.add('hidden'); $('bCos').classList.add('hidden'); $('bGame').classList.add('hidden');
     setView('overview');
   }
   /* 「帰る」を押さずに画面を閉じた: すぐには帰さず「席を外しています」にする(3分は席と料理が残る。戻ればそのまま座れる) */
@@ -1224,14 +1225,14 @@
       t.style.left = x + 'px'; t.style.top = p.y + 'px'; used[key] = 1; };
     if (showTags) {
       var st = tree.state || {};
-      if (!(ownerCam())) { var okg = kigaeNow((tree.state || {}).ownerKigae); put('owner', (OWNER_MODE ? 'owner' : 'owner tap') + (okg ? ' kigae' : ''), okg ? '👚 ' + ownerLabel() + ' 着がえ中…' : ownerLabel() + (ownerPresent() ? '' : '(おまかせ中)'), a.owner); }   // おまかせ中でも 押すと大将あてに書ける
+      if (!(ownerCam())) { var okg = kigaeNow((tree.state || {}).ownerKigae), ogm = !okg && gameNow((tree.state || {}).ownerGame); put('owner', (OWNER_MODE ? 'owner' : 'owner tap') + (okg ? ' kigae' : ogm ? ' gaming' : ''), okg ? '👚 ' + ownerLabel() + ' 着がえ中…' : ogm ? '🎮 ' + ownerLabel() + ' ゲーム中' : ownerLabel() + (ownerPresent() ? '' : '(おまかせ中)'), a.owner); }   // おまかせ中でも 押すと大将あてに書ける
       if (tagEls.owner) { if (OWNER_MODE) tagEls.owner.removeAttribute('data-seat'); else tagEls.owner.setAttribute('data-seat', 'owner'); }
       var resv = reservationsNow(), serveList = [];
       for (var i = 0; i < N; i++) {
         var uid = seatUid(i), m = uid && ms[uid];
         if (m && away(m)) { put('s' + i, 'away', m.name + '(席を外しています)', a.seats[i]); var tw = tagEls['s' + i]; if (tw) tw.removeAttribute('data-seat'); continue; }
         if (m && fresh(m) && OWNER_MODE && view === 'owner' && a.tables && a.tables[i]) serveList.push({ i: i, p: a.seats[i] ? { x: a.seats[i].x, y: a.tables[i].y } : a.tables[i] });   // 横は その人の頭の真下   // 大将の接客の目線: その人のテーブルの前に「出す」(あとで まとめて置く)
-        if (m && fresh(m)) { var kg = kigaeNow(m.kigae); put('s' + i, (uid === ME.uid ? 'me' : 'tap') + (kg ? ' kigae' : ''), kg ? '👚 ' + m.name + ' 着がえ中…' : m.name + (uid === ME.uid ? '(あなた)' : ''), a.seats[i]); var tg = tagEls['s' + i]; if (tg) { if (uid === ME.uid) tg.removeAttribute('data-seat'); else tg.setAttribute('data-seat', i); } continue; }
+        if (m && fresh(m)) { var kg = kigaeNow(m.kigae), gm = !kg && gameNow(m.game); put('s' + i, (uid === ME.uid ? 'me' : 'tap') + (kg ? ' kigae' : gm ? ' gaming' : ''), kg ? '👚 ' + m.name + ' 着がえ中…' : gm ? '🎮 ' + m.name + ' ゲーム中' : m.name + (uid === ME.uid ? '(あなた)' : ''), a.seats[i]); var tg = tagEls['s' + i]; if (tg) { if (uid === ME.uid) tg.removeAttribute('data-seat'); else tg.setAttribute('data-seat', i); } continue; }
         var r = resv[i];
         if (r) {   // 予約済みの席は、だれにでも名前が見える
           (function (k, rr) { put('e' + k, rr.uid === ME.uid ? 'free mine' : 'reserved', rr.uid === ME.uid ? 'ご予約の席(あなた)' : '予約済み ' + sama(rr.name), a.empty[k], function () { onSeatTap(k); }); })(i, r);
@@ -1363,6 +1364,7 @@
     Object.keys(ev).sort().forEach(function (k) {
       if (seenEvt[k]) return; seenEvt[k] = 1;
       var e = ev[k]; if ((e.at || 0) < joinAt - 3000) return;
+      if (e.type === 'record') { if (amLeader() && e.by !== REG_UID && regSeat() >= 0) setTimeout(function () { regLine('cheer'); }, rnd(1.5, 3) * 1000); return; }   // 本日の最高得点 → 常連の子が「すごい！」
       if (e.type === 'phrase') {
         var ph = SHOP.PHRASES.filter(function (p) { return p.id === e.id; })[0]; if (!ph) return;
         var who = ph.who === 'owner' ? 'owner' : e.seat;
@@ -1513,6 +1515,7 @@
       for (var i = 0; i < N; i++) if (seatUid(i) === uid) { net.remove('seats/' + i); net.remove('tables/' + i); }
     });
     for (var i = 0; i < N; i++) { var u = seatUid(i); if (u && !ms[u]) { net.remove('seats/' + i); net.remove('tables/' + i); } }
+    Object.keys(tree.scores || {}).forEach(function (k) { if (k !== gameKey()) net.remove('scores/' + k); });   // 前の回の得点は消す(開店のたびにゼロから)
     regTick(n);   // 常連の子(片づけのあとに。来たばかりの子を 古い一覧で片づけないように)
     // 大将がいないとき・大将が「自動で出す」にしているときは、注文を自動で出す(お客さんは3秒は取り消せる)
     var aw = ownerPresent() ? autoWait(st.autoServe) : function () { return 3000; };
@@ -2003,6 +2006,8 @@
     scene.setCelebrate(k, { names: names });
     document.body.classList.toggle('celeb', !!k);
     ['xmas', 'newyear', 'birthday'].forEach(function (x) { document.body.classList.toggle('celeb-' + x, k === x); });
+    boardTick();
+    $('bGame').classList.toggle('hidden', !inside || DEMO || !window.IZGAME || (!OWNER_MODE && mySeat < 0));   // 🎮 ミニゲーム(座ってから)
     $('bCos').classList.toggle('hidden', !inside || DEMO);   // 👕 着がえ: いつも出す(お祝いの日は 仮装も ここから)
     var lbl = $('tbCeleb'); if (lbl) { lbl.innerHTML = k ? SHOP.CELEBRATE[k].emoji + '<i>' + esc(SHOP.CELEBRATE[k].name) + '</i>' : ''; lbl.classList.toggle('hidden', !k); }
     if (lastCeleb === null) { lastCeleb = k; return; }
@@ -2092,6 +2097,58 @@
     var to = new Date(y + 1, 0, 1, 0, 0, 0).getTime();
     if (!Object.keys(tree.events || {}).some(function (k) { return tree.events[k].type === 'countdown' && Math.abs((tree.events[k].to || 0) - to) < 2000; })) event({ type: 'countdown', to: to });
   }
+
+  /* ---------------- ミニゲーム「ジョッキ キャッチ」と 本日の最高得点(ノブさん 2026-11-21) ----------------
+     🎮 で遊ぶ(30秒)。点数は scores/<その回>/<uid> = {name, score, at}(自分の いちばん高い点だけ)。
+     モニターの右の黒板に 上位3人。開店のたびに ゼロから。1位が変わったら 会話でお知らせ + 大将「いいねえ！」+ 常連の子「すごい！」 */
+  function gameKey() { return liveKey(); }
+  function gameNow(t) { return !!t && now() - t < 45000; }
+  function scoresToday() {
+    var s = (tree.scores || {})[gameKey()] || {};
+    return Object.keys(s).map(function (u) { return { uid: u, name: s[u].name, score: +s[u].score || 0, at: s[u].at || 0 }; })
+      .filter(function (x) { return x.name && x.score > 0; }).sort(function (a, b) { return b.score - a.score || a.at - b.at; });
+  }
+  var boardKey = '';
+  function boardTick() {
+    var top = scoresToday().slice(0, 3), k = JSON.stringify(top.map(function (x) { return [x.name, x.score]; }));
+    if (k === boardKey) return; boardKey = k;
+    withScene(function (sc) { if (sc.setScores) sc.setScores(top); });
+  }
+  function postScore(uid, name, score) {   // 自分の最高より高ければ 記録。1位になったら お知らせ。結果の文を返す
+    var mx = window.IZGAME ? IZGAME.maxScore(gameKey()) : 9999; score = Math.max(0, Math.min(score | 0, mx));   // ありえない点は 上限まで
+    if (score <= 0) return '';
+    var L = scoresToday(), mine = L.filter(function (x) { return x.uid === uid; })[0], top = L[0];
+    var better = !mine || score > mine.score;
+    if (better) net.set('scores/' + gameKey() + '/' + uid, { name: name, score: score, at: TS });
+    var rank = 1 + L.filter(function (x) { return x.uid !== uid && x.score >= score; }).length;
+    if (better && rank === 1 && (!top || top.uid !== uid)) {   // 1位が かわった(または はじめての記録)
+      sys('🎉 ' + honor(name) + 'が 本日の最高得点!(ジョッキ キャッチ ' + score + '点)');
+      net.push('events', { type: 'phrase', id: 'o_iine', seat: 'owner', at: TS, by: uid });   // 大将「いいねえ！」
+      net.push('events', { type: 'record', at: TS, by: uid });
+      return '🎉 本日の最高得点です!';
+    }
+    if (better && rank === 1) return '🎉 自分の記録を こえました!(いまも1位)';
+    if (!better) return '今日の自分の最高は ' + mine.score + '点(いま ' + (1 + L.filter(function (x) { return x.uid !== uid && x.score >= mine.score; }).length) + '位)';
+    return '今日の ' + rank + '位です!';
+  }
+  function myGameName() { return OWNER_MODE ? ownerLabel() : currentName(); }
+  function setGaming(on) { if (!inside || DEMO) return; if (OWNER_MODE) net.update('state', { ownerGame: on ? now() : null }); else net.update('members/' + ME.uid, { game: on ? now() : null }); }
+  var gameAlive = 0;
+  function openGame() {
+    if (!inside || DEMO || !window.IZGAME || IZGAME.isOpen()) return;
+    if (phOn) { toast('記念撮影の あとで遊べます', 2000); return; }
+    if (document.body.classList.contains('kigae-on')) return;
+    closeSheet(); closeWho();
+    var mine = scoresToday().filter(function (x) { return x.uid === ME.uid; })[0];
+    withScene(function (sc) { if (sc.setPerf) sc.setPerf({ rest: true }); });   // 遊んでいる間は お店の 3D を休ませる(軽く)
+    IZGAME.open({
+      seed: gameKey(), best: mine ? mine.score : 0,
+      onStart: function () { setGaming(true); clearInterval(gameAlive); gameAlive = setInterval(function () { if (IZGAME.isOpen()) setGaming(true); }, 20000); },
+      onEnd: function (score, aborted) { clearInterval(gameAlive); setGaming(false); if (aborted) return ''; return postScore(ME.uid, myGameName(), score); },
+      onClose: function () { clearInterval(gameAlive); setGaming(false); withScene(function (sc) { if (sc.setPerf) sc.setPerf({ rest: tvMode === 'big' }); }); }
+    });
+  }
+  $('bGame').onclick = openGame;
   $('bCos').onclick = function () { if (celebKind()) openSheet('costume'); else openMaker(); };
 
   /* ---------------- 記念撮影(大将の自撮り風) ----------------
@@ -2145,6 +2202,7 @@
     if (rem < -7) { if (phOn) photoEndUI(); if (OWNER_MODE && amLeader()) net.update('state', { photo: null }); return; }
     if (phOn !== st.id) {   // 始まり
       phOn = st.id; phShot = false; phSaid = {}; myPick = { pose: 'peace', face: 'smile', hide: false };
+      if (window.IZGAME && IZGAME.isOpen()) { IZGAME.abort(); toast('記念撮影が始まったので、ゲームは終わりにしました', 2600); }
       document.body.classList.add('photo-mode'); $('photoUi').classList.remove('hidden'); closeSheet();
       phChips();
       if (LOCAL && !phBots) { phBots = true; setTimeout(function () { phBots = false; Object.keys(bots).forEach(function (u) { var P = (scene && scene.photoPoses) || [['peace']], F = (scene && scene.photoFaces) || [['smile']]; net.set('photo/' + u, { pose: P[Math.floor(Math.random() * P.length)][0], face: F[Math.floor(Math.random() * 4)][0], hide: false, at: TS }); }); }, 6000); }
@@ -2279,8 +2337,9 @@
      店を回す人(まとめ役)のスマホが 1台だけで動かす(tick から)。記録は members/reg-ai(bot:true, regular:true)。
      自分から乾杯はしない(ほかの人の乾杯には加わる)・記念撮影に写らない・話しかけられたら「ありがとう、よろしくね」。
      注文 → 少しずつ食べる・飲む → 食べ終わったら たまに「うまい」「おいしい」→ お皿は大将(自動)が下げる */
-  var REG = Object.assign({ NAME: 'アイちゃん', CALL: ['アイ'], MAX_GUESTS: 2, HAIR: '#c4a27e', FITS: [], ACCS: [], VOICE: '', WAIT_MIN: 3, SEAT: 1, LEAVE_SEC: [20, 40], TALK: {},
+  var REG = Object.assign({ NAME: 'アイちゃん', CALL: ['アイ'], MAX_GUESTS: 2, GAME_MIN: [2, 5], GAME_RATE: [0.4, 0.7], HAIR: '#c4a27e', FITS: [], ACCS: [], VOICE: '', WAIT_MIN: 3, SEAT: 1, LEAVE_SEC: [20, 40], TALK: {},
     EAT_SEC: [50, 65], ORDER_SEC: [90, 170], FIRST_ORDER_SEC: [15, 35], TALK_MIN: [6, 11] }, SHOP.REGULAR || {});
+  var regGameAt = 0, regGaming = 0;   // 常連の子の ミニゲーム
   var REG_UID = 'reg-ai', regSince = 0, regLeaveAt = 0, regNext = 0, regTalkAt = 0, regThanks = {}, regSeen = 0;
   function rnd(a, b) { return a + Math.random() * (b - a); }
   function regMember() { var m = members()[REG_UID]; return m && m.name ? m : null; }
@@ -2321,6 +2380,7 @@
     for (var i = 0; i < order.length; i++) { var k = order[i], u = seatUid(k); if ((!u || !members()[u]) && !res[k]) { seat = k; break; } }
     if (seat < 0) return false;
     var av = regAvatar();
+    regGameAt = 0; regGaming = 0;
     net.set('members/' + REG_UID, { name: REG.NAME, avatar: av, at: TS, seen: TS, seat: seat, bot: true, regular: true, voice: av.voice || '' });
     net.set('seats/' + seat, REG_UID);
     net.push('events', { type: 'phrase', id: 'irasshai', seat: seat, at: TS, by: REG_UID });
@@ -2335,7 +2395,7 @@
     Object.keys(tree.orders || {}).forEach(function (o) { if (tree.orders[o].uid === REG_UID) net.remove('orders/' + o); });
     net.remove('members/' + REG_UID);
     if (m && !quiet) sys(honor(m.name) + 'がお帰りになりました');
-    regLeaveAt = 0; regSince = 0;
+    regLeaveAt = 0; regSince = 0; regGameAt = 0; regGaming = 0;
   }
   function regTick(n) {   // まとめ役のスマホで 1秒ごと
     if (DEMO) return;
@@ -2352,7 +2412,15 @@
     if (n - regSeen > 15000) { regSeen = n; net.update('members/' + REG_UID, { seen: TS }); }
     if (!regNext) regNext = n + rnd(REG.FIRST_ORDER_SEC[0], REG.FIRST_ORDER_SEC[1]) * 1000;   // まとめ役が代わったとき
     if (!regTalkAt) regTalkAt = n + rnd(REG.TALK_MIN[0], REG.TALK_MIN[1]) * MIN;
-    if (m.name !== REG.NAME) net.update('members/' + REG_UID, { name: REG.NAME });   // 名前を変えたとき(前の記録)
+    if (m.name !== REG.NAME) net.update('members/' + REG_UID, { name: REG.NAME });
+    // ミニゲーム: いる間に 1回だけ遊ぶ(30秒「ゲーム中」→ ほどほどの点数)。お客さんがゲーム中のときは待つ
+    if (!regGameAt) regGameAt = n + rnd(REG.GAME_MIN[0], REG.GAME_MIN[1]) * MIN;
+    if (regGameAt > 0 && n >= regGameAt && !regGaming && guests <= REG.MAX_GUESTS && !phOn && window.IZGAME) { regGaming = n; net.update('members/' + REG_UID, { game: TS }); }
+    if (regGaming && n - regGaming > IZGAME.SEC * 1000 + 1500) {
+      regGaming = 0; regGameAt = -1; net.update('members/' + REG_UID, { game: null });
+      var mx = IZGAME.maxScore(gameKey()), sc = Math.round(mx * rnd(REG.GAME_RATE[0], REG.GAME_RATE[1]) / 5) * 5;
+      postScore(REG_UID, REG.NAME, sc);
+    }   // 名前を変えたとき(前の記録)
     // MAX_GUESTS 人より多くなった → 少しして「そろそろ帰るね」
     if (guests > REG.MAX_GUESTS) {
       if (!regLeaveAt) regLeaveAt = n + rnd(REG.LEAVE_SEC[0], REG.LEAVE_SEC[1]) * 1000;

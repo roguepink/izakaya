@@ -2087,6 +2087,8 @@ function createShop(canvas, opts) {
   const tagW = 0.17, tagH = 0.5;
   const tagXs = [];
   for (let x = TV_GAP + 0.06 + tagW / 2; x < L / 2 - 0.2 - tagW / 2 + 0.001; x += tagW + 0.03) tagXs.push(x, -x);
+  const BOARD_X = TV_GAP + 0.06 + tagW + 0.015;   // モニターの右どなりの 木札2枚ぶんは「本日の最高得点」の黒板にする(ノブさん 2026-11-21)
+  for (let i = tagXs.length - 1; i >= 0; i--) if (tagXs[i] > 0 && tagXs[i] < BOARD_X + tagW + 0.02) tagXs.splice(i, 1);
   const must = (SHOP.TAG_ALWAYS || []).map((id) => SHOP.MENU.find((m) => m.id === id)).filter(Boolean);
   const items = must.concat(SHOP.MENU.filter((m) => m.pun), SHOP.MENU.filter((m) => !m.pun && m.kind !== 'drink'), SHOP.MENU.filter((m) => m.kind === 'drink')).filter((m) => !m.only)   // お祝いの日だけの品は 木札にしない
     .filter((m, i, a) => a.indexOf(m) === i).slice(0, tagXs.length);
@@ -2103,6 +2105,29 @@ function createShop(canvas, opts) {
     tag.userData.menuId = it.id; tagList.push(tag);   // 押すと注文できる
     scene.add(tag);
   });
+
+  // 本日の最高得点の黒板(ミニゲーム「ジョッキ キャッチ」。上位3人)
+  const boardTex = canvasTex(256, 336, () => {});
+  let boardList = null;
+  function drawBoard() {
+    const c = boardTex.image, g = c.getContext('2d'), W = c.width, H = c.height;
+    g.fillStyle = '#6b4728'; g.fillRect(0, 0, W, H);   // 木のわく
+    g.fillStyle = '#23382c'; g.fillRect(10, 10, W - 20, H - 20);   // 黒板
+    g.fillStyle = '#f6f0e0'; g.textAlign = 'center'; g.textBaseline = 'top';
+    g.font = 'bold 26px ' + FONT_JP; g.fillText('本日の', W / 2, 22); g.fillText('最高得点', W / 2, 52);
+    g.strokeStyle = 'rgba(246,240,224,0.5)'; g.lineWidth = 2; g.beginPath(); g.moveTo(28, 92); g.lineTo(W - 28, 92); g.stroke();
+    const L = boardList || [];
+    if (!L.length) { g.font = '22px ' + FONT_JP; g.fillText('まだ記録なし', W / 2, 140); g.font = '20px ' + FONT_JP; g.fillStyle = '#f5c04a'; g.fillText('🎮で挑戦!', W / 2, 180); }
+    L.slice(0, 3).forEach((x, i) => {
+      const y = 108 + i * 72;
+      g.textAlign = 'left'; g.fillStyle = ['#f5c04a', '#e8e8f0', '#e0a070'][i]; g.font = 'bold 26px ' + FONT_JP; g.fillText((i + 1) + '', 24, y + 4);
+      g.fillStyle = '#f6f0e0'; g.font = '22px ' + FONT_JP; g.fillText(Array.from(String(x.name || '')).slice(0, 7).join(''), 52, y + 2);
+      g.textAlign = 'right'; g.font = 'bold 24px ' + FONT_JP; g.fillText((x.score | 0) + '点', W - 22, y + 34);
+    });
+    boardTex.needsUpdate = true;
+  }
+  drawBoard();
+  scene.add(mesh(new THREE.PlaneGeometry(tagW * 2 + 0.03, tagH * 1.05), new THREE.MeshLambertMaterial({ map: boardTex }), BOARD_X, 2.45, -2.075));
 
   // 大将のうしろのモニター(動画はこの画面の上に重ねて流す。何もない時は店の名前と曲名)
   const TV_W = 1.1, TV_H = 0.62;
@@ -2803,6 +2828,7 @@ function createShop(canvas, opts) {
         seats: seatAvatars.map((a, i) => (a && a.visible ? headPos(a) : null)), owner: headPos(owner), empty: stools.map((s, i) => { tmp.set(seatX(i, N), STOOL_Y + 0.25, GUEST_Z); const v = tmp.clone().project(camera); if (v.z > 1) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }) }; },
     get name() { return SHOPNAME; },
     /* 店の名前を その場で変える(ちょうちん・のれん・モニター)。バトンタッチのとき */
+    setScores(list) { boardList = (list || []).slice(0, 3); drawBoard(); },   // 本日の最高得点(上位3人)
     setName(nm) {
       nm = nm || SHOP.NAME; if (nm === SHOPNAME) return;
       SHOPNAME = nm;

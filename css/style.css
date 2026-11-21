@@ -490,7 +490,10 @@ body.kigae-on #kpUi, body.kigae-on #kpBanner, body.kigae-on #photoUi, body.kigae
 .tag.me { pointer-events: auto; cursor: pointer; }
 .tag.me::after { content: ' 👕'; font-size: 9px; }
 body.is-owner .tag.owner { pointer-events: auto; cursor: pointer; }
-.tag.kigae::after { content: "" !important; }   /* 着がえ中は 💬・👕 の印を出さない */
+.tag.kigae::after { content: "" !important; }
+.tag.gaming { background: #24324a !important; color: #e6efff !important; border: 1.5px dashed #8fb4ff; }   /* 🎮 ゲーム中 */
+.tag.gaming::after { content: "" !important; }
+body.demo .side > #bGame { display: none !important; }   /* 着がえ中は 💬・👕 の印を出さない */
 /* バトンタッチ */
 #whoPick button[data-w=baton] { background: #e6f0ff; }
 .bt-lead { font-size: 16px; margin: 4px 0 8px; line-height: 1.6; }
