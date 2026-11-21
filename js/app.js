@@ -329,8 +329,13 @@
   }
   function playAi(id, seat) {   // 常連のアイちゃんの言葉の声(voice/ai/)。アイちゃんの席の順番待ちに入れる
     if (DEMO || !inside) return;
-    var L = ''; var T = (SHOP.REGULAR || {}).TALK || {}; Object.keys(T).forEach(function (k) { T[k].forEach(function (x) { if (x[0] === id) L = x[1]; }); });
-    speakerQueue('s' + seat, function (done) { playFiles(['voice/ai/' + id + '.m4a'], function (d) { if (L) speak(L, (SHOP.REGULAR || {}).VOICE || 'g_zephyr', false, d); else d(); }, done); });
+    /* 声のファイルが読めなかったときに、スマホの読み上げ(ロボットの声)にしない(ノブさん 2026-11-22「Gemini の声じゃなかった」)。
+       1秒あけて もう1回だけ試し、それでもだめなら 声なし(吹き出しの文字だけ)。次に言うときは また試す */
+    var f = 'voice/ai/' + id + '.m4a';
+    speakerQueue('s' + seat, function (done) {
+      delete voiceMissing[f];
+      playFiles([f], function (d) { delete voiceMissing[f]; setTimeout(function () { playFiles([f], function (d2) { delete voiceMissing[f]; d2(); }, d); }, 1000); }, done);
+    });
   }
   function previewVoice(voiceId, owner, phId) {   // アバター作りで 声を選んだとき・試し聞き
     var ph = SHOP.PHRASES.filter(function (p) { return p.id === (phId || (owner ? 'irasshai' : 'kanpai')); })[0] || SHOP.GUEST_PHRASES[0];
@@ -2875,5 +2880,5 @@
   initEntrance();
   // 確認用(画面の自動テストから使う)
   setTimeout(batonAutoEnter, 900);   // バトンタッチで開きなおしたときは 自動で店に入る
-  window.IZ = { scene: function () { return scene; }, get tree() { return tree; }, get inside() { return inside; }, get seat() { return mySeat; }, net: function () { return net; }, addBot: addBot, status: status, upcoming: upcoming, voiceFiles: voiceFiles, reg: REG };
+  window.IZ = { scene: function () { return scene; }, get tree() { return tree; }, get inside() { return inside; }, get seat() { return mySeat; }, net: function () { return net; }, addBot: addBot, status: status, upcoming: upcoming, voiceFiles: voiceFiles, playAi: playAi, reg: REG };
 })();
