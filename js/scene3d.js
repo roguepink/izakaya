@@ -716,7 +716,18 @@ const TOP_DEF = {
   ai: { sleeve: 'puff', skirt: true },   // アイちゃん専用: 大きな白いえりの ワンピース
   /* ---- アイちゃん専用の服(お客さんは選べない。ノブさん 2026-11-21)。skirtC: スカートの色(関数なら服の色から決める)・skirtTex: スカートの がら・
      tights: タイツの色・socks: くつしたの色・long: 長めのスカート・pantsC: ズボンの色・shorts: ショートパンツ・wide: ワイドパンツ */
-  ai_turtle:  { sleeve: 'long', tex: 'rib', skirt: true, skirtC: '#8e2a34', skirtTex: 'check', tights: '#2a2630' },
+  ai_turtle:  { sleeve: 'long', tex: 'rib', skirt: true, skirtC: '#cbbfae', skirtTex: 'check', tights: '#4a4650' },   // タートル + うすいチェックのスカート
+  ai_turtle2: { sleeve: 'long', tex: 'rib', skirt: true, skirtC: '#d8ccbc', socks: '#e8dccb' },   // タートル + 無地のスカート
+  /* ---- 2回目(ノブさん 2026-11-21): 20代前半の落ち着いた可愛さ。フリル・派手な色はなし。色は うすいパステル、パンツは落ち着いた色も */
+  ai_boat:    { sleeve: 'long', tex: 'rib', skirt: true, skirtC: '#d8ccbc', socks: '#e8dccb' },   // ボートネックのニット + スカート(胸元が少し開く → ネックレス)
+  ai_openshirt: { sleeve: 'long', pantsC: '#8a8a90', wide: true },   // 開襟シャツ + ワイドパンツ(胸元が少し開く → ネックレス)
+  ai_sweat:   { sleeve: 'long', pantsC: '#7a7a82' },   // スウェット + グレーのパンツ(ラフ)
+  ai_pleats:  { sleeve: 'long', tex: 'rib', skirt: true, skirtC: '#d4cfc8', skirtTex: 'pleat', socks: '#e8dccb' },   // うすいニット + プリーツスカート
+  ai_cardi2:  { sleeve: 'long', tex: 'rib', skirt: true, skirtC: '#cfc4b4', socks: '#e8dccb' },   // ボタンを留めたカーディガン(パールのボタン) + スカート
+  ai_tee:     { sleeve: 'short', pantsC: '#c8b89a' },   // Tシャツ + ベージュのパンツ(ラフ)
+  ai_quilt:   { sleeve: 'long', tex: 'rib', pantsC: '#3a3a42' },   // タートル + キルティングのベスト + パンツ
+  ai_vdress:  { sleeve: 'long', skirt: true, skirtC: (a, cc) => cc, socks: '#e8dccb' },   // 浅いVネックのワンピース(胸元が少し開く → ネックレス)
+  ai_jacket2: { sleeve: 'long', pantsC: '#8a8a90' },   // えりのないジャケット + グレーのパンツ(きれいめ)
   ai_knitdress: { sleeve: 'long', tex: 'rib', skirt: true, skirtC: (a, cc) => cc, skirtTex: 'rib', socks: '#f2ece4' },   // ニットのワンピース(制服っぽい服は作らない。ノブさん 2026-11-21)
   ai_denim:   { sleeve: 'puff', skirt: true, skirtC: '#4a6a9a', skirtTex: 'denim', socks: '#f6f4ee' },   // ふんわり袖のトップス + デニムのスカート
   ai_vknit:   { sleeve: 'long', tex: 'rib', pantsC: '#2c3044' },   // Vネックのニット + 細身のパンツ(大人っぽく。子どもっぽい服は作らない ノブさん 2026-11-21)
@@ -733,6 +744,7 @@ const TOP_DEF = {
   ai_wide:    { sleeve: 'long', tex: 'rib', pantsC: '#c8b08a', wide: true }
 };
 const AI_C = '#c8424e';   // アイちゃんの服の しるしの色(居酒屋に合う赤)
+const AI_OPEN = ['ai_blouse', 'ai_boat', 'ai_openshirt', 'ai_vdress', 'ai_vdeep', 'ai_square', 'ai_wrap'];   // 胸元が開いた服(必ず ネックレスをつける ノブさん 2026-11-21)
 const TEX_CACHE = {};
 function fabricTex(kind) {
   if (TEX_CACHE[kind]) return TEX_CACHE[kind];
@@ -827,6 +839,29 @@ function buildTop(body, a, f, cc) {
       if (a.top === 'ai_zip') { put(onChest(shapeGeo([[-0.03, 0.43], [0.03, 0.43], [0.03, 0.02], [-0.03, 0.02]], 0.002, 0), f, 0, 0, 0.002), '#f2ece2', 0); [-1, 1].forEach((s) => put(onChest(shapeGeo([[s * 0.03, 0.43], [s * 0.036, 0.43], [s * 0.036, 0.02], [s * 0.03, 0.02]], 0.002, 0), f, 0, 0, 0.004), '#b8b8c0', 0)); }
       else { [-1, 1].forEach((s) => body.add(tm(new THREE.CylinderGeometry(0.003, 0.003, 0.09, 5), '#f6f4ee', s * 0.028, 0.37, chestZ(f, 0.37, s * 0.028) + 0.006, 0))); put(onChest(shapeGeo([[-0.075, 0.06], [0.075, 0.06], [0.085, -0.01], [-0.085, -0.01]], 0.003, 0.0015), f, 0, 0.1, 0.004), shade(cc, 0.92)); }
       hem(shade(cc, 0.86)); break; }
+    case 'ai_turtle2': turtle(cc); hem(shade(cc, 0.86)); break;
+    case 'ai_boat': { const sk = AVATAR.color(AVATAR.SKIN, a.skin);   // ボートネック: 横に広く 浅く開いた えりぐり
+      put(onChest(shapeGeo([[-0.082, 0.437], [0.082, 0.437], [0.06, 0.4], [-0.06, 0.4]], 0.002, 0), f, 0, 0, 0.003), sk, 0);
+      put(onChest(shapeGeo([[-0.064, 0.404], [0.064, 0.404], [0.06, 0.394], [-0.06, 0.394]], 0.002, 0), f, 0, 0, 0.005), shade(cc, 0.86), 0); hem(shade(cc, 0.86)); break; }
+    case 'ai_openshirt': { const sk = AVATAR.color(AVATAR.SKIN, a.skin);   // 開襟シャツ: えりを開いて 胸元に少し 肌
+      put(onChest(shapeGeo([[-0.04, 0.435], [0.04, 0.435], [0, 0.35]], 0.002, 0), f, 0, 0, 0.003), sk, 0);
+      [-1, 1].forEach((s) => put(onChest(shapeGeo([[s * 0.04, 0.437], [s * 0.085, 0.425], [s * 0.04, 0.36], [s * 0.004, 0.345]], 0.003, 0.001), f, 0, 0, 0.008), lighten(cc, 0.12)));
+      buttons(3, 0, lighten(cc, 0.55), 0.31, 0.07); pocket(-0.062, 0.3, shade(cc, 0.94)); break; }
+    case 'ai_sweat': neckRib(shade(cc, 0.86), 0.046); hem(shade(cc, 0.84)); put(onChest(shapeGeo([[-0.012, 0.415], [0.012, 0.415], [0, 0.385]], 0.002, 0), f, 0, 0, 0.004), shade(cc, 0.82), 0); break;   // スウェット(えりもとに小さな三角)
+    case 'ai_pleats': neckRib(shade(cc, 0.86), 0.045); hem(shade(cc, 0.86)); break;   // うすいニット(丸首)
+    case 'ai_cardi2': neckRib(shade(cc, 0.85), 0.045); placket(shade(cc, 0.93), 0.42, 0.03); buttons(5, 0, '#fbf6ee', 0.39, 0.07); hem(shade(cc, 0.86)); break;   // ボタンを留めたカーディガン(パールのボタン)
+    case 'ai_tee': neckRib(shade(cc, 0.88), 0.044); break;   // Tシャツ
+    case 'ai_quilt': { turtle(cc); const vc = a.aiCol3 || '#d8d0c4';   // キルティングのベスト(前を留める)
+      [-1, 1].forEach((s) => { const vm = put(onChest(shapeGeo([[s * 0.002, 0.4], [s * 0.05, 0.43], [s * 0.115, 0.4], [s * 0.115, 0.03], [s * 0.002, 0.03]], 0.004, 0.0015), f, 0, 0, 0.007), vc);
+        for (let k = 0; k < 6; k++) put(onChest(shapeGeo([[s * 0.006, 0.07 + k * 0.055], [s * 0.112, 0.07 + k * 0.055], [s * 0.112, 0.073 + k * 0.055], [s * 0.006, 0.073 + k * 0.055]], 0.001, 0), f, 0, 0, 0.012), shade(vc, 0.85), 0); });
+      break; }
+    case 'ai_vdress': { const sk = AVATAR.color(AVATAR.SKIN, a.skin);   // 浅いVネックのワンピース + 同じ色の細いベルト
+      put(onChest(shapeGeo([[-0.04, 0.435], [0.04, 0.435], [0, 0.36]], 0.002, 0), f, 0, 0, 0.003), sk, 0);
+      [-1, 1].forEach((s) => put(onChest(shapeGeo([[s * 0.04, 0.437], [s * 0.05, 0.435], [s * 0.003, 0.35], [0, 0.36]], 0.002, 0.001), f, 0, 0, 0.005), shade(cc, 0.88)));
+      body.add(tm(new THREE.CylinderGeometry(0.114, 0.116, 0.016, 28), shade(cc, 0.8), 0, 0.16, 0, 0.0015)); break; }
+    case 'ai_jacket2': put(onChest(shapeGeo([[-0.05, 0.43], [0.05, 0.43], [0.02, 0.24], [-0.02, 0.24]], 0.002, 0), f, 0, 0, 0.003), '#f6f2ea', 0);   // えりのないジャケット(パンツ用)
+      [-1, 1].forEach((s) => put(onChest(shapeGeo([[s * 0.05, 0.432], [s * 0.06, 0.432], [s * 0.026, 0.235], [s * 0.016, 0.238]], 0.002, 0.001), f, 0, 0, 0.006), shade(cc, 0.78)));
+      buttons(2, 0, '#e8d8a8', 0.2, 0.06); pocket(-0.07, 0.12, shade(cc, 0.92), true); pocket(0.07, 0.12, shade(cc, 0.92), true); break;
     case 'ai_vknit': put(onChest(shapeGeo([[-0.045, 0.43], [0.045, 0.43], [0, 0.33]], 0.002, 0), f, 0, 0, 0.003), '#f2e6da', 0); [-1, 1].forEach((s) => put(onChest(shapeGeo([[s * 0.045, 0.432], [s * 0.056, 0.43], [s * 0.004, 0.318], [0, 0.33]], 0.003, 0.001), f, 0, 0, 0.006), shade(cc, 0.85))); hem(shade(cc, 0.86)); break;   // Vネック(中に うすい色)
     case 'ai_shirtdress': collarWings(lighten(cc, 0.1)); placket(shade(cc, 0.94), 0.41, 0.17); buttons(4, 0, lighten(cc, 0.5), 0.39, 0.06); body.add(tm(new THREE.CylinderGeometry(0.114, 0.116, 0.014, 28), shade(cc, 0.55), 0, 0.16, 0, 0.0015)); break;   // シャツワンピース
     case 'ai_cardi': put(onChest(shapeGeo([[-0.05, 0.43], [0.05, 0.43], [0.05, 0.03], [-0.05, 0.03]], 0.002, 0), f, 0, 0, 0.002), '#f6f2ea', 0); put(onChest(shapeGeo([[-0.04, 0.43], [0.04, 0.43], [0.04, 0.4], [-0.04, 0.4]], 0.002, 0), f, 0, 0, 0.003), '#f6f2ea', 0); [-1, 1].forEach((s) => put(onChest(shapeGeo([[s * 0.05, 0.43], [s * 0.058, 0.43], [s * 0.058, 0.03], [s * 0.05, 0.03]], 0.002, 0), f, 0, 0, 0.004), shade(cc, 0.82), 0)); hem(shade(cc, 0.86)); break;   // 前を開けたカーディガン(中は白いトップス)
@@ -902,6 +937,10 @@ function buildAvatar(raw, opt = {}) {
     if (raw.aiDress) a.top = 'ai';   // ときどき アイちゃんだけの服
     if (typeof raw.aiFit === 'string') { const t = raw.aiFit === 'dress' ? 'ai' : 'ai_' + raw.aiFit; if (TOP_DEF[t]) a.top = t; }   // アイちゃん専用の服
     if (typeof raw.aiAcc === 'string' && raw.aiAcc) { a.aiAcc = raw.aiAcc; a.acc = 'none'; }   // アイちゃん専用の小物
+    ['aiCol2', 'aiCol3', 'aiRibbonC'].forEach((k) => { if (/^#[0-9a-f]{6}$/i.test(raw[k] || '')) a[k] = raw[k]; });   // 下・ベスト・リボンの色
+    if (typeof raw.aiNeck === 'string' && raw.aiNeck) { a.aiNeck = raw.aiNeck; if (/^neck/.test(a.acc || '') || a.acc === 'necklace') a.acc = 'none'; }   // ネックレス
+    if (AI_OPEN.includes(a.top) && !a.aiNeck) a.aiNeck = 'pearl1';   // 胸元が開いた服は 必ずネックレス
+    if (typeof raw.aiRibbon === 'string' && raw.aiRibbon) a.aiRibbon = raw.aiRibbon;   // 髪のリボン(形)
   }
   const cos = raw && raw.costume; costumePrep(a, cos);   // お祝いモードの かぶりもの
   const f = a.sex === 'f';
@@ -951,10 +990,10 @@ function buildAvatar(raw, opt = {}) {
   // 足(座っている形)。記念撮影のときは消せるように、体とは別のまとまり(legs)にする
   const legs = new THREE.Group(); body.add(legs);
   if (!opt.standing) {
-    const pantsC = def.pantsC || (def.pants === 'same' ? cc : (a.top === 'work' ? cc : (f ? '#3a3a4a' : '#2a2c38')));
+    const pantsC = a.aiCol2 || def.pantsC || (def.pants === 'same' ? cc : (a.top === 'work' ? cc : (f ? '#3a3a4a' : '#2a2c38')));
     const skirt = lower === 'skirt';
     const legC = skirt ? (def.tights || skinC) : def.shorts ? (def.tights || skinC) : pantsC;
-    const skc = typeof def.skirtC === 'function' ? def.skirtC(a, cc) : def.skirtC || (a.top === 'office' ? '#2c2c36' : cc);   // スカートの色
+    const skc = a.aiCol2 && skirt ? a.aiCol2 : typeof def.skirtC === 'function' ? def.skirtC(a, cc) : def.skirtC || (a.top === 'office' ? '#2c2c36' : cc);   // スカートの色
     [-1, 1].forEach((s) => {
       const x = (f ? 0.062 : 0.072) * s;
       if (!skirt) { const th = tm(new THREE.CapsuleGeometry(def.wide ? 0.064 : (f ? 0.055 : 0.06), 0.2, 6, 12), def.shorts ? pantsC : legC, x, 0.04, 0.13, LN); th.rotation.x = Math.PI / 2; legs.add(th); }
@@ -1215,6 +1254,18 @@ function buildAcc(head, body, a, R, f) {
     g.position.set(-HR * 0.5, HR * 0.42, HR * 0.9); g.rotation.set(-0.35, -0.5, 0); head.add(g);
     [[0.6, '#f2c14e'], [-0.6, '#e8707a']].forEach(([rz, col]) => { const p = tm(new THREE.BoxGeometry(0.011, 0.075, 0.007), col, 0, 0, 0, 0.0015); p.rotation.z = rz; g.add(p); });
   }
+  if (a.special === 'ai' && a.aiRibbon) {   // 髪のリボン(後ろ頭。お客さんの席からは 後ろ姿が よく見えるので目立つ)
+    const HR = head.userData.hairR || R * 1.12, rc = a.aiRibbonC || '#2c3550', g = new THREE.Group(); g.position.set(0, HR * 0.25, -HR * 1.0); head.add(g);
+    const wing = (sz, x, rz) => { const w = tm(new THREE.ConeGeometry(0.075 * sz, 0.13 * sz, 4), rc, x, 0, 0, 0.003); w.rotation.z = rz; w.scale.z = 0.45; g.add(w); };
+    const tail = (len, x, rz, wd = 0.03) => { const t = tm(new THREE.BoxGeometry(wd, len, 0.006), rc, x, -len * 0.62, 0.005, 0.002); t.rotation.z = rz; g.add(t); };
+    switch (a.aiRibbon) {
+      case 'big': [-1, 1].forEach((s) => { wing(1, s * 0.06, s * Math.PI / 2); tail(0.1, s * 0.03, s * 0.35); }); g.add(tm(new THREE.SphereGeometry(0.024, 10, 8), shade(rc, 0.82), 0, 0, 0.01)); break;   // 大きなリボン
+      case 'small': [-1, 1].forEach((s) => { wing(0.62, s * 0.037, s * Math.PI / 2); tail(0.06, s * 0.02, s * 0.35, 0.02); }); g.add(tm(new THREE.SphereGeometry(0.015, 10, 8), shade(rc, 0.82), 0, 0, 0.008)); break;   // 小さなリボン
+      case 'tails': [-1, 1].forEach((s) => { wing(0.9, s * 0.054, s * Math.PI / 2); tail(0.2, s * 0.028, s * 0.18, 0.026); }); g.add(tm(new THREE.SphereGeometry(0.022, 10, 8), shade(rc, 0.82), 0, 0, 0.01)); break;   // 長くたれる リボン
+      case 'thin': [-1, 1].forEach((s) => { const w = tm(new THREE.ConeGeometry(0.03, 0.085, 4), rc, s * 0.04, 0, 0, 0.002); w.rotation.z = s * Math.PI / 2; w.scale.z = 0.35; g.add(w); tail(0.17, s * 0.012, s * 0.12, 0.012); }); g.add(tm(new THREE.SphereGeometry(0.011, 8, 6), shade(rc, 0.82), 0, 0, 0.006)); break;   // 細いリボン(細長い羽 + 長い ひも)
+      case 'barrette': { const b = tm(new THREE.BoxGeometry(0.11, 0.026, 0.012), rc, 0, 0, 0, 0.002); g.add(b); for (let k = -2; k <= 2; k++) g.add(tm(new THREE.SphereGeometry(0.006, 8, 6), '#fbf6ee', k * 0.02, 0, 0.008)); break; }   // バレッタ(髪どめ)
+    }
+  }
   if (a.special === 'ai' && a.aiAcc) {   // アイちゃん専用の小物
     const HR = head.userData.hairR || R * 1.12;
     switch (a.aiAcc) {
@@ -1248,6 +1299,21 @@ function buildAcc(head, body, a, R, f) {
   const starGeo = (sz, d = 0.006) => { const pts = []; for (let k = 0; k < 10; k++) { const an = Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? sz * 0.45 : sz; pts.push([Math.cos(an) * r, Math.sin(an) * r]); } return shapeGeo(pts, d, 0.0015); };
   const flower = (sz, c1, c2) => { const g = new THREE.Group(); for (let k = 0; k < 5; k++) { const an = k / 5 * Math.PI * 2; const pt = tm(new THREE.SphereGeometry(sz * 0.42, 10, 8), c1, Math.cos(an) * sz * 0.5, Math.sin(an) * sz * 0.5, 0, 0.0015); pt.scale.z = 0.45; g.add(pt); } g.add(tm(new THREE.SphereGeometry(sz * 0.3, 10, 8), c2, 0, 0, sz * 0.1)); return g; };
   const GOLD = '#f0c84a', SILVER = '#d8dce6';
+  if (a.special === 'ai' && a.aiNeck) {   // アイちゃんの ネックレス: 細い鎖に 小さな飾り(大人しめ ノブさん 2026-11-21)
+    const open = AI_OPEN.includes(a.top), SG = '#e6c878';
+    const chain = (drop) => { const pts = []; for (let k = 0; k <= 20; k++) { const u = -1 + k / 10, x = u * 0.06, y = 0.428 - drop * (1 - u * u); pts.push(new THREE.Vector3(x, y, chestZ(f, y, x) + 0.008 - Math.pow(Math.abs(u), 3) * 0.02)); }
+      body.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.0024, 5, false), new THREE.MeshBasicMaterial({ color: SG }))); const py = 0.428 - drop; return [py, chestZ(f, py - 0.012, 0) + 0.012]; };
+    const [py, pz] = chain(open ? 0.07 : 0.12);
+    switch (a.aiNeck) {
+      case 'pearl1': body.add(tm(new THREE.SphereGeometry(0.011, 12, 10), '#fbf6ee', 0, py - 0.01, pz, 0.001)); break;   // 小さな真珠ひとつぶ
+      case 'heart': body.add(tm(heartGeo(0.018, 0.004), '#eab4c0', 0, py - 0.018, pz, 0.001)); break;   // 小さなハート(うすいピンク)
+      case 'flower': { const g = new THREE.Group(); g.position.set(0, py - 0.014, pz); body.add(g); for (let k = 0; k < 5; k++) { const an = k / 5 * Math.PI * 2; const p = tm(new THREE.SphereGeometry(0.0065, 8, 6), '#fbf3f2', Math.cos(an) * 0.008, Math.sin(an) * 0.008, 0); p.scale.z = 0.5; g.add(p); } g.add(tm(new THREE.SphereGeometry(0.004, 8, 6), SG, 0, 0, 0.003)); break; }   // 小さな花
+      case 'coin': { const c = tm(new THREE.CylinderGeometry(0.012, 0.012, 0.003, 18), SG, 0, py - 0.013, pz, 0.001); c.rotation.x = Math.PI / 2; body.add(c); break; }   // 小さな丸いプレート
+      case 'drop': { const d = tm(new THREE.OctahedronGeometry(0.009, 0), '#b8d2e6', 0, py - 0.014, pz, 0.001); d.scale.y = 1.5; body.add(d); break; }   // しずく形の石(うすい水色)
+      case 'bar': body.add(tm(new THREE.BoxGeometry(0.032, 0.005, 0.004), SG, 0, py - 0.002, pz, 0.001)); break;   // 横長の小さなバー
+      case 'double': { const [py2, pz2] = chain(open ? 0.095 : 0.145); body.add(tm(new THREE.SphereGeometry(0.008, 10, 8), '#fbf6ee', 0, py2 - 0.008, pz2, 0.001)); break; }   // 2れんの鎖 + 小さな真珠
+    }
+  }
   if (!a.owner && /^ear/.test(a.acc || '')) [-1, 1].forEach((s2) => {   // イヤリング: 耳たぶから 下がる(髪の外がわ・あごの横)
     const x = s2 * (head.userData.hairR || R * 1.1) * 0.95, y = -R * 0.5, z = R * 0.3;
     const g = new THREE.Group(); g.position.set(x, y, z); g.rotation.y = s2 * 0.5; head.add(g);

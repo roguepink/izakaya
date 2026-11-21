@@ -241,7 +241,7 @@ var SHOP = {
      LEAVE_SEC: お客さんが多くなってから 帰るまでの秒(少し間をおく) / TALK: しゃべる言葉 */
   REGULAR: { NAME: 'アイちゃん', CALL: ['アイ', 'あいちゃん', '愛ちゃん'], MAX_GUESTS: 2,
     HAIR: '#c4a27e',   // 髪の色はいつも同じ(ミルクティー。ノブさんが選んだ 2026-11-21)
-    FACE: { hair: 'shortbob', bangs: 'nagashi', eyes: 'round', brows: 'soft', mouth: 'soft', cheek: 2, lip: 3, skin: 1, face: 'round' },   // 顔・髪型もいつも同じ(ショートボブ・前髪を流す・まる目。ノブさんが候補から選んだ 2026-11-21)
+    FACE: { hair: 'shortbob', bangs: 'nagashi', eyes: 'round', brows: 'soft', mouth: 'soft', cheek: 1, lip: 3, skin: 1, face: 'egg' },   // 顔・髪型もいつも同じ(ショートボブ・前髪を流す・まる目・少し面長でほっぺ控えめ=20代前半。ノブさんが候補から選んだ 2026-11-21)
     TOPS: ['blouse', 'onepiece', 'knit', 'cardigan', 'hoodie', 'tee', 'denim'],   // お客さんと同じ服から毎回1つ
     OWN_DRESS: 0.25,   // このくらいの割合で アイちゃんだけの服(白い丸えりのワンピース)
     ACCS: ['none', 'none', 'ear_pearl', 'ear_flower', 'ear_heart', 'necklace', 'neck_heart', 'neck_pearl', 'neck_star', 'band', 'ribbon', 'glasses', 'beret'],   // 小物も毎回ちがう(キャップ・ニット帽は髪型が隠れるので入れない)
