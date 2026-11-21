@@ -2184,9 +2184,11 @@ function createShop(canvas, opts) {
   };
   const lanternTex = canvasTex(256, 256, drawLantern);
   const lanterns = [];
-  const nl = Math.max(2, Math.round(L / 1.6));
+  // 真ん中(モニターと お祝いの垂れ幕)の前には 提灯を下げない。左右に同じ数ずつ、等しい間で(ノブさん 2026-11-21「真ん中の提灯が じゃまで 映像が見づらい」)
+  const LGAP = 1.0, nside = Math.max(1, Math.round((L / 2 - LGAP) / 1.5)), nl = nside * 2;
   for (let k = 0; k < nl; k++) {
-    const x = -L / 2 + (k + 0.5) * (L / nl);
+    const kk = k < nside ? k : k - nside, sgn = k < nside ? -1 : 1;
+    const x = sgn * (LGAP + (kk + 0.5) * ((L / 2 - LGAP) / nside));
     const lg = new THREE.Group(); lg.position.set(x, 2.58, -0.05);
     const body = mesh(new THREE.SphereGeometry(0.16, 20, 14), new THREE.MeshLambertMaterial({ map: lanternTex, emissive: '#ff5a2a', emissiveIntensity: 0.55, emissiveMap: lanternTex }));
     body.scale.y = 1.35; lg.add(body);
