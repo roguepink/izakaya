@@ -975,7 +975,7 @@ function buildAvatar(raw, opt = {}) {
   }
   if (raw && raw.special === 'nobu' && a.owner && a.sex === 'm') {   // 大将ノブ専用の顔・髪型(ノブさん 2026-11-21)。お客さんは選べない。服・頭の手ぬぐい等は これまでどおり選べる。小物は付けない
     const N = Object.assign({ hair: 'n1', brow: 'k1', eye: 'e1', nose: 1, beard: 'b1', face: 'egg', skin: 2 }, (window.SHOP && SHOP.NOBU_FACE) || {}, raw.nobuFace || {});
-    a.special = 'nobu'; a.hair = 'nobu'; a.nHair = N.hair; a.hairColor = 0; a.brows = 'n' + N.brow; a.eyes = 'n' + N.eye; a.beard = 'chin'; a.nBeard = N.beard; a.nNose = N.nose;
+    a.special = 'nobu'; a.hair = 'nobu'; a.nHair = N.hair; a.hairColor = 0; a.brows = 'n' + N.brow; a.eyes = 'n' + N.eye; a.beard = 'chin'; a.nBeard = N.beard; a.nNose = N.nose; a.nBeardC = N.beardColor || '';
     if (['round', 'egg', 'sharp', 'square', 'long'].includes(N.face)) a.face = N.face; if (N.mouth) a.mouth = N.mouth; if (N.skin >= 0 && N.skin <= 5) a.skin = N.skin; a.acc = 'none';
   }
   const cos = raw && raw.costume; costumePrep(a, cos);   // お祝いモードの かぶりもの
@@ -1068,7 +1068,7 @@ function buildAvatar(raw, opt = {}) {
     nose.scale.set(0.6, 1.3, 1.25); nose.rotation.x = -0.3; skull.add(nose);
   }
   if (!f && a.beard && a.beard !== 'none' && a.beard !== 'mustache') {   // ひげ: あごの形に そった殻(あごひげ=あごの先、フル=もみあげから あご全体、ぶしょう=うすく)
-    const hcB = a.nBeard === 'b5' ? '#5a4a40' : shade(AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor), 0.92);   // b5 は うすい色(地肌が少し すける感じ)
+    const hcB = a.nBeardC ? a.nBeardC : a.nBeard === 'b5' ? '#5a4a40' : shade(AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor), 0.92);   // b5 は うすい色(地肌が少し すける感じ)
     const kind = a.beard, ph = kind === 'chin' ? (a.nBeard === 'b4' ? 0.95 : a.nBeard === 'b5' ? 0.46 : 0.62) : 1.45, th0 = kind === 'chin' ? (a.nBeard === 'b4' ? 2.18 : a.nBeard === 'b5' ? 2.36 : 2.25) : kind === 'full' ? 1.95 : 1.9;   // b5: 大将ノブの うすく小さい あごひげ   // b4: 大将ノブの 広めの あごひげ
     const bg = new THREE.SphereGeometry(R * (kind === 'stubble' ? 1.006 : 1.03), 28, 14, Math.PI / 2 - ph, ph * 2, th0, Math.PI - 0.1 - th0), bp = bg.attributes.position;
     for (let i = 0; i < bp.count; i++) {   // 上のふちを ぎざぎざに、あご先は 少し ふくらませる
@@ -1398,7 +1398,7 @@ function buildAcc(head, body, a, R, f) {
     const Rh = f ? R * 1.2 : R;   // 女性は髪がふくらんでいるので、頭の飾りを ひとまわり大きく(髪にうもれないように)
     switch (a.head) {
       case 'hachimaki': case 'nejiri': { const Rb = f ? R * 0.98 : R, up = a.special === 'nobu' ? 0.07 : 0, tlt = a.special === 'nobu' ? 0.06 : 0.15;   // 大将ノブ: おでこを出した髪なので 少し上に巻く(まゆを隠さない)
-        const band = tm(new THREE.TorusGeometry(Rb * (a.special === 'nobu' ? 0.97 : 1.03), a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), '#f6f4ee', 0, Rb * (0.3 + up), 0, 0.003); band.rotation.x = Math.PI / 2 + tlt; if (a.special === 'nobu') band.scale.x = 0.93; head.add(band);   // 大将ノブは面長で横はばが せまいので、横を少し しぼる(浮かないように)
+        const band = tm(new THREE.TorusGeometry(Rb * (a.special === 'nobu' ? (a.face === 'long' ? 0.97 : 0.995) : 1.03), a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), '#f6f4ee', 0, Rb * (0.3 + up), 0, 0.003); band.rotation.x = Math.PI / 2 + tlt; if (a.special === 'nobu') band.scale.x = a.face === 'long' ? 0.93 : 0.955; head.add(band);   // 大将ノブ: 面長のときは横はばが せまいので 横を しぼる(浮かないように)。卵型は ほぼ そのまま(しぼると髪に うまる 11-22)
         if (a.head === 'nejiri') for (let k = 0; k < 24; k++) { const ang = k / 24 * Math.PI * 2; head.add(tm(new THREE.BoxGeometry(0.006, 0.03, 0.01), '#2a3a6a', Math.sin(ang) * Rb * 1.04, Rb * (0.3 + up) + Math.cos(ang) * Rb * tlt * 0.98, Math.cos(ang) * Rb * 1.04)); }
         const knot = tm(new THREE.SphereGeometry(0.025, 8, 6), '#f6f4ee', 0, Rb * (0.25 + up), -Rb * 1.02, 0.003); head.add(knot);
         [-1, 1].forEach((s) => { const tl = tm(new THREE.BoxGeometry(0.03, 0.09, 0.006), '#f6f4ee', s * 0.03, Rb * (0.12 + up), -Rb * 1.04); tl.rotation.z = s * 0.4; head.add(tl); });

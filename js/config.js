@@ -304,7 +304,7 @@ var SHOP = {
   /* ノブさんの声を録音してある言葉の id(大将の声「ノブの声(録音)」で使う)。録音ページ rec.html で録って、voice/nobu/ に置く。
      ここにない言葉は、代わりの声(落ち着いた男性)で読む */
   /* 大将ノブの顔・髪型(ノブさんが 11-21 に選んだ: 9番 + まゆ・ひげを組み合わせ)。ノブさん本人が大将のときだけ。お客さんは選べない */
-  NOBU_FACE: { hair: 'n1', brow: 'k3', eye: 'e1', nose: 1, beard: 'b1', face: 'long', skin: 2, mouth: 'nsmile' },   // 11-22 ノブさんが 1番を選んだ(まゆは太め k3・あごひげ b1・もっと面長)。口は 笑顔の手前のまま
+  NOBU_FACE: { hair: 'n1', brow: 'k4', eye: 'e2', nose: 2, beard: 'b1', beardColor: '#4a4542', face: 'egg', skin: 2, mouth: 'nsmile' },   // 11-22 ノブさん: 卵型・目元と鼻は前の顔(まゆ k4・目 e2・鼻 高め)で やさしく・あごひげは 髪より少し うすいグレー
   NOBU_VOICE: ['irasshai', 'o_okaeri', 'o_nani', 'haiyo', 'omachi', 'o_service', 'o_shosho', 'o_atsui', 'o_kanpai', 'o_iine', 'o_moriagari', 'o_omedeto', 'o_okawari', 'o_arigato', 'o_maido', 'o_goyukkuri', 'lastcall', 'mataokoshi', 'o_kiwotsukete', 'oyasumi', 'o_photo', 'o_cheese']
 };
 SHOP.GUEST_PHRASES.forEach(function (p) { p.who = 'guest'; });
