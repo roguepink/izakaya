@@ -1387,11 +1387,11 @@ function buildAcc(head, body, a, R, f) {
   if (a.owner) {
     const Rh = f ? R * 1.2 : R;   // 女性は髪がふくらんでいるので、頭の飾りを ひとまわり大きく(髪にうもれないように)
     switch (a.head) {
-      case 'hachimaki': case 'nejiri': { const Rb = f ? R * 0.98 : R;
-        const band = tm(new THREE.TorusGeometry(Rb * 1.03, a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), '#f6f4ee', 0, Rb * 0.3, 0, 0.003); band.rotation.x = Math.PI / 2 + 0.15; head.add(band);
-        if (a.head === 'nejiri') for (let k = 0; k < 24; k++) { const ang = k / 24 * Math.PI * 2; head.add(tm(new THREE.BoxGeometry(0.006, 0.03, 0.01), '#2a3a6a', Math.sin(ang) * Rb * 1.04, Rb * 0.3 + Math.cos(ang) * Rb * 0.15 * 0.98, Math.cos(ang) * Rb * 1.04)); }
-        const knot = tm(new THREE.SphereGeometry(0.025, 8, 6), '#f6f4ee', 0, Rb * 0.25, -Rb * 1.02, 0.003); head.add(knot);
-        [-1, 1].forEach((s) => { const tl = tm(new THREE.BoxGeometry(0.03, 0.09, 0.006), '#f6f4ee', s * 0.03, Rb * 0.12, -Rb * 1.04); tl.rotation.z = s * 0.4; head.add(tl); });
+      case 'hachimaki': case 'nejiri': { const Rb = f ? R * 0.98 : R, up = a.special === 'nobu' ? 0.14 : 0, tlt = a.special === 'nobu' ? 0.04 : 0.15;   // 大将ノブ: おでこを出した髪なので 少し上に巻く(まゆを隠さない)
+        const band = tm(new THREE.TorusGeometry(Rb * (1.03 + up * 0.1), a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), '#f6f4ee', 0, Rb * (0.3 + up), 0, 0.003); band.rotation.x = Math.PI / 2 + tlt; head.add(band);
+        if (a.head === 'nejiri') for (let k = 0; k < 24; k++) { const ang = k / 24 * Math.PI * 2; head.add(tm(new THREE.BoxGeometry(0.006, 0.03, 0.01), '#2a3a6a', Math.sin(ang) * Rb * 1.04, Rb * (0.3 + up) + Math.cos(ang) * Rb * tlt * 0.98, Math.cos(ang) * Rb * 1.04)); }
+        const knot = tm(new THREE.SphereGeometry(0.025, 8, 6), '#f6f4ee', 0, Rb * (0.25 + up), -Rb * 1.02, 0.003); head.add(knot);
+        [-1, 1].forEach((s) => { const tl = tm(new THREE.BoxGeometry(0.03, 0.09, 0.006), '#f6f4ee', s * 0.03, Rb * (0.12 + up), -Rb * 1.04); tl.rotation.z = s * 0.4; head.add(tl); });
         break; }
       case 'tenugui': { const c = tm(new THREE.SphereGeometry(Rh * 1.1, 26, 14, 0, Math.PI * 2, 0, 1.2), '#2a3a6a', 0, 0, 0, 0.003); c.rotation.x = -0.25; head.add(c); regHat(head, c, { kind: 'dome', r: Rh * 1.1, sy: 1, th: 1.2 });
         for (let k = 0; k < 10; k++) head.add(tm(new THREE.SphereGeometry(0.01, 6, 5), '#f6f4ee', Math.sin(k * 1.9) * Rh * 0.6, Rh * 0.8 + Math.cos(k * 2.3) * Rh * 0.1, Math.cos(k * 1.9) * Rh * 0.5));

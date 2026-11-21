@@ -752,6 +752,8 @@
   };
 
   /* ---------------- 店に入る・出る ---------------- */
+  /* 大将ノブ(ノブさん本人)のときだけ、顔と髪型を NOBU_FACE に固定する(服・頭の手ぬぐい等は選んだまま。小物なし)。バトンタッチ・マスターの人には付けない */
+  function nobuLook(av) { if (!av || ROLE !== 'nobu' || av.sex !== 'm' || !SHOP.NOBU_FACE) return av; var o = JSON.parse(JSON.stringify(av)); o.special = 'nobu'; o.acc = 'none'; return o; }
   var hbTimer = null;
   function enter(name) {
     inside = true; seenMine = false; mySeat = -1; joinAt = now();
@@ -760,7 +762,7 @@
     Object.keys(tree.events || {}).forEach(function (k) { seenEvt[k] = 1; });
     net.set('members/' + ME.uid, { name: name, avatar: myAvatar(), owner: OWNER_MODE, at: TS, seen: TS, voice: myAvatar().voice || '' });
     if (OWNER_MODE) {
-      net.update('state', { ownerAvatar: ownerAvatar, ownerName: name, ownerRole: ROLE });
+      net.update('state', { ownerAvatar: nobuLook(ownerAvatar), ownerName: name, ownerRole: ROLE });
       if (TAKE_OK) { net.update('state', { baton: null }); TAKE = ''; try { history.replaceState(null, '', location.pathname + location.search + location.hash.replace(/[#&]take=[\w-]+/, '').replace(/&nm=[^&]*/, '')); } catch (e) {} }
       else sys(ROLE === 'master' ? '🏮 今回のマスター ' + honor(name) + 'が店に立ちました' : '🏮 ' + (/^大将/.test(name) ? '' : '大将の') + name + 'が店に立ちました');
     }
@@ -1980,7 +1982,7 @@
     setTimeout(function () {
       enter('見学の人');
       net.set('members/demo-owner', { name: SHOP.OWNER_NAME, owner: true, at: TS, seen: TS, voice: '' });
-      net.update('state', { ownerAvatar: AVATAR.OWNER, ownerName: SHOP.OWNER_NAME, ownerRole: 'nobu', autoServe: 'mix' });
+      net.update('state', { ownerAvatar: Object.assign({}, AVATAR.OWNER, SHOP.NOBU_FACE ? { special: 'nobu' } : {}), ownerName: SHOP.OWNER_NAME, ownerRole: 'nobu', autoServe: 'mix' });
       [0, 900, 1800, 2700].forEach(function (t) { setTimeout(addBot, 600 + t); });
       setTimeout(demoVideo, 1500);
       setTimeout(function () {   // はじめから 4人の前に 飲み物と料理(開いてすぐ にぎやかに)
@@ -2777,7 +2779,7 @@
   $('mkBack').onclick = function () { pendingEnter = false; closeMaker(); };
   $('mkSave').onclick = function () {
     if (!draft) return;
-    if (OWNER_MODE) { draft.owner = true; ownerAvatar = AVATAR.fix(draft); lsSet('iz-owner-avatar', ownerAvatar); if (inside) net.update('state', { ownerAvatar: ownerAvatar }); }
+    if (OWNER_MODE) { draft.owner = true; ownerAvatar = AVATAR.fix(draft); lsSet('iz-owner-avatar', ownerAvatar); if (inside) net.update('state', { ownerAvatar: nobuLook(ownerAvatar) }); }
     else { draft.owner = false; ME.avatar = AVATAR.fix(draft); saveMe(); }
     if (inside) net.update('members/' + ME.uid, { avatar: myAvatar(), voice: myAvatar().voice });
     drawFace2D($('meFace'), myAvatar());
