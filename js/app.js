@@ -2166,12 +2166,13 @@
      残り PICK_FROM〜PICK_TO 秒のあいだに ポーズと表情を選ぶ(「今回は写らない」も選べる)。0秒で 全員が同じ絵を それぞれのスマホで写真にする。
      写真は送り合わない(それぞれのスマホで作る)。大将のスマホには KEEP_DAYS 日だけ とっておき、消せる */
   var PH = Object.assign({ SEC: 20, PICK_FROM: 15, PICK_TO: 3, KEEP_DAYS: 30 }, SHOP.PHOTO || {});
-  var phOn = null, phShot = false, phSaid = {}, myPick = { pose: 'peace', face: 'smile', hide: false }, phReqAt = 0, phBots = false;
+  var phOn = null, phShot = false, phSaid = {}, phAiSaid = '', myPick = { pose: 'peace', face: 'smile', hide: false }, phReqAt = 0, phBots = false;
   function ownerUid() { var ms = members(); return Object.keys(ms).filter(function (u) { return ms[u].owner && fresh(ms[u]); })[0] || null; }
   function photoList() {   // 写る人(席の順)。写らないを選んだ人は入れない
     var picks = tree.photo || {}, ms = members(), L = [];
     function pk(uid) { var p = uid === ME.uid ? myPick : (picks[uid] || {}); return { pose: p.pose || 'peace', face: p.face || 'smile', hide: !!p.hide }; }
-    for (var i = 0; i < N; i++) { var u = seatUid(i), m = u && ms[u]; if (!m || !fresh(m) || m.regular) continue; var p = pk(u); if (!p.hide) L.push({ key: i, pose: p.pose, face: p.face }); }   // 常連の子は 写らない
+    var aiIn = !!((tree.state || {}).photo || {}).ai;
+    for (var i = 0; i < N; i++) { var u = seatUid(i), m = u && ms[u]; if (!m || !fresh(m) || (m.regular && !aiIn)) continue; var p = pk(u); if (!p.hide) L.push({ key: i, pose: p.pose, face: p.face }); }   // 常連の子(アイちゃん)は ふだん写らない。だれかが「アイちゃんも入れる」を押したら写る(ノブさん 2026-11-21)
     var ou = ownerUid(); if (ou) { var po = pk(ou); if (!po.hide) L.push({ key: 'owner', pose: po.pose, face: po.face }); }
     return L;
   }
@@ -2205,6 +2206,13 @@
     myPick.hide = !myPick.hide; phSend();
     toast(myPick.hide ? '今回は写りません' : '写真に写ります', 1600);
   };
+  $('phAi').onclick = function () {   // アイちゃんも写真に入れる / 外す(だれが押してもよい。みんなの画面で同じ)
+    var st = (tree.state || {}).photo; if (!st || $('phPick').classList.contains('locked')) return;
+    var on = !st.ai;
+    if (on) { var P = (scene && scene.photoPoses) || [['peace']], F = (scene && scene.photoFaces) || [['smile']]; net.set('photo/' + REG_UID, { pose: P[Math.floor(Math.random() * Math.min(P.length, 6))][0], face: F[Math.floor(Math.random() * Math.min(F.length, 3))][0], hide: false, at: TS }); }
+    net.set('state/photo/ai', on);
+    toast(on ? REG.NAME + 'も写真に入ります' : REG.NAME + 'は今回は写りません', 1600);
+  };
   function photoTick() {
     var st = (tree.state || {}).photo;
     if (!st || !st.at || !inside) { if (phOn) photoEndUI(); return; }
@@ -2224,6 +2232,11 @@
     $('phPick').classList.toggle('locked', locked);
     $('phPick').classList.toggle('hidden', rem <= 0);
     $('phHide').textContent = myPick.hide ? '🙈 写りません(押すと写ります)' : '🙈 今回は写らない';
+    var regM = members()[REG_UID], regHere = !!(regM && fresh(regM) && regSeat() >= 0);
+    $('phAi').classList.toggle('hidden', !regHere || rem <= 0);
+    $('phAi').classList.toggle('on', !!st.ai);
+    $('phAi').textContent = st.ai ? '👧 ' + REG.NAME + 'も写ります(押すと外す)' : '👧 ' + REG.NAME + 'も写真に入れる';
+    if (st.ai && regHere && amLeader() && phAiSaid !== st.id) { phAiSaid = st.id; setTimeout(function () { regSay(['えっ、わたしもいいの？うれしい！', 'わーい、一緒に撮ろう！', 'えへへ、入れてくれて ありがとう'][Math.floor(Math.random() * 3)]); }, 900); }
     $('phHide').classList.toggle('on', myPick.hide);
     $('phChoose').classList.toggle('off', myPick.hide || !picking);
     $('phNote').textContent = myPick.hide ? 'あなたは この写真に写りません。ほかの人の写真は受けとれます。'

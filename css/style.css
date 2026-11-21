@@ -361,6 +361,9 @@ body.photo-mode .bottom, body.photo-mode .side, body.photo-mode #tags, body.phot
 .ph-pick { pointer-events: auto; background: rgba(20,12,8,.88); border-radius: 18px 18px 0 0; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); max-height: 40vh; overflow-y: auto; }
 .ph-hide { width: 100%; font-size: 17px; font-weight: 900; padding: 11px; border-radius: 14px; background: #fff; color: #c8261c; border: 3px solid #c8261c; }
 .ph-hide.on { background: #c8261c; color: #fff; border-color: #fff; box-shadow: 0 0 0 3px #c8261c; }
+.ph-ai { width: 100%; margin-top: 7px; font-size: 15px; font-weight: 900; padding: 9px; border-radius: 14px; background: #fff5e2; color: #8a5a20; border: 2px dashed #d9a35a; }
+.ph-ai.on { background: #ffd27a; color: #5a3410; border: 2px solid #c8261c; }
+.ph-pick.locked .ph-ai { opacity: .5; pointer-events: none; }
 .ph-sec { color: #e8d7b6; font-size: 12px; font-weight: 800; margin: 8px 0 4px; }
 .ph-chips { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
 .ph-chips::-webkit-scrollbar { display: none; }
