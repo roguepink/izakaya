@@ -2044,14 +2044,14 @@
       '<p class="small-note">いま: ' + (here ? 'お店にいます' : 'いません') + '・' + (md === 'stay' ? '呼んだので、お客さんが多くても ずっといます' : md === 'away' ? '帰したので、呼ぶまで来ません' : 'おまかせ(お客さんが ' + REG.MAX_GUESTS + '人までのとき来て、' + (REG.MAX_GUESTS + 1) + '人目が来たら帰ります)') +
       (md ? ' <a href="#" id="regAuto">おまかせに戻す</a>' : '') + '</p>' +
       '<p class="small-note" style="margin-bottom:4px">' + esc(REG.NAME) + 'が自分から話す間かく(お客さんへの話しかけ・大将への ひとこと など。だれかが話している間は 少し待ちます)</p><div class="ph-chips cel-pick">' +
-      [1, 2, 5, 10].map(function (v) { return '<button data-aitalk="' + v + '"' + (regEvery() === v ? ' class="on"' : '') + '>' + v + '分に1回</button>'; }).join('') + '</div>';
+      (LOCAL ? [0.5, 1, 2, 5, 10] : [1, 2, 5, 10]).map(function (v) { return '<button data-aitalk="' + v + '"' + (regEvery() === v ? ' class="on"' : '') + '>' + (v < 1 ? '30秒' : v + '分') + 'に1回</button>'; }).join('') + '</div>';
   }
   function wireReg(q) {
     var set = function (m) { net.update('state', { aiMode: m ? { m: m, at: TS } : null }); setTimeout(function () { refreshSheet(true); }, 300); };
     var a = q('#regCall'); if (a) a.onclick = function () { set('stay'); toast(REG.NAME + 'を呼びました。ずっといてくれます', 2200); };
     var b = q('#regBye'); if (b) b.onclick = function () { set('away'); toast(REG.NAME + 'に帰ってもらいます', 2200); };
     var c = q('#regAuto'); if (c) c.onclick = function (e) { e.preventDefault(); set(''); };
-    document.querySelectorAll('#shBody [data-aitalk]').forEach(function (bt) { bt.onclick = function () { var v = +bt.getAttribute('data-aitalk'); net.update('state', { aiTalk: v }); regTalkAt = 0; toast(REG.NAME + 'は ' + v + '分に1回くらい 話します', 1800); setTimeout(function () { refreshSheet(true); }, 300); }; });
+    document.querySelectorAll('#shBody [data-aitalk]').forEach(function (bt) { bt.onclick = function () { var v = +bt.getAttribute('data-aitalk'); net.update('state', { aiTalk: v }); regTalkAt = 0; toast(REG.NAME + 'は ' + (v < 1 ? '30秒' : v + '分') + 'に1回くらい 話します', 1800); setTimeout(function () { refreshSheet(true); }, 300); }; });
   }
   function celebSheetHTML() {
     var k = celebKind(), c = celeb(), h = '<div class="sh-sec">🎉 お祝いモード</div><div class="ph-chips cel-pick">';
@@ -2423,11 +2423,11 @@
   function regLine(kind, to, filter) { var L = (REG.TALK || {})[kind] || []; if (filter) L = L.filter(filter); if (L.length > 1) L = L.filter(function (x) { return x[0] !== regLast; }); if (!L.length) return false; var x = L[Math.floor(Math.random() * L.length)]; regLast = x[0]; regSay(x[1], to, x[0]); return true; }   // 同じ言葉を続けて言わない
   /* 自分から話す(ノブさん 2026-11-21「2分に1回くらい。1・5・10分も選べるように。お客さんに話しかけたり 大将に話したり を多めに」) */
   var regOnce = {};   // 来ている間に 1回だけ言う言葉(金曜・夜おそく・ラストオーダー前・年末)
-  function regEvery() { var v = +((tree.state || {}).aiTalk) || REG.TALK_EVERY || 2; return [1, 2, 5, 10].indexOf(v) >= 0 ? v : 2; }
+  function regEvery() { var v = +((tree.state || {}).aiTalk) || (LOCAL ? 0.5 : REG.TALK_EVERY || 2); return (LOCAL ? [0.5, 1, 2, 5, 10] : [1, 2, 5, 10]).indexOf(v) >= 0 ? v : 2; }   // おためし版は はじめ30秒に1回(ノブさん 2026-11-21「お試し版では30秒に1回」)
   function regGap() { return regEvery() * MIN * rnd(0.75, 1.25); }   // きっちり同じ間にしない
   function lastHumanTalk() { var c = tree.chat || {}, t = 0; Object.keys(c).forEach(function (k) { var m = c[k]; if (m && !m.sys && m.uid !== REG_UID && (m.at || 0) > t) t = m.at; }); return t; }
   function regTalk(n) {
-    if (now() - lastHumanTalk() < 30000) { regTalkAt = n + 20000; return; }   // だれかが話している最中は 待つ(割りこまない)
+    if (now() - lastHumanTalk() < (LOCAL ? 8000 : 30000)) { regTalkAt = n + (LOCAL ? 5000 : 20000); return; }   // だれかが話している最中は 待つ(割りこまない。おためし版は短め)
     regTalkAt = n + regGap();
     var jst = new Date(now() + JST), st = status(n), soon = st && st.phase === 'open' && st.end && st.end - now() < 15 * MIN;
     var once = function (k) { if (regOnce[k]) return false; if (regLine(k)) { regOnce[k] = 1; return true; } return false; };
@@ -2471,7 +2471,7 @@
       if (members()[REG_UID]) net.remove('members/' + REG_UID);   // 名前のない記録の片づけ
       var md0 = regMode();
       if (open && human && md0 === 'stay') { if (n - regTried > 5000) { regTried = n; regEnter(n); } return; }   // 大将が呼んだ → すぐ来る
-      if (open && human && md0 !== 'away' && guests <= REG.MAX_GUESTS) { if (!regSince) regSince = n; if (n - regSince >= REG.WAIT_MIN * MIN) regEnter(n); }
+      if (open && human && md0 !== 'away' && guests <= REG.MAX_GUESTS) { if (!regSince) regSince = n; if (n - regSince >= (LOCAL ? 20000 : REG.WAIT_MIN * MIN)) regEnter(n); }   // おためし版は 20秒で来る(ノブさん 2026-11-21。本番は WAIT_MIN 分)
       else regSince = 0;
       return;
     }
