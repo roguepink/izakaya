@@ -276,3 +276,9 @@
 - パーカーのフード: 切れ目のない形(addHood)。リボンの羽: 四角すい → ふっくらした輪(後ろ・横からもリボン)。服21種の一覧画像を送った。
 - 大将ノブ: 専用の顔・髪型(special:'nobu'、hair 'nobu' n1〜n5、まゆ nk1〜3、目 ne1〜3、高い鼻、ひげ b1〜b4)。候補10パターンを送った(scratchpad/nobu/pat.json)。**ノブさんが選んだら** config.js に NOBU_FACE を書き、ROLE==='nobu' の大将の見た目に special:'nobu' を付ける。小物は付けない。服・頭の手ぬぐいは選べるまま。
 - 11-21 夜おそく: アイちゃんの声 64こ すべて ノブさん OK(voice/ai/。少し高め=+1.5半音、返事 e* は +2.5半音。作り方は scratchpad の aivoice2〜4.py と同じ注文文)。話す間かくは 大将が 1・2・5・10分(state.aiTalk、はじめ2分)、話し中(30秒以内)は待つ、お客さんへの話しかけ 多め・大将へ・金曜/夜/LO前/12月は1回。相づちは入れない(ノブさん)。大将ノブの顔は NOBU_FACE(9番+まゆk3+ひげb1)。縦に撮った動画は VIDEOS の tall と tools/video-shape.py。
+
+## 11-22 ミニゲームの「わく」(今日のゲーム)
+- js/game-kit.js = わく(スタート画面・点数・時間・おしまい・もう一回・ゆれ/光る/点数の文字)。window.IZGAME。
+- ゲーム 1本 = games/<id>.js。遊ぶときだけ読みこむ(何本ふやしても お店の重さは同じ)。一覧は config.js の SHOP.GAMES(off: true は出さない)。
+- 今日のゲーム = state.todayGame(大将のメニュー「🎮 今日のゲーム」)。なければ 日がわり(朝5時)。点数は scores/<その回>_<id>。
+- 新しいゲームの作り方は games/_template.js(焼き鳥タップのお手本)。ためしは tools/game-play.html?g=<id>、重さは tools/game-check.py <id>(合格したら off をはずす)。

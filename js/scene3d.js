@@ -2206,15 +2206,18 @@ function createShop(canvas, opts) {
     scene.add(tag);
   });
 
-  // 本日の最高得点の黒板(ミニゲーム「ジョッキ キャッチ」。上位3人)
+  // 本日の最高得点の黒板(今日のミニゲーム。上位3人。上に ゲームの名前 11-22)
   const boardTex = canvasTex(256, 336, () => {});
-  let boardList = null;
+  let boardList = null, boardTitle = '';
   function drawBoard() {
     const c = boardTex.image, g = c.getContext('2d'), W = c.width, H = c.height;
     g.fillStyle = '#6b4728'; g.fillRect(0, 0, W, H);   // 木のわく
     g.fillStyle = '#23382c'; g.fillRect(10, 10, W - 20, H - 20);   // 黒板
     g.fillStyle = '#f6f0e0'; g.textAlign = 'center'; g.textBaseline = 'top';
-    g.font = 'bold 26px ' + FONT_JP; g.fillText('本日の', W / 2, 22); g.fillText('最高得点', W / 2, 52);
+    if (boardTitle) {   // 今日のゲームの名前(長いときは 字を小さく)
+      const tt = Array.from(boardTitle).slice(0, 12).join(''); g.font = 'bold ' + (tt.length > 9 ? 17 : 20) + 'px ' + FONT_JP; g.fillStyle = '#f5c04a'; g.fillText(tt, W / 2, 20);
+      g.fillStyle = '#f6f0e0'; g.font = 'bold 24px ' + FONT_JP; g.fillText('本日の最高得点', W / 2, 52);
+    } else { g.font = 'bold 26px ' + FONT_JP; g.fillText('本日の', W / 2, 22); g.fillText('最高得点', W / 2, 52); }
     g.strokeStyle = 'rgba(246,240,224,0.5)'; g.lineWidth = 2; g.beginPath(); g.moveTo(28, 92); g.lineTo(W - 28, 92); g.stroke();
     const L = boardList || [];
     if (!L.length) { g.font = '22px ' + FONT_JP; g.fillText('まだ記録なし', W / 2, 140); g.font = '20px ' + FONT_JP; g.fillStyle = '#f5c04a'; g.fillText('🎮で挑戦!', W / 2, 180); }
@@ -2930,7 +2933,7 @@ function createShop(canvas, opts) {
         seats: seatAvatars.map((a, i) => (a && a.visible ? headPos(a) : null)), owner: headPos(owner), empty: stools.map((s, i) => { tmp.set(seatX(i, N), STOOL_Y + 0.25, GUEST_Z); const v = tmp.clone().project(camera); if (v.z > 1) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }) }; },
     get name() { return SHOPNAME; },
     /* 店の名前を その場で変える(ちょうちん・のれん・モニター)。バトンタッチのとき */
-    setScores(list) { boardList = (list || []).slice(0, 3); drawBoard(); },   // 本日の最高得点(上位3人)
+    setScores(list, title) { boardList = (list || []).slice(0, 3); boardTitle = title || ''; drawBoard(); },   // 本日の最高得点(上位3人)と 今日のゲームの名前
     setName(nm) {
       nm = nm || SHOP.NAME; if (nm === SHOPNAME) return;
       SHOPNAME = nm;

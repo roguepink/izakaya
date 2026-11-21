@@ -304,6 +304,13 @@ var SHOP = {
   /* ノブさんの声を録音してある言葉の id(大将の声「ノブの声(録音)」で使う)。録音ページ rec.html で録って、voice/nobu/ に置く。
      ここにない言葉は、代わりの声(落ち着いた男性)で読む */
   /* 大将ノブの顔・髪型(ノブさんが 11-21 に選んだ: 9番 + まゆ・ひげを組み合わせ)。ノブさん本人が大将のときだけ。お客さんは選べない */
+  /* ミニゲームの一覧(ノブさん 2026-11-22「今日のゲームはこれ、と出したい」)。1本 = games/<id>.js の1ファイル。遊ぶときだけ読みこむ。
+     今日のゲーム: 大将が決めたもの。決めていなければ 日がわり(この並びの順に 毎日1つずつ。朝5時で かわる)。
+     off: true … お店には出さない(作っている途中・ためし中)。新しいゲームの作り方は games/_template.js */
+  GAMES: [
+    { id: 'jokki', name: 'ジョッキ キャッチ', icon: '🍺', sec: 30, file: 'games/jokki.js', note: '落ちてくる料理を お盆で受け止める。焦げは よける' },
+    { id: '_template', name: '焼き鳥タップ(お手本)', icon: '🍢', sec: 20, file: 'games/_template.js', note: '新しいゲームの お手本', off: true }
+  ],
   NOBU_FACE: { hair: 'n1', brow: 'k4', eye: 'e2', nose: 2, beard: 'b1', beardColor: '#4a4542', face: 'egg', skin: 2, mouth: 'nsmile' },   // 11-22 ノブさん: 卵型・目元と鼻は前の顔(まゆ k4・目 e2・鼻 高め)で やさしく・あごひげは 髪より少し うすいグレー
   NOBU_VOICE: ['irasshai', 'o_okaeri', 'o_nani', 'haiyo', 'omachi', 'o_service', 'o_shosho', 'o_atsui', 'o_kanpai', 'o_iine', 'o_moriagari', 'o_omedeto', 'o_okawari', 'o_arigato', 'o_maido', 'o_goyukkuri', 'lastcall', 'mataokoshi', 'o_kiwotsukete', 'oyasumi', 'o_photo', 'o_cheese']
 };
