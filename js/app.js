@@ -2394,7 +2394,17 @@
   $('bOwner').onclick = function () { openSheet('owner'); };
   $('bBot').onclick = function () { openSheet('bot'); };
   /* 大将の接客画面の「☰」: 右のボタンを出す・しまう。ほかのボタンを押したら しまう */
-  $('bMore').onclick = function () { var o = document.body.classList.toggle('side-open'); $('bMoreLbl').textContent = o ? 'しまう' : 'メニュー'; };
+  $('bMore').onclick = function () { var o = document.body.classList.toggle('side-open'); $('bMoreLbl').textContent = o ? 'しまう' : 'メニュー'; fitSide(); };
+  /* 右のボタンの列が 下の「決まり文句・会話・入力」に重ならない高さに(重なる分は 左に もう1列) */
+  function fitSide() {
+    var sd = document.querySelector('.side'), bt = document.querySelector('.bottom'); if (!sd || !bt) return;
+    if (window.matchMedia && matchMedia('(orientation: landscape) and (max-height: 520px)').matches) { sd.style.maxHeight = ''; return; }
+    var lim = Infinity; Array.prototype.forEach.call(bt.children, function (c) { if (c.offsetParent) { var r = c.getBoundingClientRect(); if (r.height > 0) lim = Math.min(lim, r.top); } });
+    if (lim === Infinity) { sd.style.maxHeight = ''; return; }
+    var h = Math.max(120, Math.floor(lim - sd.getBoundingClientRect().top - 8)) + 'px';
+    if (sd.style.maxHeight !== h) sd.style.maxHeight = h;
+  }
+  window.addEventListener('resize', fitSide); setInterval(fitSide, 800);
   document.querySelectorAll('.side > .sbtn').forEach(function (b) { if (b.id !== 'bMore') b.addEventListener('click', function () { document.body.classList.remove('side-open'); $('bMoreLbl').textContent = 'メニュー'; }); });
 
   /* ---------------- 常連の女の子(ボット)「アイ」 ----------------
