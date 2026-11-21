@@ -627,6 +627,7 @@
     }
     scene.setSeats(seats);
     var ou0 = ownerUid();
+    setTimeout(talkRender, 0);
     scene.setOwner(frz('_owner', withCos((st.ownerAvatar && AVATAR.fix(st.ownerAvatar)) || AVATAR.fix(AVATAR.OWNER), ou0 ? cosOf(ou0, ms[ou0]) : '')));
     applyCeleb();
     batonTick();
@@ -806,6 +807,8 @@
   function leave(kicked) {
     if (!inside) return;
     if (window.IZGAME && IZGAME.isOpen()) IZGAME.abort();   // ゲーム中に帰ったら ゲームは終わり
+    if (talkOn) { view = camView; talkOn = false; document.body.classList.remove('talk-on'); $('talk').classList.add('hidden'); $('talkBg').classList.add('hidden'); $('tkQuick').classList.add('hidden'); }   // 帰るときは 好みを変えない
+    talkAuto = false;
     if (!kicked) {
       if (mySeat >= 0) { event({ type: 'phrase', id: 'mataokoshi', seat: mySeat }); net.remove('seats/' + mySeat); net.remove('tables/' + mySeat); }
       sys(OWNER_MODE ? (/^大将/.test(currentName()) ? '' : '大将の') + currentName() + 'が奥に下がりました' : honor(currentName()) + 'がお帰りになりました');
@@ -867,15 +870,116 @@
   }
 
   /* ---------------- 視点 ---------------- */
-  var VIEW_NAMES = { first: '目線', back: '後ろ', overview: '全体', owner: '接客', ownerAll: '全体' };
+  var VIEW_NAMES = { first: '目線', back: '後ろ', overview: '全体', owner: '接客', ownerAll: '全体', talk: 'おしゃべり' };
   /* 大将の目線か(接客 = 座っている人だけ大きく / 全体 = お店ぜんぶ)。どちらも 会話の欄は大きく、ボタンはたたむ */
   function ownerCam() { return OWNER_MODE && (view === 'owner' || view === 'ownerAll'); }
-  function setView(v) { if (OWNER_MODE && inside && v !== 'owner' && v !== 'ownerAll') v = 'owner'; view = v; document.body.classList.toggle('owner-view', ownerCam()); withScene(function (s) { s.setView(v, DEMO ? DEMO_SEAT : mySeat); if (DEMO && s.setZoom) s.setZoom(v === 'overview' ? 0.82 : 1); }); $('bViewLbl').textContent = VIEW_NAMES[v] || '目線'; }
+  var camView = 'first';   // おしゃべり画面の間も、うしろの お店のカメラは この向きのまま
+  function setView(v) { if (OWNER_MODE && inside && v !== 'owner' && v !== 'ownerAll' && !(v === 'talk' && TALK_OWNER)) v = 'owner'; var wasTalk = view === 'talk'; view = v; if (v !== 'talk') camView = v; talkSet(v === 'talk', wasTalk); if (v === 'talk') { $('bViewLbl').textContent = VIEW_NAMES.talk; return; } document.body.classList.toggle('owner-view', ownerCam()); withScene(function (s) { s.setView(v, DEMO ? DEMO_SEAT : mySeat); if (DEMO && s.setZoom) s.setZoom(v === 'overview' ? 0.82 : 1); }); $('bViewLbl').textContent = VIEW_NAMES[v] || '目線'; }
   $('bView').onclick = function () {
-    var order = OWNER_MODE ? ['owner', 'ownerAll'] : DEMO ? ['overview', 'first', 'back'] : (mySeat >= 0 ? ['first', 'back', 'overview'] : ['overview']);
+    var order = OWNER_MODE ? (TALK_OWNER ? ['owner', 'ownerAll', 'talk'] : ['owner', 'ownerAll']) : DEMO ? ['overview', 'first', 'back'] : (mySeat >= 0 ? ['first', 'back', 'overview', 'talk'] : ['overview']);
     var i = order.indexOf(view); setView(order[(i + 1) % order.length]);
-    toast('視点: ' + VIEW_NAMES[view] + (view === 'owner' ? '(座っている人を大きく)' : view === 'ownerAll' ? '(お店ぜんぶ)' : ''), 1500);
+    toast('視点: ' + VIEW_NAMES[view] + (view === 'owner' ? '(座っている人を大きく)' : view === 'ownerAll' ? '(お店ぜんぶ)' : view === 'talk' ? '(みんなの顔を見ながら 話す)' : ''), 1500);
   };
+
+  /* ---------------- おしゃべり画面(ノブさん 2026-11-22「リモートで話すような、会話がメインの画面」) ----------------
+     来ている人の顔を カードで ならべる(自分は出さない。大将は 金色のわく)。人数が少ないほど 大きい。
+     話した人の カードが光って、顔の上に 吹き出し。カードを押すと その人あてに書ける。さわるだけで送れる ひとこと。
+     顔は アバターを 写真にしたもの(仮装も そのまま写る。姿が変わったときだけ 撮りなおす)。お店の 3D は その間 休む(軽い) */
+  var TALK_OWNER = false;   // 大将用は あとで(11-22 ノブさん: まず お客さん用)
+  var TALK_QUICK = ['👍 いいね!', '😆 わかる〜', '🙌 おつかれさま!', '😋 おいしそう!', '🤣 それな!'];
+  var talkOn = false, talkPics = {}, talkQ = [], talkBusy = false, talkSay = {}, talkHtmlKey = '';
+  function talkSet(on, was) {
+    talkOn = !!on && inside;
+    document.body.classList.toggle('talk-on', talkOn);
+    $('talk').classList.toggle('hidden', !talkOn); $('talkBg').classList.toggle('hidden', !talkOn); $('tkQuick').classList.toggle('hidden', !talkOn);
+    if (talkOn) { withScene(function (sc) { if (sc.setPerf) sc.setPerf({ rest: true }); }); talkRender(true); }
+    else if (was) withScene(function (sc) { if (sc.setPerf) sc.setPerf({ rest: tvMode === 'big' }); s3dView(); });
+    if (talkOn || was) { try { localStorage.setItem('iz-talk', talkOn ? '1' : '0'); } catch (e) {} }   // 自分で 居酒屋の画面に もどした人は、次も 居酒屋の画面から
+  }
+  function s3dView() { withScene(function (s) { s.setView(camView, DEMO ? DEMO_SEAT : mySeat); }); }
+  /* カードに出す人: 大将(いるとき)+ 座っている人(自分は出さない) */
+  function talkPeople() {
+    var ms = members(), st = tree.state || {}, L = [];
+    if (!OWNER_MODE && ownerPresent()) { var ou = ownerUid(); L.push({ key: 'owner', name: st.ownerName || SHOP.OWNER_NAME, owner: true, av: withCos((st.ownerAvatar && AVATAR.fix(st.ownerAvatar)) || AVATAR.fix(AVATAR.OWNER), ou ? cosOf(ou, ms[ou]) : ''), m: ou && ms[ou] }); }
+    for (var i = 0; i < N; i++) {
+      var u = seatUid(i), m = u && ms[u]; if (!m || u === ME.uid || !(fresh(m) || away(m))) continue;
+      var items = tableItems(i).filter(function (x) { return !x.empty; }), last = items[items.length - 1], it = last && menuItem(last.id);
+      L.push({ key: i, name: m.name, av: withCos(m.avatar, cosOf(u, m)), m: m, drink: it ? it.emoji : '', away: !fresh(m) });
+    }
+    return L;
+  }
+  function talkPic(av) {   // 顔写真(なければ 順番に撮る。1枚ずつ 間をあけて、画面が かたまらないように)
+    var k = JSON.stringify(av || {}); if (talkPics[k]) return talkPics[k];
+    if (talkQ.indexOf(k) < 0) talkQ.push(k);
+    if (!talkBusy) talkNext();
+    return '';
+  }
+  function talkNext() {
+    var k = talkQ.shift(); if (!k) { talkBusy = false; return; }
+    talkBusy = true;
+    setTimeout(function () {
+      try { if (window.IZ3D && IZ3D.portrait) talkPics[k] = IZ3D.portrait(JSON.parse(k), 256) || 'x'; } catch (e) { talkPics[k] = 'x'; }
+      if (talkOn) talkRender(true);
+      talkNext();
+    }, 30);
+  }
+  /* 人数と 画面の広さから、顔が いちばん大きくなる ならべ方を えらぶ(1〜4列) */
+  function talkLayout(n, W, H) {
+    var best = { cols: 1, rows: n || 1, w: W, h: H, sz: 0 }, gap = 8;
+    for (var c = 1; c <= Math.min(4, Math.max(1, n)); c++) {
+      var r = Math.ceil(n / c), w = (W - gap * (c - 1)) / c, h = (H - gap * (r - 1)) / r, sz = Math.min(w, h * 1.1);
+      if (sz > best.sz + 2) best = { cols: c, rows: r, w: w, h: h, sz: sz };
+    }
+    return best;
+  }
+  function talkBox() {   // カードを置ける場所(上のボタンの下 〜 下の会話の上)
+    var top = 0, bot = innerHeight;
+    var sd = document.querySelector('.side'); if (sd) { var r = sd.getBoundingClientRect(); top = Math.max(top, r.bottom + 8); }
+    var bt = document.querySelector('.bottom'); if (bt) Array.prototype.forEach.call(bt.children, function (c) { if (c.offsetParent) { var r2 = c.getBoundingClientRect(); if (r2.height > 0) bot = Math.min(bot, r2.top - 6); } });
+    return { top: top, h: Math.max(120, bot - top) };
+  }
+  var talkAuto = false;
+  function talkRender(force) {
+    if (!talkOn) {   // 前に おしゃべり画面を使っていた人は、座ったら そのまま おしゃべり画面に
+      if (!talkAuto && inside && !DEMO && !OWNER_MODE && mySeat >= 0) { talkAuto = true; var pf = null; try { pf = localStorage.getItem('iz-talk'); } catch (e) {} if (pf !== '0' && !phOn) setView('talk'); }   // 座ったら はじめから おしゃべり画面(11-22 ノブさん「このアプリの一番の弱点は 相手の顔が見えないこと」)
+      return;
+    }
+    if (phOn) { setView(camView); toast('記念撮影なので、お店の画面に もどしました', 2200); return; }
+    var L = talkPeople(), box = talkBox(), el = $('talk'), W = Math.min(innerWidth - 16, 900);
+    el.style.top = box.top + 'px'; el.style.height = box.h + 'px';
+    if (!L.length) { var e0 = '<div class="tk-empty">まだ だれも来ていません。<br>来たら ここに 顔が ならびます 🏮</div>'; if (el._h !== e0) { el.innerHTML = e0; el._h = e0; } return; }
+    var lay = talkLayout(L.length, W, box.h), t = Date.now();
+    var small = lay.sz < 150, cw = Math.floor(lay.w), ch = Math.floor(lay.h);
+    var html = '<div class="tk-grid' + (small ? ' small' : '') + '" style="width:' + Math.ceil(lay.cols * cw + (lay.cols - 1) * 8) + 'px">' + L.map(function (p) {
+      var pic = talkPic(p.av), say = talkSay[String(p.key)], on = say && t < say.until, glow = say && t < say.glow;
+      var badge = p.away ? '💤 席をはずしています' : p.m && kigaeNow(p.m.kigae) ? '👚 着がえ中' : p.m && gameNow(p.m.game) ? '🎮 ゲーム中' : '';
+      return '<button class="tk-card' + (p.owner ? ' owner' : '') + (glow ? ' talk' : '') + (p.away ? ' away' : '') + (p.drink ? ' dr' : '') + '" data-tk="' + p.key + '" style="width:' + cw + 'px;height:' + ch + 'px">' +
+        (pic && pic !== 'x' ? '<img alt="" src="' + pic + '">' : '<span class="tk-wait">' + (pic === 'x' ? '🙂' : '…') + '</span>') +
+        (on ? '<span class="tk-bub">' + esc(say.text) + '</span>' : '') +
+        '<span class="tk-nm">' + (p.owner ? '🏮 ' : '') + esc(p.owner ? p.name : honor(p.name)) + '</span>' +
+        (p.drink ? '<span class="tk-dr">' + p.drink + '</span>' : '') + (badge ? '<span class="tk-st">' + badge + '</span>' : '') + '</button>';
+    }).join('') + '</div>';
+    if (force || el._h !== html) { el.innerHTML = html; el._h = html; }
+  }
+  /* 話した人の カードを光らせ、吹き出しを出す(頭の上の吹き出しと 同じとき) */
+  function talkHear(seat, text) {
+    var k = String(seat), t = Date.now();
+    talkSay[k] = { text: text, until: t + Math.min(15000, 5000 + text.length * 120), glow: t + 3000 };
+    if (talkOn) talkRender();
+  }
+  setInterval(function () { if (talkOn) talkRender(); }, 1000);   // 吹き出しを消す・人の出入り
+  window.addEventListener('resize', function () { if (talkOn) talkRender(true); });
+  $('talk').addEventListener('click', function (e) {
+    var c = e.target.closest && e.target.closest('[data-tk]'); if (!c) return;
+    var k = c.getAttribute('data-tk'); replyToSeat(k === 'owner' ? 'owner' : +k, false);
+  });
+  $('tkQuick').innerHTML = TALK_QUICK.map(function (q) { return '<button type="button" data-q="' + esc(q) + '">' + esc(q) + '</button>'; }).join('');
+  $('tkQuick').addEventListener('click', function (e) {   // さわるだけで送れる ひとこと(あて先が 入っていれば その人あて)
+    var b = e.target.closest && e.target.closest('[data-q]'); if (!b) return;
+    var call = (chatIn.value.match(CALL_RE) || [''])[0];
+    chatIn.value = call + b.getAttribute('data-q'); growInput();
+    $('chatForm').requestSubmit ? $('chatForm').requestSubmit() : $('sendBtn').click();
+  });
 
   /* ---------------- 会話 ---------------- */
   function sys(text) { net.push('chat', { sys: true, text: text, at: TS }); }
@@ -1186,6 +1290,7 @@
   function okSeat(v) { return typeof v === 'number' && v >= 0 && v < N && Math.floor(v) === v; }   // 席番号として正しいか(おかしな値で画面がこわれないように)
   function bubble(seat, text, phrase) {
     if (seat !== 'owner' && !okSeat(seat)) return;
+    talkHear(seat, text);
     var key = String(seat);
     var b = bubbles[key];
     if (!b) { b = bubbles[key] = { el: document.createElement('div'), bn: document.createElement('div'), bt: document.createElement('div') }; b.bn.className = 'bn'; b.bt.className = 'bt'; b.el.appendChild(b.bn); b.el.appendChild(b.bt); }

@@ -503,3 +503,38 @@ body.demo .side > #bGame { display: none !important; }   /* 着がえ中は 💬
 .bt-free { width: 100%; margin-top: 8px; font-size: 16px; padding: 10px 12px; border-radius: 10px; border: 2px solid #d9c49a; }
 .yt-tall { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; margin: 6px 0 0; }
 .yt-tall input { width: 18px; height: 18px; }
+
+/* ===== おしゃべり画面(11-22 ノブさん「会話がメインの画面」)。顔のカードを ならべる。自分は出さない ===== */
+#talkBg { position: fixed; inset: 0; z-index: 9; background: radial-gradient(120% 70% at 50% 30%, #3a2618 0%, #20150e 70%); }
+#talkBg::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: calc(var(--sat) + 46px); background: linear-gradient(#2a3a6a, #22305a); border-bottom: 3px solid #c8402c; }
+#talk { position: absolute; left: 8px; right: 8px; z-index: 5; display: flex; align-items: center; justify-content: center; }
+.tk-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; align-content: center; height: 100%; max-width: 100%; }
+.tk-card { position: relative; flex: none; padding: 0; border: 3px solid #6b4728; border-radius: 14px; background: #4a2e1a; overflow: hidden; display: block; font: inherit; color: #fbf3e4; cursor: pointer; transition: box-shadow .25s, border-color .25s; }
+.tk-card img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 70%; display: block; }
+.tk-card.owner { border-color: #e8b830; background: #5a3a1c; }
+.tk-card.talk { border-color: #f5c04a; box-shadow: 0 0 0 3px rgba(245,192,74,.45), 0 0 18px rgba(245,192,74,.55); }
+.tk-card.away img { filter: grayscale(.7) brightness(.7); }
+.tk-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 30px; opacity: .6; }
+.tk-nm { position: absolute; left: 6px; bottom: 6px; max-width: calc(100% - 12px); background: rgba(20,12,8,.8); border-radius: 8px; padding: 2px 8px; font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-card.owner .tk-nm { background: #c8402c; }
+.tk-dr { position: absolute; right: 6px; bottom: 5px; font-size: 20px; }
+.tk-st { position: absolute; right: 6px; top: 6px; font-size: 11px; font-weight: 800; background: #d9442e; border-radius: 99px; padding: 2px 7px; }
+.tk-bub { position: absolute; left: 6px; right: 6px; top: 6px; background: #fffdf6; color: #2a1a10; border-radius: 12px; padding: 5px 9px; font-size: 13px; line-height: 1.35; font-weight: 800; text-align: left; box-shadow: 0 2px 6px rgba(0,0,0,.35); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tk-empty { color: #e8dcc6; text-align: center; font-size: 15px; line-height: 1.8; }
+.tk-quick { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.tk-quick::-webkit-scrollbar { display: none; }
+.tk-quick button { flex: none; background: #4a3a2c; color: #fbf3e4; border-radius: 999px; padding: 8px 12px; font-weight: 800; font-size: 14px; }
+/* おしゃべり画面の間: 右のボタンは 上に 横ならび。頭の上の吹き出し・名札・モニターは かくす。会話の欄は 少し広く */
+body.talk-on .side { flex-direction: row; flex-wrap: wrap; left: 8px; right: 8px; max-height: none !important; gap: 5px; justify-content: center; align-content: flex-start; }   /* ボタンは 全部見えるように(入りきらなければ 2段に) */
+body.talk-on .side::-webkit-scrollbar { display: none; }
+body.talk-on .sbtn { flex: none; width: 49px; padding: 5px 0 4px; }
+body.talk-on .sbtn span { font-size: 19px; }
+body.talk-on .sbtn small { font-size: 9.5px; white-space: nowrap; letter-spacing: -.03em; }
+.tk-card.dr .tk-nm { max-width: calc(100% - 38px); }
+.tk-grid.small .tk-nm { font-size: 11.5px; padding: 1px 6px; left: 4px; bottom: 4px; }
+.tk-grid.small .tk-bub { font-size: 11.5px; padding: 4px 7px; -webkit-line-clamp: 2; left: 4px; right: 4px; top: 4px; }
+.tk-grid.small .tk-dr { font-size: 16px; right: 4px; bottom: 3px; }
+.tk-grid.small .tk-st { font-size: 10px; padding: 1px 5px; }
+body.talk-on .np-row, body.talk-on #bubbles, body.talk-on #tags, body.talk-on #pickHint { display: none !important; }
+body.talk-on #tv, body.talk-on #tvBack, body.talk-on #tvClose { visibility: hidden; }
+body.talk-on .log { max-height: 22vh; }

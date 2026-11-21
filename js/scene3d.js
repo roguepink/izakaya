@@ -3044,5 +3044,32 @@ function createPreview(canvas) {
   };
 }
 
-window.IZ3D = { createShop, createPreview, buildItem, buildAvatar, THREE, HAT_STATS };   // buildItem と THREE は 確認用のページ(tools/menu-gallery.html)で使う
+/* =====================================================================
+   顔写真(おしゃべり画面のカード用。2026-11-22 ノブさん)
+   アバターを 1回だけ 立体で作って 写真にし、すぐ片づける。仮装(かぶりもの)も そのまま写る。
+   小さな絵の板を1枚だけ使い回す(スマホの負担を ふやさない)
+   ===================================================================== */
+let ptR = null, ptS = null, ptC = null;
+function portrait(raw, size) {
+  size = size || 256;
+  if (!ptR) {
+    ptR = new THREE.WebGLRenderer({ canvas: document.createElement('canvas'), antialias: true, alpha: true, preserveDrawingBuffer: true });
+    ptR.outputColorSpace = THREE.SRGBColorSpace; ptR.setPixelRatio(1);
+    ptS = new THREE.Scene();
+    ptS.add(new THREE.HemisphereLight('#fff1dc', '#5a3a22', 1.6));
+    const d = new THREE.DirectionalLight('#ffe0b0', 1.7); d.position.set(1, 2, 2.5); ptS.add(d);
+    ptC = new THREE.PerspectiveCamera(14, 1, 0.05, 20);
+  }
+  ptR.setSize(size, size, false);
+  const av = buildAvatar(raw, { standing: true }); av.rotation.y = -0.18; ptS.add(av);
+  const hat = !!(raw && raw.costume && String(raw.costume).split('|')[0]);   // かぶりものが あるときは 少し引いて 上まで入れる
+  const ly = hat ? 0.8 : 0.72, dist = hat ? 3.1 : 2.55;
+  ptC.position.set(0, ly + 0.12, dist); ptC.lookAt(0, ly, 0);
+  let url = '';
+  try { ptR.render(ptS, ptC); url = ptR.domElement.toDataURL('image/png'); } catch (e) {}
+  ptS.remove(av); disposeAvatar(av);
+  return url;
+}
+
+window.IZ3D = { createShop, createPreview, buildItem, buildAvatar, portrait, THREE, HAT_STATS };   // buildItem と THREE は 確認用のページ(tools/menu-gallery.html)で使う
 window.dispatchEvent(new Event('iz3d-ready'));
