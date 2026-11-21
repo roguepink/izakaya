@@ -1135,6 +1135,7 @@
     keys.forEach(function (k) {
       if (seenChat[k]) return; seenChat[k] = 1;
       var m = c[k]; if (m.sys || (m.at || 0) < joinAt - 5000) return;
+      if ((m.at || 0) > now() - 15000) regHear(m);
       bubble(m.seat, m.text, false);
       withScene(function (s) {
         s.talk(m.seat);
@@ -1512,6 +1513,7 @@
       for (var i = 0; i < N; i++) if (seatUid(i) === uid) { net.remove('seats/' + i); net.remove('tables/' + i); }
     });
     for (var i = 0; i < N; i++) { var u = seatUid(i); if (u && !ms[u]) { net.remove('seats/' + i); net.remove('tables/' + i); } }
+    regTick(n);   // 常連の子(片づけのあとに。来たばかりの子を 古い一覧で片づけないように)
     // 大将がいないとき・大将が「自動で出す」にしているときは、注文を自動で出す(お客さんは3秒は取り消せる)
     var aw = ownerPresent() ? autoWait(st.autoServe) : function () { return 3000; };
     if (aw) {
@@ -1916,6 +1918,7 @@
     $('kpUi').classList.remove('hidden'); document.body.classList.add('kp-on'); kpCount();   // kp-on: 乾杯の間は「🍶 出す」を隠す(ボタンが重なる)
     clearTimeout(kpT); kpT = setTimeout(function () { kpEnd(false); }, rem);
     // おためし客は 少しずつ続く
+    var rk = regSeat(); if (rk >= 0 && amLeader() && e.by !== REG_UID) setTimeout(function () { if (kp && kp.key === key && regSeat() === rk) net.push('events', { type: 'kanpaiJoin', ref: key, seat: rk, at: TS, by: REG_UID }); }, 700 + Math.random() * 1800);   // 常連の子は ほかの人の乾杯に加わる(自分からはしない)
     if (LOCAL) Object.keys(bots).forEach(function (u) { var b = bots[u]; if (u === e.by || Math.random() < 0.15) return; setTimeout(function () { if (kp && kp.key === key) net.push('events', { type: 'kanpaiJoin', ref: key, seat: b.seat, at: TS, by: u }); }, 400 + Math.random() * 2000); });
   }
   function kpCount() { if (!kp) return; $('kpCount').textContent = '🍻 ' + kp.n + '人'; }
@@ -2101,7 +2104,7 @@
   function photoList() {   // 写る人(席の順)。写らないを選んだ人は入れない
     var picks = tree.photo || {}, ms = members(), L = [];
     function pk(uid) { var p = uid === ME.uid ? myPick : (picks[uid] || {}); return { pose: p.pose || 'peace', face: p.face || 'smile', hide: !!p.hide }; }
-    for (var i = 0; i < N; i++) { var u = seatUid(i), m = u && ms[u]; if (!m || !fresh(m)) continue; var p = pk(u); if (!p.hide) L.push({ key: i, pose: p.pose, face: p.face }); }
+    for (var i = 0; i < N; i++) { var u = seatUid(i), m = u && ms[u]; if (!m || !fresh(m) || m.regular) continue; var p = pk(u); if (!p.hide) L.push({ key: i, pose: p.pose, face: p.face }); }   // 常連の子は 写らない
     var ou = ownerUid(); if (ou) { var po = pk(ou); if (!po.hide) L.push({ key: 'owner', pose: po.pose, face: po.face }); }
     return L;
   }
@@ -2270,6 +2273,102 @@
   /* 大将の接客画面の「☰」: 右のボタンを出す・しまう。ほかのボタンを押したら しまう */
   $('bMore').onclick = function () { var o = document.body.classList.toggle('side-open'); $('bMoreLbl').textContent = o ? 'しまう' : 'メニュー'; };
   document.querySelectorAll('.side > .sbtn').forEach(function (b) { if (b.id !== 'bMore') b.addEventListener('click', function () { document.body.classList.remove('side-open'); $('bMoreLbl').textContent = 'メニュー'; }); });
+
+  /* ---------------- 常連の女の子(ボット)「アイ」 ----------------
+     お客さん(人)が1人以下の時、3分たったら 奥から2番目の席に来る。2人以上になったら 少しして帰る。
+     店を回す人(まとめ役)のスマホが 1台だけで動かす(tick から)。記録は members/reg-ai(bot:true, regular:true)。
+     自分から乾杯はしない(ほかの人の乾杯には加わる)・記念撮影に写らない・話しかけられたら「ありがとう、よろしくね」。
+     注文 → 少しずつ食べる・飲む → 食べ終わったら たまに「うまい」「おいしい」→ お皿は大将(自動)が下げる */
+  var REG = Object.assign({ NAME: 'アイ', WAIT_MIN: 3, SEAT: 1, LEAVE_SEC: [20, 40], LINES: [], THANKS: ['ありがとう！よろしくね'], BYE: 'そろそろ帰るね',
+    EAT_SEC: [50, 65], ORDER_SEC: [90, 170], FIRST_ORDER_SEC: [15, 35], TALK_MIN: [6, 11] }, SHOP.REGULAR || {});
+  var REG_UID = 'reg-ai', regSince = 0, regLeaveAt = 0, regNext = 0, regTalkAt = 0, regThanks = {}, regSeen = 0;
+  function rnd(a, b) { return a + Math.random() * (b - a); }
+  function regMember() { var m = members()[REG_UID]; return m && m.name ? m : null; }
+  function regSeat() { var m = regMember(); return m && okSeat(m.seat) && seatUid(m.seat) === REG_UID ? m.seat : -1; }
+  function realGuests() { var ms = members(); return Object.keys(ms).filter(function (u) { var m = ms[u]; return m.name && !m.owner && !m.bot && (fresh(m) || away(m)); }).length; }
+  function anyHuman() { var ms = members(); return Object.keys(ms).some(function (u) { var m = ms[u]; return m.name && !m.bot && fresh(m); }); }
+  function regAvatar() {   // 顔・髪型は いつも同じ(覚えてもらえるように)。髪の色・服の色だけ 毎回ちがう
+    var base = JSON.parse(JSON.stringify((AVATAR.PRESETS.f || [])[1] || AVATAR.random('f')));
+    base.sex = 'f'; base.owner = false;
+    base.hairColor = Math.floor(Math.random() * Math.min(6, AVATAR.HAIR_COLOR.length));   // 黒〜明るい茶色(灰色・白は 年上に見えるので出さない)
+    base.topColor = Math.floor(Math.random() * AVATAR.CLOTH_COLOR.length);
+    return AVATAR.fix(base);
+  }
+  function regPhrase(id) { var m = regMember(), k = regSeat(); if (!m || k < 0) return; net.push('events', { type: 'phrase', id: id, seat: k, at: TS, by: REG_UID, voice: m.voice || '' }); }
+  function regSay(text, to) { var m = regMember(), k = regSeat(); if (!m || k < 0) return; var c = { uid: REG_UID, name: m.name, seat: k, text: text, at: TS }; if (to != null) c.to = to; net.push('chat', c); }
+  function regEnter(n) {
+    var want = Math.min(Math.max(0, REG.SEAT), N - 1), seat = -1, res = reservationsNow();
+    var order = [want]; for (var d = 1; d < N; d++) { if (want - d >= 0) order.push(want - d); if (want + d < N) order.push(want + d); }   // ふさがっていたら 近くの空いた席
+    for (var i = 0; i < order.length; i++) { var k = order[i], u = seatUid(k); if ((!u || !members()[u]) && !res[k]) { seat = k; break; } }
+    if (seat < 0) return false;
+    var av = regAvatar();
+    net.set('members/' + REG_UID, { name: REG.NAME, avatar: av, at: TS, seen: TS, seat: seat, bot: true, regular: true, voice: av.voice || '' });
+    net.set('seats/' + seat, REG_UID);
+    net.push('events', { type: 'phrase', id: 'irasshai', seat: seat, at: TS, by: REG_UID });
+    sys('🏮 ' + honor(REG.NAME) + 'が来店しました');
+    regNext = n + rnd(REG.FIRST_ORDER_SEC[0], REG.FIRST_ORDER_SEC[1]) * 1000; regTalkAt = n + rnd(REG.TALK_MIN[0], REG.TALK_MIN[1]) * MIN; regSeen = n;
+    return true;
+  }
+  function regLeave(quiet) {
+    var m = regMember(), k = m && okSeat(m.seat) ? m.seat : -1;
+    if (k >= 0 && seatUid(k) === REG_UID) { net.remove('seats/' + k); net.remove('tables/' + k); }
+    Object.keys(tree.orders || {}).forEach(function (o) { if (tree.orders[o].uid === REG_UID) net.remove('orders/' + o); });
+    net.remove('members/' + REG_UID);
+    if (m && !quiet) sys(honor(m.name) + 'がお帰りになりました');
+    regLeaveAt = 0; regSince = 0;
+  }
+  function regTick(n) {   // まとめ役のスマホで 1秒ごと
+    if (DEMO) return;
+    var m = regMember(), k = regSeat(), guests = realGuests(), human = anyHuman();
+    var s = status(n), open = LOCAL || s.phase === 'open';
+    if (!m) {
+      if (members()[REG_UID]) net.remove('members/' + REG_UID);   // 名前のない記録の片づけ
+      if (open && human && guests <= 1) { if (!regSince) regSince = n; if (n - regSince >= REG.WAIT_MIN * MIN) regEnter(n); }
+      else regSince = 0;
+      return;
+    }
+    if (k < 0) { regLeave(true); return; }   // 席がなくなった(片づけられた)
+    if (!human || !open) { regLeave(false); return; }   // だれもいない・閉店
+    if (n - regSeen > 15000) { regSeen = n; net.update('members/' + REG_UID, { seen: TS }); }
+    if (!regNext) regNext = n + rnd(REG.FIRST_ORDER_SEC[0], REG.FIRST_ORDER_SEC[1]) * 1000;   // まとめ役が代わったとき
+    if (!regTalkAt) regTalkAt = n + rnd(REG.TALK_MIN[0], REG.TALK_MIN[1]) * MIN;
+    // 2人以上 → 少しして「そろそろ帰るね」
+    if (guests >= 2) {
+      if (!regLeaveAt) regLeaveAt = n + rnd(REG.LEAVE_SEC[0], REG.LEAVE_SEC[1]) * 1000;
+      else if (n >= regLeaveAt && regLeaveAt > 0) { regSay(REG.BYE); regLeaveAt = -1; setTimeout(function () { if (regMember()) regLeave(false); }, 2500); }
+      return;
+    } else if (regLeaveAt > 0) regLeaveAt = 0;
+    if (regLeaveAt < 0) return;
+    // 食べる・飲む: 出てきてから 少しずつ(2回で空になる)
+    tableItems(k).forEach(function (x) {
+      if (x.empty) return;
+      var it = menuItem(x.id), drink = it && it.kind === 'drink', gap = (drink ? REG.EAT_SEC[0] : REG.EAT_SEC[1]) * 1000 * (1 + (x.key.charCodeAt(x.key.length - 1) % 7) * 0.05);
+      if (n < x.at + (x.bites + 1) * gap) return;
+      var up = { bites: x.bites + 1 }; if (up.bites >= 2) up.emptyAt = TS;
+      net.update('tables/' + k + '/' + x.key, up);
+      if (up.bites >= 2 && Math.random() < (drink ? 0.25 : 0.6)) setTimeout(function () { regPhrase(Math.random() < 0.6 ? 'umai' : 'g_oishii'); }, 1200);   // 食べ終わったら たまに
+    });
+    // 注文: 飲み物がなければ飲み物、料理が1つもなければ料理(一定のリズムで)
+    if (n >= regNext) {
+      regNext = n + rnd(REG.ORDER_SEC[0], REG.ORDER_SEC[1]) * 1000;
+      var c = seatCounts(k), ML = SHOP.MENU.filter(inMode), pick = null;
+      if (c.drink < (SHOP.DRINK_LIMIT || 1)) { var D = ML.filter(function (x) { return x.kind === 'drink'; }); pick = D[Math.floor(Math.random() * D.length)]; }
+      else if (c.food < 1) { var F = ML.filter(function (x) { return x.kind !== 'drink'; }); pick = F[Math.floor(Math.random() * F.length)]; }
+      if (pick && !whyNot(k, pick.id)) { net.push('orders', { uid: REG_UID, name: m.name, seat: k, item: pick.id, at: TS }); net.push('events', { type: 'order', seat: k, item: pick.id, at: TS, by: REG_UID }); }
+    }
+    // たまに ひとこと(少なめ)
+    if (n >= regTalkAt) { regTalkAt = n + rnd(REG.TALK_MIN[0], REG.TALK_MIN[1]) * MIN; if (REG.LINES.length && Math.random() < 0.5) regSay(REG.LINES[Math.floor(Math.random() * REG.LINES.length)]); }
+    // お祝いの日は 仮装(かわいく。なければ その日の帽子)
+    var ck = celebKind(); if (ck && !cosOf(REG_UID, m)) { var d0 = SHOP.CELEBRATE[ck]; net.update('members/' + REG_UID, { costume: ck + '/' + d0.hats[0][0] + '||' }); }
+  }
+  /* 話しかけられたら(その子あて・名前が入っている)→ 少しして「ありがとう、よろしくね」。同じ人には 2分に1回まで */
+  function regHear(msg) {
+    if (!amLeader() || !msg || msg.uid === REG_UID || msg.sys) return;
+    var k = regSeat(); if (k < 0) return;
+    if (!(msg.to === k || String(msg.text || '').indexOf(REG.NAME) >= 0)) return;
+    var key = msg.uid || msg.name, n = now(); if (regThanks[key] && n - regThanks[key] < 2 * MIN) return; regThanks[key] = n;
+    setTimeout(function () { regSay(REG.THANKS[Math.floor(Math.random() * REG.THANKS.length)], msg.seat); }, rnd(2, 4) * 1000);
+  }
 
   /* ---------------- おためし客(おためしモードだけ) ---------------- */
   var bots = {};
@@ -2578,5 +2677,5 @@
   initEntrance();
   // 確認用(画面の自動テストから使う)
   setTimeout(batonAutoEnter, 900);   // バトンタッチで開きなおしたときは 自動で店に入る
-  window.IZ = { scene: function () { return scene; }, get tree() { return tree; }, get inside() { return inside; }, get seat() { return mySeat; }, net: function () { return net; }, addBot: addBot, status: status, upcoming: upcoming, voiceFiles: voiceFiles };
+  window.IZ = { scene: function () { return scene; }, get tree() { return tree; }, get inside() { return inside; }, get seat() { return mySeat; }, net: function () { return net; }, addBot: addBot, status: status, upcoming: upcoming, voiceFiles: voiceFiles, reg: REG };
 })();
