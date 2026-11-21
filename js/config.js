@@ -242,9 +242,22 @@ var SHOP = {
   REGULAR: { NAME: 'アイちゃん', CALL: ['アイ', 'あいちゃん', '愛ちゃん'], MAX_GUESTS: 2,
     HAIR: '#c4a27e',   // 髪の色はいつも同じ(ミルクティー。ノブさんが選んだ 2026-11-21)
     FACE: { hair: 'shortbob', bangs: 'nagashi', eyes: 'round', brows: 'soft', mouth: 'soft', cheek: 1, lip: 3, skin: 1, face: 'egg' },   // 顔・髪型もいつも同じ(ショートボブ・前髪を流す・まる目・少し面長でほっぺ控えめ=20代前半。ノブさんが候補から選んだ 2026-11-21)
-    TOPS: ['blouse', 'onepiece', 'knit', 'cardigan', 'hoodie', 'tee', 'denim'],   // お客さんと同じ服から毎回1つ
-    OWN_DRESS: 0.25,   // このくらいの割合で アイちゃんだけの服(白い丸えりのワンピース)
-    ACCS: ['none', 'none', 'ear_pearl', 'ear_flower', 'ear_heart', 'necklace', 'neck_heart', 'neck_pearl', 'neck_star', 'band', 'ribbon', 'glasses', 'beret'],   // 小物も毎回ちがう(キャップ・ニット帽は髪型が隠れるので入れない)
+    /* 服・ネックレス・髪のリボン(アイちゃんだけのもの。ノブさんが選んだ 2026-11-21)。来るたびに組み合わせて着てくる。
+       20代前半の落ち着いた可愛さ。フリル・派手な色はなし。色は うすいパステル、パンツは落ち着いた色も */
+    FITS: [   // [服, 下の色('paleB'=うすい色 / 'calm'=落ち着いた色 / ''=服で決まり)]
+      ['turtle', ''], ['turtle2', 'paleB'], ['knitdress', ''], ['shirtdress', ''], ['cardi', 'paleB'], ['cardi2', 'paleB'], ['denim', ''],
+      ['pleats', 'paleB'], ['blouse', 'calm'], ['jacket', ''], ['vdress', ''], ['boat', 'paleB'], ['vknit', 'calm'], ['wide', 'paleB'],
+      ['satin', 'calm'], ['openshirt', 'calm'], ['jacket2', 'calm'], ['quilt', 'calm'], ['hoodie', ''], ['sweat', 'calm'], ['tee', 'paleB']],
+    PALE: ['#ecd6a6', '#a9c2e0', '#e3c0b6', '#b5cca8', '#e3b6c4', '#f3efe8', '#c4b6de', '#d8c8b4', '#bcc4d0'],   // 上の色(うすいパステル。お店の明かりがオレンジなので、写真で見分けがつくくらいに少しだけ はっきりめ)
+    PALE_B: ['#cfc4b4', '#d8ccbc', '#c8bca8', '#d4cfc8', '#bcc4d0', '#a9c2e0'],   // スカート・パンツの うすい色
+    CALM: ['#3a3a42', '#7a7a82', '#5a5048', '#5a6270', '#8a8478', '#4a4448'],   // パンツなどの 落ち着いた色
+    OPEN: ['blouse', 'boat', 'openshirt', 'vdress'],   // 胸元が開いた服 → 必ずネックレス
+    NO_NECK: ['hoodie', 'sweat', 'tee', 'quilt'],   // ネックレスを付けない服
+    NECKS: ['pearl1', 'heart', 'flower', 'coin', 'double'],
+    RIBBONS: ['big', 'big', 'small', 'tails'],   // 髪のリボン(大きなリボンを多めに)
+    RIBBON_COLORS: ['#2c3550', '#d9b3b8', '#b8c8dc', '#f2ece2', '#7a2a36'],   // 紺・くすみピンク・うすい水色・白・ボルドー
+    RIBBON_RATE: 0.8,   // リボンを付けてくる割合
+    ACCS: ['maru', 'flower', 'muffler'],   // そのほかの小物(丸メガネ・花の髪かざり・マフラーは冬だけ)。ときどき
     WAIT_MIN: 3, SEAT: 1, LEAVE_SEC: [20, 40],   // 名前はカタカナ+ひらがなの「ちゃん」(ノブさん 2026-11-21)。お客さん MAX_GUESTS 人までのとき来る
     VOICE: 'g_zephyr',   // 声: 明るい声(ノブさんが A を選んだ 2026-11-21)
     /* しゃべる言葉(ノブさんが選んだ 2026-11-21)。[id, 言葉]。id は あとで録る声のファイル名(voice/ai/<id>.m4a) */

@@ -1255,7 +1255,7 @@ function buildAcc(head, body, a, R, f) {
     [[0.6, '#f2c14e'], [-0.6, '#e8707a']].forEach(([rz, col]) => { const p = tm(new THREE.BoxGeometry(0.011, 0.075, 0.007), col, 0, 0, 0, 0.0015); p.rotation.z = rz; g.add(p); });
   }
   if (a.special === 'ai' && a.aiRibbon) {   // 髪のリボン(後ろ頭。お客さんの席からは 後ろ姿が よく見えるので目立つ)
-    const HR = head.userData.hairR || R * 1.12, rc = a.aiRibbonC || '#2c3550', g = new THREE.Group(); g.position.set(0, HR * 0.25, -HR * 1.0); head.add(g);
+    const HR = head.userData.hairR || R * 1.12, rc = a.aiRibbonC || '#2c3550', g = new THREE.Group(); g.position.set(-HR * 0.42, HR * 0.27, -HR * 0.9); g.rotation.y = -0.5; head.add(g);   // 後ろ頭の 少し横(お客さんの席が多い側)に、斜めに向けて付ける。横の席からも よく見えるように
     const wing = (sz, x, rz) => { const w = tm(new THREE.ConeGeometry(0.075 * sz, 0.13 * sz, 4), rc, x, 0, 0, 0.003); w.rotation.z = rz; w.scale.z = 0.45; g.add(w); };
     const tail = (len, x, rz, wd = 0.03) => { const t = tm(new THREE.BoxGeometry(wd, len, 0.006), rc, x, -len * 0.62, 0.005, 0.002); t.rotation.z = rz; g.add(t); };
     switch (a.aiRibbon) {

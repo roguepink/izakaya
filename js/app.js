@@ -2279,7 +2279,7 @@
      店を回す人(まとめ役)のスマホが 1台だけで動かす(tick から)。記録は members/reg-ai(bot:true, regular:true)。
      自分から乾杯はしない(ほかの人の乾杯には加わる)・記念撮影に写らない・話しかけられたら「ありがとう、よろしくね」。
      注文 → 少しずつ食べる・飲む → 食べ終わったら たまに「うまい」「おいしい」→ お皿は大将(自動)が下げる */
-  var REG = Object.assign({ NAME: 'アイちゃん', CALL: ['アイ'], MAX_GUESTS: 2, HAIR: '#3a2219', TOPS: ['blouse'], ACCS: ['none'], OWN_DRESS: 0.25, VOICE: '', WAIT_MIN: 3, SEAT: 1, LEAVE_SEC: [20, 40], TALK: {},
+  var REG = Object.assign({ NAME: 'アイちゃん', CALL: ['アイ'], MAX_GUESTS: 2, HAIR: '#c4a27e', FITS: [], ACCS: [], VOICE: '', WAIT_MIN: 3, SEAT: 1, LEAVE_SEC: [20, 40], TALK: {},
     EAT_SEC: [50, 65], ORDER_SEC: [90, 170], FIRST_ORDER_SEC: [15, 35], TALK_MIN: [6, 11] }, SHOP.REGULAR || {});
   var REG_UID = 'reg-ai', regSince = 0, regLeaveAt = 0, regNext = 0, regTalkAt = 0, regThanks = {}, regSeen = 0;
   function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -2291,12 +2291,21 @@
      服は お客さんと同じ服から毎回1つ(おそろいになることもある)+ ときどき アイちゃんだけの服。小物も毎回ちがう */
   function pickOne(L) { return L[Math.floor(Math.random() * L.length)]; }
   function regAvatar() {
-    var base = Object.assign(JSON.parse(JSON.stringify((AVATAR.PRESETS.f || [])[1] || AVATAR.random('f'))), REG.FACE || {});   // 顔・髪型は REG.FACE(ノブさんが選ぶ)
-    base.sex = 'f'; base.owner = false; base.special = 'ai'; base.aiHair = REG.HAIR;
-    base.top = pickOne(REG.TOPS); base.topColor = Math.floor(Math.random() * AVATAR.CLOTH_COLOR.length);
-    if (Math.random() < REG.OWN_DRESS) { base.aiDress = 1; base.topColor = pickOne([0, 1, 3, 4, 6, 7, 11]); }   // 白いえりが映える 濃い色だけ
-    base.acc = pickOne(REG.ACCS); base.accColor = Math.floor(Math.random() * AVATAR.CLOTH_COLOR.length);
-    var a = AVATAR.fix(base); a.special = 'ai'; a.aiHair = REG.HAIR; if (base.aiDress) a.aiDress = 1; if (REG.FACE && REG.FACE.aiEyes) a.aiEyes = 1;
+    var base = Object.assign(JSON.parse(JSON.stringify((AVATAR.PRESETS.f || [])[1] || AVATAR.random('f'))), REG.FACE || {});   // 顔・髪型は REG.FACE(ノブさんが選んだ)
+    base.sex = 'f'; base.owner = false; base.special = 'ai'; base.acc = 'none';
+    var a = AVATAR.fix(base); a.special = 'ai'; a.aiHair = REG.HAIR; if (REG.FACE && REG.FACE.aiEyes) a.aiEyes = 1;
+    var fit = (REG.FITS || []).length ? pickOne(REG.FITS) : ['turtle2', 'paleB'];
+    a.aiFit = fit[0]; a.topColor = pickOne(REG.PALE || ['#f3efe8']);
+    if (fit[1] === 'paleB') a.aiCol2 = pickOne(REG.PALE_B || ['#cfc4b4']); else if (fit[1] === 'calm') a.aiCol2 = pickOne(REG.CALM || ['#7a7a82']);
+    if (fit[0] === 'quilt') a.aiCol3 = pickOne(['#c8bca8', '#cdd2da', '#ccd9c2', '#ddd0c0']);   // ベストの色
+    var open = (REG.OPEN || []).indexOf(fit[0]) >= 0, noNeck = (REG.NO_NECK || []).indexOf(fit[0]) >= 0;
+    if ((REG.NECKS || []).length && (open || (!noNeck && Math.random() < 0.3))) a.aiNeck = pickOne(REG.NECKS);   // 胸元が開いた服は必ず
+    if ((REG.RIBBONS || []).length && Math.random() < (REG.RIBBON_RATE == null ? 0.8 : REG.RIBBON_RATE)) {
+      a.aiRibbon = pickOne(REG.RIBBONS); var rc = (REG.RIBBON_COLORS || ['#2c3550']).filter(function (c) { return c !== a.topColor; }); a.aiRibbonC = pickOne(rc.length ? rc : REG.RIBBON_COLORS);
+    }
+    var mo = new Date(now() + JST).getUTCMonth() + 1, winter = mo === 12 || mo <= 2;
+    var accs = (REG.ACCS || []).filter(function (x) { return (x !== 'muffler' || winter) && (x !== 'flower' || !a.aiRibbon); });
+    if (accs.length && Math.random() < 0.3) a.aiAcc = pickOne(accs);   // そのほかの小物は ときどき
     if (REG.VOICE) a.voice = REG.VOICE;
     return a;
   }
