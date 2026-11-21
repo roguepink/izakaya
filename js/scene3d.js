@@ -1848,7 +1848,7 @@ const DRINK_SLOT = [0.26, 0.1];
    ===================================================================== */
 function createShop(canvas, opts) {
   const N = opts.seats;
-  const SHOPNAME = opts.name || SHOP.NAME;   // 回ごとの店の名前(ちょうちん・のれんの文字)
+  let SHOPNAME = opts.name || SHOP.NAME;   // バトンタッチで その場で変わる(setName)   // 回ごとの店の名前(ちょうちん・のれんの文字)
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -1968,7 +1968,7 @@ function createShop(canvas, opts) {
   }
 
   // ちょうちん
-  const lanternTex = canvasTex(256, 256, (g) => {
+  const drawLantern = (g) => {
     g.fillStyle = '#c8261c'; g.fillRect(0, 0, 256, 256);
     g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 3;
     for (let y = 16; y < 256; y += 22) { g.beginPath(); g.moveTo(0, y); g.lineTo(256, y); g.stroke(); }
@@ -1977,7 +1977,8 @@ function createShop(canvas, opts) {
     const sz = chars.length === 1 ? 120 : chars.length === 2 ? 78 : 58;
     g.font = 'bold ' + sz + 'px ' + FONT_JP;
     [64, 192].forEach((cx) => chars.forEach((ch, k) => g.fillText(ch, cx, 128 + (k - (chars.length - 1) / 2) * sz * 1.02)));
-  });
+  };
+  const lanternTex = canvasTex(256, 256, drawLantern);
   const lanterns = [];
   const nl = Math.max(2, Math.round(L / 1.6));
   for (let k = 0; k < nl; k++) {
@@ -1991,16 +1992,17 @@ function createShop(canvas, opts) {
     scene.add(lg); lanterns.push(lg);
   }
   // 入口ののれん(お客さんの後ろ)
-  const norenT = canvasTex(512, 256, (g) => {
+  const drawNoren = (g) => {
     g.fillStyle = '#1f2a4a'; g.fillRect(0, 0, 512, 256);
     g.fillStyle = '#f3efe6'; g.font = 'bold 120px ' + FONT_JP; g.textAlign = 'center'; g.textBaseline = 'middle';
     const nm = SHOPNAME.replace(/^居酒屋\s*/, '') || SHOPNAME;
     g.fillText(nm.slice(0, 4), 256, 140);
-  });
+  };
+  const norenT = canvasTex(512, 256, drawNoren), norenTexs = [norenT];
   for (let k = 0; k < 3; k++) {
     const piece = mesh(new THREE.PlaneGeometry(0.42, 0.75), new THREE.MeshLambertMaterial({ map: norenT, side: THREE.DoubleSide }), -0.44 + k * 0.44, 2.15, 3.55);
     piece.material = piece.material.clone(); piece.material.map = norenT.clone(); piece.material.map.needsUpdate = true;
-    piece.material.map.repeat.set(1 / 3, 1); piece.material.map.offset.set(k / 3, 0);
+    norenTexs.push(piece.material.map); piece.material.map.repeat.set(1 / 3, 1); piece.material.map.offset.set((2 - k) / 3, 0);   // 大将から見て 左から読めるように(右から3枚目が 文字の頭)
     piece.rotation.y = Math.PI; scene.add(piece);
   }
   { const door = mesh(new THREE.PlaneGeometry(1.4, 2.4), mat('#a88a5a'), 0, 1.2, 3.58); door.rotation.y = Math.PI; scene.add(door); }
@@ -2620,7 +2622,15 @@ function createShop(canvas, opts) {
     anchors() { const r0 = canvas.getBoundingClientRect(), proj = (x, y, z) => { const v = tmp.set(x, y, z).clone().project(camera); return v.z > 1 || v.z < -1 ? null : { x: r0.left + (v.x + 1) / 2 * r0.width, y: r0.top + (1 - v.y) / 2 * r0.height }; };
       return { tables: seatAvatars.map((a, i) => (a ? proj(seatX(i, N), COUNTER_Y + 0.01, -0.3) : null)),   // その人のテーブルの手前のふち(大将の「出す」ボタンの高さ。料理にかからない。横は その人の頭に合わせる)
         seats: seatAvatars.map((a, i) => (a && a.visible ? headPos(a) : null)), owner: headPos(owner), empty: stools.map((s, i) => { tmp.set(seatX(i, N), STOOL_Y + 0.25, GUEST_Z); const v = tmp.clone().project(camera); if (v.z > 1) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }) }; },
-    name: SHOPNAME,
+    get name() { return SHOPNAME; },
+    /* 店の名前を その場で変える(ちょうちん・のれん・モニター)。バトンタッチのとき */
+    setName(nm) {
+      nm = nm || SHOP.NAME; if (nm === SHOPNAME) return;
+      SHOPNAME = nm;
+      const lc = lanternTex.image, lg = lc.getContext('2d'); lg.clearRect(0, 0, lc.width, lc.height); drawLantern(lg); lanternTex.needsUpdate = true;
+      const nc = norenT.image, ng = nc.getContext('2d'); ng.clearRect(0, 0, nc.width, nc.height); drawNoren(ng); norenTexs.forEach((t) => { t.needsUpdate = true; });
+      drawTV();
+    },
     // モニターの画面の四すみ(左上・右上・右下・左下)。見えていなければ null
     monitorQuad() {   // 見えているモニターのうち、いちばん大きく見える1台。main=奥の壁の1台
       if (view.mode === 'owner') return null;   // 大将の目線は いつも左上の小窓
