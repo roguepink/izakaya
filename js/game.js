@@ -4,6 +4,8 @@
      ・白いお皿にのった物 … プラス(+5〜10)。たくさんの種類
      ・赤い丸の 黒く焦げた物 … マイナス(−20)。後半ほど たくさん落ちてくる。よけるのが本番
      ・金色の星 … 大当たり(+50)。1回に4つだけ。少し速い
+     ・でっかい焦げ … −100。1回に3つ。出る前に 上に赤い「!」
+   11-21 夜 2回目: まっすぐ・右ななめ上・左ななめ上から。1つずつ速さがちがう。はじめ少なめ → だんだん どしゃぶり。
    焦げを取らずに 続けて受け止めると、おまけ(+1〜+9)がつく。焦げを取ると おまけは0から。
    ノブさん「マイナスとプラスを ちゃんと見分けられるように」→ 色だけでなく 形でも分ける(丸い皿 / 赤い輪と「−」の札とけむり / 星)。
    軽くするため 3D は使わず、平らな絵(canvas 2D)だけ。絵は先に1回だけ描いて使い回す。
@@ -35,33 +37,47 @@
     { id: 'b_fish', e: '🐟', type: 'bad', pt: -20, w: 8, name: '焦げた魚' },
     { id: 'b_meat', e: '🥩', type: 'bad', pt: -20, w: 8, name: '焦げた肉' },
     { id: 'b_ika', e: '🦑', type: 'bad', pt: -20, w: 7, name: '焦げたイカ' },
+    { id: 'b_huge', e: '🍖', type: 'bad', pt: -100, w: 0, big: 1, name: '巨大な焦げ肉' },   // たまにだけ出る でっかい焦げ(−100)
     { id: 'g_beer', e: '🍺', type: 'gold', pt: 50, w: 1, name: '金のジョッキ' },
     { id: 'g_ebi', e: '🦞', type: 'gold', pt: 50, w: 1, name: '金の伊勢えび' }
   ];
-  var BY = { good: [], bad: [], gold: [] };
-  KINDS.forEach(function (k, i) { BY[k.type].push(i); });
-  var TRAY_Y = 0.84, TRAY_W = 0.27, GOLD_N = 4;
+  var BY = { good: [], bad: [], gold: [] }, HUGE_I = KINDS.findIndex(function (k) { return k.big; });
+  KINDS.forEach(function (k, i) { if (k.w) BY[k.type].push(i); });
+  var TRAY_Y = 0.84, TRAY_W = 0.27, GOLD_N = 4, BIG = 2.6;   // BIG: 巨大な焦げの大きさ(ふつうの何倍)
 
   function hash(str) { var h = 2166136261; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
   function rng(seed) { var s = seed >>> 0 || 1; return function () { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
   function pickIn(r, list) { var tot = 0, i; for (i = 0; i < list.length; i++) tot += KINDS[list[i]].w; var p = r() * tot; for (i = 0; i < list.length; i++) { p -= KINDS[list[i]].w; if (p < 0) return list[i]; } return list[0]; }
-  /* 落ちてくる物の並び(seed が同じなら いつも同じ) */
+  /* 落ちてくる物の並び(seed が同じなら いつも同じ)
+     ノブさん 11-21 夜「簡単すぎる。右ななめ上・左ななめ上からも、まっすぐも。1つずつ速さを変えて。たくさん。異常な感じ」
+     「はじめは少なめで、だんだん すごく いっぱい出てくる。たまに ものすごく でっかい 当たっちゃいけないやつ(すごいマイナス)」
+     x … お盆の高さに来たときの横の位置。sx … 出てくるときの横の位置(画面の外のこともある=ななめに飛んでくる) */
+  var HUGE = HUGE_I;
   function plan(seed) {
-    var r = rng(hash('jokki2:' + seed)), L = [], t = 0.6;
-    while (t < SEC - 1.3) {
-      var p = t / SEC, v = 0.3 + p * 0.32 + r() * 0.08;   // v: 1秒に 画面の高さの何倍 落ちるか(だんだん速く)
-      var badShare = 0.28 + p * 0.2;                     // 焦げの割合: はじめ3割 → 終わり5割
+    var r = rng(hash('jokki3:' + seed)), L = [], t = 0.7;
+    function one(t, p, k, dir, vmul) {
       var x = 0.08 + r() * 0.84;
-      L.push({ t: t, x: x, k: pickIn(r, r() < badShare ? BY.bad : BY.good), v: v });
-      if (p > 0.45 && r() < 0.2) {   // 後半は ときどき 焦げが2つ同時に(はなれた所に)
-        var x2 = x + (r() < 0.5 ? -1 : 1) * (0.3 + r() * 0.25); if (x2 < 0.08 || x2 > 0.92) x2 = x2 < 0.08 ? x2 + 0.84 * 0.6 : x2 - 0.84 * 0.6;
-        L.push({ t: t + 0.05, x: Math.max(0.08, Math.min(0.92, x2)), k: pickIn(r, BY.bad), v: v * (0.9 + r() * 0.2) });
-      }
-      t += 0.44 - p * 0.16 + r() * 0.12;
+      var v = (0.3 + p * 0.3) * (0.6 + r() * 0.95) * (vmul || 1);   // 1つずつ速さがちがう(遅いのも 速いのも)
+      if (dir == null) { var q = r(), side = 0.25 + p * 0.3; dir = q < side ? -1 : q < side * 2 ? 1 : 0; }   // 後半ほど ななめが多い
+      var sx = x;
+      if (dir) sx = Math.max(-0.3, Math.min(1.3, x - dir * (0.4 + r() * 0.6)));   // dir=1: 右上から左下へ / -1: 左上から右下へ
+      L.push({ t: t, x: x, sx: sx, k: k, v: v });
     }
-    for (var g = 0; g < GOLD_N; g++) {   // 大当たりは 4つ(だいたい 6・13・20・26秒ごろ)。少し速い
+    while (t < SEC - 1.2) {
+      var p = t / SEC, badShare = 0.26 + p * 0.2;   // 焦げの割合: はじめ3割 → 終わり5割弱
+      one(t, p, pickIn(r, r() < badShare ? BY.bad : BY.good));
+      t += 0.62 - p * 0.44 + r() * 0.1;   // はじめは ゆったり(0.6秒に1つ) → 終わりは どしゃぶり(0.2秒に1つ)
+    }
+    // どしゃぶり: 中ごろと後半に、同じ向きから 一気に 6〜9こ
+    [11 + r() * 3, 19 + r() * 3, 25 + r() * 2].forEach(function (bt, i) {
+      var dir = r() < 0.5 ? -1 : 1, n = 6 + i + Math.floor(r() * 2);
+      for (var j = 0; j < n; j++) one(bt + j * 0.09, bt / SEC, pickIn(r, r() < 0.45 ? BY.bad : BY.good), dir, 1.1);
+    });
+    // 巨大な焦げ(−100): 3回。ゆっくり大きく落ちてくる。よけられるように 少し遅め
+    [8 + r() * 3, 16 + r() * 3, 23 + r() * 3].forEach(function (ht) { one(ht, ht / SEC, HUGE, null, 0.75); });
+    for (var g = 0; g < GOLD_N; g++) {   // 大当たりは 4つ。少し速い
       var gt = 4.5 + g * 7 + r() * 2.5;
-      L.push({ t: gt, x: 0.12 + r() * 0.76, k: pickIn(r, BY.gold), v: (0.3 + gt / SEC * 0.32) * 1.3 });
+      one(gt, gt / SEC, pickIn(r, BY.gold), null, 1.3);
     }
     L.sort(function (a, b) { return a.t - b.t; });
     return L;
@@ -142,9 +158,15 @@
       [[-0.18, 0.1], [0.12, -0.14], [0.2, 0.16], [-0.05, -0.02]].forEach(function (d) { circle(tx, cx + d[0] * size, cy + d[1] * size, size * 0.035); tx.fill(); });
       x.drawImage(t, 0, 0);
       circle(x, cx, cy, R); x.lineWidth = size * 0.1; x.strokeStyle = '#ff3b2f'; x.stroke();
-      var bx = cx + R * 0.74, by = cy + R * 0.7, br = size * 0.2;   // 「−」の札(右下)
-      circle(x, bx, by, br); x.fillStyle = '#ff3b2f'; x.fill(); x.lineWidth = 2; x.strokeStyle = '#fff'; x.stroke();
-      x.fillStyle = '#fff'; x.fillRect(bx - br * 0.55, by - br * 0.14, br * 1.1, br * 0.28);
+      if (K.big) {   // 巨大な焦げ: 「−100」の札(下のまんなか)
+        var lw = size * 0.62, lh = size * 0.26, ly = cy + R * 0.62;
+        x.fillStyle = '#ff3b2f'; x.fillRect(cx - lw / 2, ly - lh / 2, lw, lh); x.lineWidth = Math.max(2, size * 0.02); x.strokeStyle = '#fff'; x.strokeRect(cx - lw / 2, ly - lh / 2, lw, lh);
+        x.fillStyle = '#fff'; x.font = 'bold ' + Math.round(lh * 0.8) + 'px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('−100', cx, ly + lh * 0.04);
+      } else {
+        var bx = cx + R * 0.74, by = cy + R * 0.7, br = size * 0.2;   // 「−」の札(右下)
+        circle(x, bx, by, br); x.fillStyle = '#ff3b2f'; x.fill(); x.lineWidth = 2; x.strokeStyle = '#fff'; x.stroke();
+        x.fillStyle = '#fff'; x.fillRect(bx - br * 0.55, by - br * 0.14, br * 1.1, br * 0.28);
+      }
     }
     return (sprites[id] = c);
   }
@@ -172,16 +194,17 @@
       '<div class="izg-leg">' +
       '<div class="g">' + good + '<span><b>白いお皿</b> … 取る!<br>+5〜10点</span></div>' +
       '<div class="b">' + bad + '<span><b>赤い丸の焦げ</b> … よける!<br>−20点</span></div>' +
+      '<div class="b">' + icon(HUGE_I) + '<span><b>でっかい焦げ</b> … ぜったい よける!<br>−100点(「!」が出たら来る)</span></div>' +
       '<div class="o">' + gold + '<span><b>金色の星</b> … 大当たり!<br>+50点(4つだけ)</span></div>' +
       '</div>' +
-      '<p>指で お盆を左右に動かします。30秒。<br>焦げを取らずに続けると 点数がどんどんふえる!</p>' +
+      '<p>指で お盆を左右に動かします。30秒。<br>ななめからも飛んでくる! だんだん どしゃぶりに。<br>焦げを取らずに続けると 点数がどんどんふえる!</p>' +
       (opts.best ? '<p>今日の自分の最高: <b>' + opts.best + '点</b></p>' : ''),
       [['スタート', begin], ['やめる', close, 'izg-no']]);
   }
   function begin() {
     panel(null);
-    var items = plan(opts.seed).map(function (it) { return { t: it.t, x: it.x, k: it.k, v: it.v, y: -0.1, live: false, done: false }; });
-    st.items = items; st.t = 0; st.score = 0; st.streak = 0; st.fx = []; st.flash = 0; st.gflash = 0; st.shake = 0; st.phase = 'play'; st.last = performance.now();
+    var items = plan(opts.seed).map(function (it) { return { t: it.t, x: it.x, sx: it.sx, cx: it.sx, k: it.k, v: it.v, y: -0.1, live: false, done: false }; });
+    st.items = items; st.t = 0; st.score = 0; st.streak = 0; st.huge = 0; st.gold = 0; st.bad = 0; st.fx = []; st.flash = 0; st.gflash = 0; st.shake = 0; st.phase = 'play'; st.last = performance.now();
     if (opts.onStart) opts.onStart();
     loop();
   }
@@ -192,7 +215,7 @@
     try { msg = opts.onEnd ? opts.onEnd(score, !!aborted) || '' : ''; } catch (e) {}
     if (aborted) { close(); return; }
     panel('<h2>おしまい!</h2><div class="izg-big">' + score + '<small style="font-size:20px">点</small></div>' +
-      '<p>大当たり ' + st.gold + '/' + GOLD_N + ' ・ 焦げ ' + st.bad + '回</p>' + (msg ? '<p class="izg-res">' + msg + '</p>' : ''),
+      '<p>大当たり ' + st.gold + '/' + GOLD_N + ' ・ 焦げ ' + st.bad + '回' + (st.huge ? '(でっかい焦げ ' + st.huge + '回)' : '') + '</p>' + (msg ? '<p class="izg-res">' + msg + '</p>' : ''),
       [['もう一回', function () { opts.best = Math.max(opts.best || 0, score); begin(); }], ['お店にもどる', close, 'izg-no']]);
   }
 
@@ -206,21 +229,23 @@
       if (it.done) return;
       if (!it.live) { if (st.t >= it.t) it.live = true; else return; }
       var py = it.y; it.y += it.v * dt;
-      var r = size * (KINDS[it.k].type === 'bad' ? 0.3 : 0.42) / st.W;   // 焦げは 少し甘めに(かすったくらいは セーフ)
-      if (py < TRAY_Y && it.y >= TRAY_Y - 0.01 && Math.abs(it.x - tray) < half + r) {   // お盆に当たった
+      it.cx = it.sx + (it.x - it.sx) * (it.y + 0.1) / (TRAY_Y + 0.1);   // ななめに進む(お盆の高さで ちょうど x)
+      var KK = KINDS[it.k], r = size * (KK.big ? BIG * 0.36 : KK.type === 'bad' ? 0.3 : 0.42) / st.W;   // 焦げは 少し甘めに(かすったくらいは セーフ)
+      if (py < TRAY_Y && it.y >= TRAY_Y - 0.01 && Math.abs(it.cx - tray) < half + r) {   // お盆に当たった
         it.done = true; var K = KINDS[it.k];
         if (K.pt > 0) {
           st.streak++; var add = addPt(K, st.streak); st.score += add;
           if (K.type === 'gold') { st.gold++; st.gflash = 1; st.fx.push({ x: it.x, y: TRAY_Y - 0.06, s: '+' + add + ' 大当たり!', c: '#ffd23f', a: 1.4, big: 1 }); }
           else st.fx.push({ x: it.x, y: TRAY_Y - 0.04, s: '+' + add, c: '#ffe08a', a: 1 });
         } else {
-          st.bad++; st.streak = 0; st.score = Math.max(0, st.score + K.pt); st.flash = 1; st.shake = 1;
-          st.fx.push({ x: it.x, y: TRAY_Y - 0.05, s: String(K.pt).replace('-', '−'), c: '#ff5a4a', a: 1.2, big: 1 });
+          st.bad++; st.streak = 0; st.score = Math.max(0, st.score + K.pt); st.flash = K.big ? 2.2 : 1; st.shake = K.big ? 2.5 : 1;
+          if (K.big) st.huge++;
+          st.fx.push({ x: it.x, y: TRAY_Y - 0.05, s: String(K.pt).replace('-', '−') + (K.big ? ' うわぁ!' : ''), c: '#ff5a4a', a: K.big ? 1.8 : 1.2, big: K.big ? 2 : 1 });
         }
-      } else if (it.y > 1.05) it.done = true;   // 落としても 減らない(焦げは よけるもの)
+      } else if (it.y > 1.05 + (KK.big ? 0.15 : 0)) it.done = true;   // 落としても 減らない(焦げは よけるもの)
     });
     st.fx.forEach(function (f) { f.y -= dt * 0.12; f.a -= dt * 1.4; }); st.fx = st.fx.filter(function (f) { return f.a > 0; });
-    st.flash = Math.max(0, st.flash - dt * 3); st.gflash = Math.max(0, st.gflash - dt * 2.5); st.shake = Math.max(0, st.shake - dt * 5);
+    st.flash = Math.max(0, st.flash - dt * (st.flash > 1 ? 2 : 3)); st.gflash = Math.max(0, st.gflash - dt * 2.5); st.shake = Math.max(0, st.shake - dt * (st.shake > 1 ? 2.5 : 5));
     root.querySelector('#izgScore').textContent = st.score;
     root.querySelector('#izgTime').textContent = Math.max(0, Math.ceil(SEC - st.t));
     root.querySelector('.izg-combo').textContent = st.streak >= 3 ? '🔥 ' + st.streak + 'れんぞく' : '';
@@ -230,8 +255,8 @@
 
   function draw() {
     var W = st.W, H = st.H, size = st.size = Math.max(40, Math.min(W * 0.13, H * 0.1, 80));
-    var sx = st.shake ? Math.sin(st.t * 90) * 6 * st.shake : 0;
-    g.save(); g.translate(sx, 0);
+    var sx = st.shake ? Math.sin(st.t * 90) * 6 * st.shake : 0, sy = st.shake > 1 ? Math.cos(st.t * 70) * 5 * (st.shake - 1) : 0;
+    g.save(); g.translate(sx, sy);
     g.fillStyle = '#2a1c12'; g.fillRect(-10, 0, W + 20, H);
     // のれんの帯とカウンター(雰囲気だけ。軽く)
     g.fillStyle = '#3a2618'; g.fillRect(-10, 0, W + 20, H * 0.06);
@@ -239,12 +264,18 @@
     g.fillStyle = '#5a3418'; g.fillRect(-10, H * (TRAY_Y + 0.06), W + 20, 6);
     if (st.items) st.items.forEach(function (it) {
       if (!it.live || it.done) return;
-      var K = KINDS[it.k], x = it.x * W, y = it.y * H;
+      var K = KINDS[it.k], x = it.cx * W, y = it.y * H;
       if (K.type === 'gold') {   // 後ろの星を ゆっくり回して 目立たせる
         var rs = sprite(it.k, size, 'rays'), sc = 1 + Math.sin(st.t * 8) * 0.07;
         g.save(); g.translate(x, y); g.rotate(st.t * 1.6); g.scale(sc, sc); g.drawImage(rs, -rs.width / 2, -rs.height / 2); g.restore();
       } else if (K.type === 'bad') x += Math.sin(st.t * 14 + it.t * 7) * 2;   // 焦げは ぷるぷる
-      var sp = sprite(it.k, size); g.drawImage(sp, x - sp.width / 2, y - sp.height / 2);
+      var sp = sprite(it.k, K.big ? Math.round(size * BIG) : size); g.drawImage(sp, x - sp.width / 2, y - sp.height / 2);
+    });
+    if (st.items) st.items.forEach(function (it) {   // 巨大な焦げの予告: 出てくる 1秒前から 上に赤い「!」
+      if (it.live || it.done || !KINDS[it.k].big || it.t - st.t > 1) return;
+      var ax = Math.max(0.06, Math.min(0.94, it.sx)) * W, on = Math.floor(st.t * 8) % 2;
+      g.fillStyle = on ? '#ff3b2f' : '#ffdd55'; g.font = 'bold 44px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'top';
+      g.fillText('!', ax, H * 0.065); g.textBaseline = 'alphabetic';
     });
     // お盆
     var tx = st.trayX * W, tw = TRAY_W * W, ty = TRAY_Y * H;
@@ -252,12 +283,12 @@
     g.fillStyle = '#d99a58'; g.beginPath(); g.ellipse(tx, ty + 2, tw / 2 - 4, 9, 0, 0, Math.PI * 2); g.fill();
     g.textAlign = 'center';
     st.fx && st.fx.forEach(function (f) {
-      g.globalAlpha = Math.max(0, Math.min(1, f.a)); g.font = 'bold ' + (f.big ? 30 : 22) + 'px sans-serif';
+      g.globalAlpha = Math.max(0, Math.min(1, f.a)); g.font = 'bold ' + (f.big === 2 ? 42 : f.big ? 30 : 22) + 'px sans-serif';
       if (f.big) { g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.6)'; g.strokeText(f.s, Math.max(70, Math.min(W - 70, f.x * W)), f.y * H); }
       g.fillStyle = f.c; g.fillText(f.s, Math.max(70, Math.min(W - 70, f.x * W)), f.y * H); g.globalAlpha = 1;
     });
     g.restore();
-    if (st.flash > 0) { g.fillStyle = 'rgba(220,40,30,' + (st.flash * 0.3) + ')'; g.fillRect(0, 0, W, H); }
+    if (st.flash > 0) { g.fillStyle = 'rgba(220,40,30,' + (Math.min(1, st.flash) * 0.3 + Math.max(0, st.flash - 1) * 0.2) + ')'; g.fillRect(0, 0, W, H); }
     if (st.gflash > 0) { g.fillStyle = 'rgba(255,215,60,' + (st.gflash * 0.3) + ')'; g.fillRect(0, 0, W, H); }
   }
 
