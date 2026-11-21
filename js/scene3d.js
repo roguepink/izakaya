@@ -243,7 +243,7 @@ function lighten(hex, f) { const c = new THREE.Color(hex); c.lerp(new THREE.Colo
 /* ---------- 顔(キャンバス 512×512 に描く) ---------- */
 const FACE_CACHE = {};
 function faceTexture(a) {
-  const key = JSON.stringify([a.sex, a.eyes, a.eyeColor, a.brows, a.mouth, a.beard, a.lip, a.cheek, a.hairColor, a.skin, a.nBeard || '', a.nBeardC || '']);
+  const key = JSON.stringify([a.sex, a.eyes, a.eyeColor, a.brows, a.mouth, a.beard, a.lip, a.cheek, a.hairColor, a.skin, a.nBeard || '', a.nBeardC || '', a.blink ? 1 : 0]);
   if (FACE_CACHE[key]) return FACE_CACHE[key];
   const t = canvasTex(512, 512, (g) => {
     const F = a.sex === 'f';
@@ -260,7 +260,7 @@ function faceTexture(a) {
         if (ck === 2) { g.strokeStyle = 'rgba(220,90,90,0.5)'; g.lineWidth = 3; for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(x + k * 12 - 4, y + 6); g.lineTo(x + k * 12 + 4, y - 6); g.stroke(); } }
       });
     }
-    const NB = /^ne/.test(a.eyes || '');   // 大将ノブ: ほかの人より 細かく描く(11-22 ノブさん「大将の顔だけ 作りこんで」)
+    const NB = a.special === 'nobu' || /^ne/.test(a.eyes || '');   // 大将ノブ: ほかの人より 細かく描く(11-22 ノブさん「大将の顔だけ 作りこんで」)
     let sd = 7; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;   // いつも同じ形になる でたらめ
     if (NB) {
       [[150, 330], [362, 330]].forEach(([x, y]) => {   // ほんのり血色(お酒の場の あたたかさ)
@@ -339,6 +339,16 @@ function faceTexture(a) {
       case 'open':
         g.fillStyle = '#7a2a28'; g.beginPath(); g.ellipse(256, MY + 6, 14, 18, 0, 0, Math.PI * 2); g.fill();
         g.fillStyle = '#e8707a'; g.beginPath(); g.ellipse(256, MY + 14, 9, 7, 0, 0, Math.PI * 2); g.fill(); break;
+      case 'tk_open':   // おしゃべり画面: 話している口(大きく あける。小さい カードでも 分かるように)
+        g.fillStyle = '#6a2422'; g.beginPath(); g.ellipse(256, MY + 10, 38, 34, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#f2f0ea'; g.beginPath(); g.ellipse(256, MY - 14, 27, 8, 0, 0, Math.PI * 2); g.fill();
+        g.fillStyle = '#e06a74'; g.beginPath(); g.ellipse(256, MY + 30, 23, 11, 0, 0, Math.PI * 2); g.fill();
+        g.lineWidth = 5; g.beginPath(); g.ellipse(256, MY + 10, 38, 34, 0, 0, Math.PI * 2); g.stroke(); break;
+      case 'tk_laugh':   // おしゃべり画面: 大きく笑う口
+        g.fillStyle = '#6a2422'; g.beginPath(); g.moveTo(190, MY - 14); g.quadraticCurveTo(256, MY + 96, 322, MY - 14); g.closePath(); g.fill();
+        g.fillStyle = '#f6f4ee'; g.beginPath(); g.moveTo(198, MY - 12); g.quadraticCurveTo(256, MY + 14, 314, MY - 12); g.closePath(); g.fill();
+        g.fillStyle = '#e06a74'; g.beginPath(); g.ellipse(256, MY + 46, 32, 14, 0, 0, Math.PI * 2); g.fill();
+        g.lineWidth = 5.5; g.beginPath(); g.moveTo(190, MY - 14); g.quadraticCurveTo(256, MY + 96, 322, MY - 14); g.closePath(); g.stroke(); break;
       case 'flat': g.beginPath(); g.moveTo(236, MY + 2); g.lineTo(276, MY + 2); g.stroke(); break;
       case 'cat': g.beginPath(); g.moveTo(226, MY - 6); g.quadraticCurveTo(241, MY + 12, 256, MY - 2); g.quadraticCurveTo(271, MY + 12, 286, MY - 6); g.stroke(); break;
       case 'soft': g.beginPath(); g.moveTo(232, MY); g.quadraticCurveTo(256, MY + 12, 280, MY); g.stroke(); break;
@@ -374,6 +384,12 @@ function drawEye(g, cx, cy, s, a, eyeC, ink) {
     case 'ne3': w *= 1.08; h *= 1.2; tilt = 0.06; break;   // 大将ノブ: くりっと大きい目
   }
   g.save(); g.translate(cx, cy); g.rotate(tilt * s);
+  if (a.blink) {   // まばたき(目を とじた 線。おしゃべり画面の顔写真だけ)
+    g.strokeStyle = ink; g.lineWidth = F ? 7 : 6.5;
+    g.beginPath(); g.arc(0, -w * 0.55, w * 1.0, Math.PI * 0.28, Math.PI * 0.72); g.stroke();
+    if (F) { g.lineWidth = 4; g.beginPath(); g.moveTo(w * 0.92 * s, -2); g.lineTo(w * 1.18 * s, -8); g.stroke(); }
+    g.restore(); return;
+  }
   if (closed) {   // にこにこ・ウインクは 弧を描く
     g.strokeStyle = ink; g.lineWidth = F ? 8 : 7;
     g.beginPath(); g.arc(0, 10, w * 0.95, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
@@ -1028,6 +1044,7 @@ function buildAvatar(raw, opt = {}) {
     a.special = 'nobu'; a.hair = 'nobu'; a.nHair = N.hair; a.hairColor = 0; a.brows = 'n' + N.brow; a.eyes = 'n' + N.eye; a.beard = 'chin'; a.nBeard = N.beard; a.nNose = N.nose; a.nBeardC = N.beardColor || '';
     if (['round', 'egg', 'sharp', 'square', 'long'].includes(N.face)) a.face = N.face; if (N.mouth) a.mouth = N.mouth; if (N.skin >= 0 && N.skin <= 5) a.skin = N.skin; a.acc = 'none';
   }
+  if (raw && raw._face) Object.assign(a, raw._face);   // おしゃべり画面の顔写真だけ: まばたき・笑顔・口をあける(大将ノブの決まった顔より あとに)
   const cos = raw && raw.costume; costumePrep(a, cos);   // お祝いモードの かぶりもの
   const f = a.sex === 'f';
   const skinC = AVATAR.color(AVATAR.SKIN, a.skin); SKIN_SET.add(String(skinC).toLowerCase());

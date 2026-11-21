@@ -218,7 +218,7 @@
   var vol = lsGet('iz-vol', 0.6);
   var audio = new Audio(); audio.preload = 'auto'; audio.crossOrigin = null;
   var audioUnlocked = false, duck = 1;
-  function setVol() { var v = Math.max(0, Math.min(1, vol * duck)); audio.volume = v; if (tvVideo) tvVideo.volume = v; ytCmd('setVolume', [Math.round(v * 100)]); }
+  function setVol() { var v = Math.max(0, Math.min(1, vol * duck)); audio.volume = v; if (tvVideo) tvVideo.volume = v; ytCmd('setVolume', [Math.round(v * 100)]); }   // おしゃべり画面の間も 動画の音は そのまま(見えないだけ。音がないと 一緒に見ている感じが うすれる 11-22 ノブさん)
   function unlockAudio() {
     if (audioUnlocked) return; audioUnlocked = true;
     try { audio.muted = true; var p = audio.play(); if (p && p.then) p.then(function () { audio.pause(); audio.muted = false; }).catch(function () { audio.muted = false; }); } catch (e) {}
@@ -908,20 +908,24 @@
     }
     return L;
   }
-  function talkPic(av) {   // 顔写真(なければ 順番に撮る。1枚ずつ 間をあけて、画面が かたまらないように)
-    var k = JSON.stringify(av || {}); if (talkPics[k]) return talkPics[k];
-    if (talkQ.indexOf(k) < 0) talkQ.push(k);
+  /* 顔写真は 1人4枚: n ふつう / b まばたき / o 口をあける(話している間) / s 笑顔(楽しい言葉のあと)。11-22 ノブさん */
+  var TALK_FACES = { n: null, b: { blink: 1 }, o: { mouth: 'tk_open' }, s: { mouth: 'tk_laugh', eyes: 'smile', cheek: 2 } };
+  function talkPic(av) {   // { n, b, o, s }。まだ撮っていない分は 順番に撮る(1枚ずつ 間をあけて、画面が かたまらないように)
+    var k = JSON.stringify(av || {}), f = talkPics[k] || (talkPics[k] = {});
+    Object.keys(TALK_FACES).forEach(function (v) { if (!f[v] && talkQ.indexOf(k + '\n' + v) < 0) talkQ.push(k + '\n' + v); });
     if (!talkBusy) talkNext();
-    return '';
+    return f;
   }
   function talkNext() {
-    var k = talkQ.shift(); if (!k) { talkBusy = false; return; }
+    var j = talkQ.shift(); if (!j) { talkBusy = false; return; }
     talkBusy = true;
+    var i = j.lastIndexOf('\n'), k = j.slice(0, i), v = j.slice(i + 1);
     setTimeout(function () {
-      try { if (window.IZ3D && IZ3D.portrait) talkPics[k] = IZ3D.portrait(JSON.parse(k), 256) || 'x'; } catch (e) { talkPics[k] = 'x'; }
-      if (talkOn) talkRender(true);
+      var f = talkPics[k] || (talkPics[k] = {});
+      try { var raw = JSON.parse(k); if (TALK_FACES[v]) raw = Object.assign({}, raw, { _face: TALK_FACES[v] }); if (window.IZ3D && IZ3D.portrait) f[v] = IZ3D.portrait(raw, 256) || 'x'; } catch (e) { f[v] = 'x'; }
+      if (talkOn && v === 'n') talkRender(true);
       talkNext();
-    }, 30);
+    }, v === 'n' ? 20 : 60);
   }
   /* 人数と 画面の広さから、顔が いちばん大きくなる ならべ方を えらぶ(1〜4列) */
   function talkLayout(n, W, H) {
@@ -948,28 +952,47 @@
     var L = talkPeople(), box = talkBox(), el = $('talk'), W = Math.min(innerWidth - 16, 900);
     el.style.top = box.top + 'px'; el.style.height = box.h + 'px';
     if (!L.length) { var e0 = '<div class="tk-empty">まだ だれも来ていません。<br>来たら ここに 顔が ならびます 🏮</div>'; if (el._h !== e0) { el.innerHTML = e0; el._h = e0; } return; }
-    var lay = talkLayout(L.length, W, box.h), t = Date.now();
+    var tvOn = !$('tv').classList.contains('hidden'), tvH = tvOn ? 44 : 0;   // モニターで動画が流れているときは「居酒屋で見る」の案内
+    var lay = talkLayout(L.length, W, box.h - tvH), t = Date.now();
     var small = lay.sz < 150, cw = Math.floor(lay.w), ch = Math.floor(lay.h);
     var html = '<div class="tk-grid' + (small ? ' small' : '') + '" style="width:' + Math.ceil(lay.cols * cw + (lay.cols - 1) * 8) + 'px">' + L.map(function (p) {
-      var pic = talkPic(p.av), say = talkSay[String(p.key)], on = say && t < say.until, glow = say && t < say.glow;
+      var fr = talkPic(p.av), pic = fr.n || '', say = talkSay[String(p.key)], on = say && t < say.until, glow = say && t < say.glow;
       var badge = p.away ? '💤 席をはずしています' : p.m && kigaeNow(p.m.kigae) ? '👚 着がえ中' : p.m && gameNow(p.m.game) ? '🎮 ゲーム中' : '';
       return '<button class="tk-card' + (p.owner ? ' owner' : '') + (glow ? ' talk' : '') + (p.away ? ' away' : '') + (p.drink ? ' dr' : '') + '" data-tk="' + p.key + '" style="width:' + cw + 'px;height:' + ch + 'px">' +
-        (pic && pic !== 'x' ? '<img alt="" src="' + pic + '">' : '<span class="tk-wait">' + (pic === 'x' ? '🙂' : '…') + '</span>') +
+        (pic && pic !== 'x' ? '<img alt="" data-av="' + esc(JSON.stringify(p.av || {})) + '" data-k="' + p.key + '" src="' + pic + '">' : '<span class="tk-wait">' + (pic === 'x' ? '🙂' : '…') + '</span>') +
         (on ? '<span class="tk-bub">' + esc(say.text) + '</span>' : '') +
         '<span class="tk-nm">' + (p.owner ? '🏮 ' : '') + esc(p.owner ? p.name : honor(p.name)) + '</span>' +
         (p.drink ? '<span class="tk-dr">' + p.drink + '</span>' : '') + (badge ? '<span class="tk-st">' + badge + '</span>' : '') + '</button>';
     }).join('') + '</div>';
+    if (tvOn) html = '<button class="tk-tv" data-tktv="1">📺 モニターで動画が流れています(音だけ) <b>▶ 居酒屋で見る</b></button>' + html;
     if (force || el._h !== html) { el.innerHTML = html; el._h = html; }
   }
   /* 話した人の カードを光らせ、吹き出しを出す(頭の上の吹き出しと 同じとき) */
-  function talkHear(seat, text) {
-    var k = String(seat), t = Date.now();
-    talkSay[k] = { text: text, until: t + Math.min(15000, 5000 + text.length * 120), glow: t + 3000 };
+  var TALK_HAPPY = /笑|ｗ|w$|[!！]|いいね|乾杯|かんぱい|うまい|おいし|ありがと|おめでと|すご|楽し|わかる|それな|最高|やった|ナイス|ははは|へへ|ふふ/;
+  function talkHear(seat, text, phrase) {
+    var k = String(seat), t = Date.now(), talkMs = Math.min(4500, 700 + text.length * 120);
+    talkSay[k] = { text: text, until: t + Math.min(15000, 5000 + text.length * 120), glow: t + 3000, mouth: t + talkMs, smile: phrase || TALK_HAPPY.test(text) ? t + talkMs + 2600 : 0 };
     if (talkOn) talkRender();
   }
+  /* 顔を動かす: 話している間は 口をパクパク、楽しい言葉のあとは 笑顔、ときどき まばたき(絵を入れかえるだけ。軽い) */
+  var talkBlink = {};
+  setInterval(function () {
+    if (!talkOn) return;
+    var t = Date.now();
+    Array.prototype.forEach.call(document.querySelectorAll('#talk img[data-k]'), function (im) {
+      var k = im.getAttribute('data-k'), f = talkPics[im.getAttribute('data-av')]; if (!f) return;
+      var say = talkSay[k], v = 'n';
+      if (!talkBlink[k] || talkBlink[k] < t - 400) talkBlink[k] = t + 2200 + Math.random() * 4200;   // 次の まばたき
+      if (say && t < say.mouth) v = Math.floor(t / 170) % 3 === 1 ? 'n' : 'o';
+      else if (say && t < say.smile) v = 's';
+      else if (t >= talkBlink[k] && t < talkBlink[k] + 150) v = 'b';
+      var src = f[v] && f[v] !== 'x' ? f[v] : f.n; if (src && im.getAttribute('src') !== src) im.setAttribute('src', src);
+    });
+  }, 85);
   setInterval(function () { if (talkOn) talkRender(); }, 1000);   // 吹き出しを消す・人の出入り
   window.addEventListener('resize', function () { if (talkOn) talkRender(true); });
   $('talk').addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('[data-tktv]')) { setView(camView); return; }
     var c = e.target.closest && e.target.closest('[data-tk]'); if (!c) return;
     var k = c.getAttribute('data-tk'); replyToSeat(k === 'owner' ? 'owner' : +k, false);
   });
@@ -1290,7 +1313,7 @@
   function okSeat(v) { return typeof v === 'number' && v >= 0 && v < N && Math.floor(v) === v; }   // 席番号として正しいか(おかしな値で画面がこわれないように)
   function bubble(seat, text, phrase) {
     if (seat !== 'owner' && !okSeat(seat)) return;
-    talkHear(seat, text);
+    talkHear(seat, text, phrase);
     var key = String(seat);
     var b = bubbles[key];
     if (!b) { b = bubbles[key] = { el: document.createElement('div'), bn: document.createElement('div'), bt: document.createElement('div') }; b.bn.className = 'bn'; b.bt.className = 'bt'; b.el.appendChild(b.bn); b.el.appendChild(b.bt); }
