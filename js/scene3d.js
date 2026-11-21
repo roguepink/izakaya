@@ -1042,6 +1042,9 @@ function buildAvatar(raw, opt = {}) {
   if (raw && raw.special === 'nobu' && a.owner && a.sex === 'm') {   // 大将ノブ専用の顔・髪型(ノブさん 2026-11-21)。お客さんは選べない。服・頭の手ぬぐい等は これまでどおり選べる。小物は付けない
     const N = Object.assign({ hair: 'n1', brow: 'k1', eye: 'e1', nose: 1, beard: 'b1', face: 'egg', skin: 2 }, (window.SHOP && SHOP.NOBU_FACE) || {}, raw.nobuFace || {});
     a.special = 'nobu'; a.hair = 'nobu'; a.nHair = N.hair; a.hairColor = 0; a.brows = 'n' + N.brow; a.eyes = 'n' + N.eye; a.beard = 'chin'; a.nBeard = N.beard; a.nNose = N.nose; a.nBeardC = N.beardColor || '';
+    const col = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : '';   // 大将だけの目印: はちまきの色・背中の文字(11-22)
+    a.headColor = col(raw.headColor) || col(N.headColor); a.backTextColor = col(raw.backTextColor) || col(N.backTextColor);
+    a.backText = Array.from(String(raw.backText != null ? raw.backText : N.backText || '')).slice(0, 3).join('');
     if (['round', 'egg', 'sharp', 'square', 'long'].includes(N.face)) a.face = N.face; if (N.mouth) a.mouth = N.mouth; if (N.skin >= 0 && N.skin <= 5) a.skin = N.skin; a.acc = 'none';
   }
   if (raw && raw._face) Object.assign(a, raw._face);   // おしゃべり画面の顔写真だけ: まばたき・笑顔・口をあける(大将ノブの決まった顔より あとに)
@@ -1059,6 +1062,17 @@ function buildAvatar(raw, opt = {}) {
   const torsoMat = def.tex ? toon(cc, { map: fabricTex(def.tex) }) : toon(cc);
   const torso = new THREE.Mesh(torsoGeo(f), torsoMat); torso.add(outlineOf(torso.geometry, LN)); body.add(torso);
   const lower = buildTop(body, a, f, cc);
+  if (a.backText && a.owner) {   // 大将の 法被の背中の大きな文字(11-22 ノブさん 大将だけの目印)。縦書き。背中の丸みに そわせる
+    const tx = canvasTex(256, 384, (g) => {
+      g.fillStyle = a.backTextColor || '#f6f2e8'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      const ch = Array.from(String(a.backText)).slice(0, 3), fs = ch.length > 2 ? 118 : 172;
+      g.font = '900 ' + fs + 'px "Hiragino Sans","Hiragino Kaku Gothic StdN","Noto Sans JP",sans-serif';
+      g.lineJoin = 'round'; g.lineWidth = fs * 0.08; g.strokeStyle = 'rgba(0,0,0,.35)';
+      ch.forEach((c, i) => { const y = 192 + (i - (ch.length - 1) / 2) * fs * 0.98; g.strokeText(c, 128, y); g.fillText(c, 128, y); });
+    });
+    const bk = new THREE.Mesh(new THREE.CylinderGeometry(0.152, 0.152, 0.27, 16, 1, true, Math.PI - 0.6, 1.2), new THREE.MeshBasicMaterial({ map: tx, transparent: true, depthWrite: false, side: THREE.FrontSide }));
+    bk.position.y = 0.25; body.add(bk);
+  }
   // 首・肩
   body.add(tm(new THREE.CylinderGeometry(0.032, 0.038, 0.09, 14), skinC, 0, 0.465, 0, LN));
   [-1, 1].forEach((s) => { const sh = tm(new THREE.SphereGeometry(f ? 0.042 : 0.05, 16, 12), cc, (f ? 0.112 : 0.13) * s, 0.37, -0.008, LN); sh.scale.set(1, 0.85, 0.9); body.add(sh); });
@@ -1465,10 +1479,10 @@ function buildAcc(head, body, a, R, f) {
     const Rh = f ? R * 1.2 : R;   // 女性は髪がふくらんでいるので、頭の飾りを ひとまわり大きく(髪にうもれないように)
     switch (a.head) {
       case 'hachimaki': case 'nejiri': { const Rb = f ? R * 0.98 : R, up = a.special === 'nobu' ? 0.07 : 0, tlt = a.special === 'nobu' ? 0.06 : 0.15;   // 大将ノブ: おでこを出した髪なので 少し上に巻く(まゆを隠さない)
-        const band = tm(new THREE.TorusGeometry(Rb * (a.special === 'nobu' ? (a.face === 'long' ? 0.97 : 0.995) : 1.03), a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), '#f6f4ee', 0, Rb * (0.3 + up), 0, 0.003); band.rotation.x = Math.PI / 2 + tlt; if (a.special === 'nobu') band.scale.x = a.face === 'long' ? 0.93 : 0.955; head.add(band);   // 大将ノブ: 面長のときは横はばが せまいので 横を しぼる(浮かないように)。卵型は ほぼ そのまま(しぼると髪に うまる 11-22)
+        const band = tm(new THREE.TorusGeometry(Rb * (a.special === 'nobu' ? (a.face === 'long' ? 0.97 : 0.995) : 1.03), a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), a.headColor || '#f6f4ee', 0, Rb * (0.3 + up), 0, 0.003); band.rotation.x = Math.PI / 2 + tlt; if (a.special === 'nobu') band.scale.x = a.face === 'long' ? 0.93 : 0.955; head.add(band);   // 大将ノブ: 面長のときは横はばが せまいので 横を しぼる(浮かないように)。卵型は ほぼ そのまま(しぼると髪に うまる 11-22)
         if (a.head === 'nejiri') for (let k = 0; k < 24; k++) { const ang = k / 24 * Math.PI * 2; head.add(tm(new THREE.BoxGeometry(0.006, 0.03, 0.01), '#2a3a6a', Math.sin(ang) * Rb * 1.04, Rb * (0.3 + up) + Math.cos(ang) * Rb * tlt * 0.98, Math.cos(ang) * Rb * 1.04)); }
-        const knot = tm(new THREE.SphereGeometry(0.025, 8, 6), '#f6f4ee', 0, Rb * (0.25 + up), -Rb * 1.02, 0.003); head.add(knot);
-        [-1, 1].forEach((s) => { const tl = tm(new THREE.BoxGeometry(0.03, 0.09, 0.006), '#f6f4ee', s * 0.03, Rb * (0.12 + up), -Rb * 1.04); tl.rotation.z = s * 0.4; head.add(tl); });
+        const knot = tm(new THREE.SphereGeometry(0.025, 8, 6), a.headColor || '#f6f4ee', 0, Rb * (0.25 + up), -Rb * 1.02, 0.003); head.add(knot);
+        [-1, 1].forEach((s) => { const tl = tm(new THREE.BoxGeometry(0.03, 0.09, 0.006), a.headColor || '#f6f4ee', s * 0.03, Rb * (0.12 + up), -Rb * 1.04); tl.rotation.z = s * 0.4; head.add(tl); });
         break; }
       case 'tenugui': { const c = tm(new THREE.SphereGeometry(Rh * 1.1, 26, 14, 0, Math.PI * 2, 0, 1.2), '#2a3a6a', 0, 0, 0, 0.003); c.rotation.x = -0.25; head.add(c); regHat(head, c, { kind: 'dome', r: Rh * 1.1, sy: 1, th: 1.2 });
         for (let k = 0; k < 10; k++) head.add(tm(new THREE.SphereGeometry(0.01, 6, 5), '#f6f4ee', Math.sin(k * 1.9) * Rh * 0.6, Rh * 0.8 + Math.cos(k * 2.3) * Rh * 0.1, Math.cos(k * 1.9) * Rh * 0.5));
