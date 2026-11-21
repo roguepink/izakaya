@@ -542,3 +542,11 @@ body.talk-on .log { max-height: 22vh; }
 .tk-tv { flex: none; width: 100%; margin-bottom: 8px; background: #2a3a6a; color: #fbf3e4; border: 2px solid #4a5a8a; border-radius: 12px; padding: 8px 10px; font: inherit; font-size: 13.5px; font-weight: 700; }
 .tk-tv b { color: #f5c04a; margin-left: 4px; }
 #talk { flex-direction: column; }
+
+/* 大将用のおしゃべり画面: 注文ありの印・出すボタン(お客さんの画面には出ない) */
+.tk-ord { position: absolute; left: 6px; bottom: 34px; font-size: 12px; font-weight: 900; background: #f5c04a; color: #2a1a10; border-radius: 99px; padding: 2px 8px; box-shadow: 0 0 0 2px rgba(0,0,0,.25); }
+.tk-serve { position: absolute; right: 6px; bottom: 30px; font-size: 13px; font-weight: 900; background: #c8402c; color: #fff; border-radius: 99px; padding: 6px 10px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+.tk-grid.small .tk-serve { font-size: 11.5px; padding: 4px 8px; right: 4px; bottom: 24px; }
+.tk-grid.small .tk-ord { font-size: 10.5px; left: 4px; bottom: 26px; }
+body.talk-on.owner-view:not(.side-open) .side > #bView { display: flex !important; }   /* 大将の おしゃべり画面: 👁(もどる)は いつも見える */
+body.talk-on.owner-view .log { max-height: 22vh; }

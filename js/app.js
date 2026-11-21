@@ -885,7 +885,7 @@
      来ている人の顔を カードで ならべる(自分は出さない。大将は 金色のわく)。人数が少ないほど 大きい。
      話した人の カードが光って、顔の上に 吹き出し。カードを押すと その人あてに書ける。さわるだけで送れる ひとこと。
      顔は アバターを 写真にしたもの(仮装も そのまま写る。姿が変わったときだけ 撮りなおす)。お店の 3D は その間 休む(軽い) */
-  var TALK_OWNER = false;   // 大将用は あとで(11-22 ノブさん: まず お客さん用)
+  var TALK_OWNER = true;   // 大将用(11-22): お客さんの顔だけ ならべる。カードに「注文あり」と「🍶 出す」(お客さんの画面には 出ない)
   var TALK_QUICK = ['👍 いいね!', '😆 わかる〜', '🙌 おつかれさま!', '😋 おいしそう!', '🤣 それな!'];
   var talkOn = false, talkPics = {}, talkQ = [], talkBusy = false, talkSay = {}, talkHtmlKey = '';
   function talkSet(on, was) {
@@ -904,7 +904,8 @@
     for (var i = 0; i < N; i++) {
       var u = seatUid(i), m = u && ms[u]; if (!m || u === ME.uid || !(fresh(m) || away(m))) continue;
       var items = tableItems(i).filter(function (x) { return !x.empty; }), last = items[items.length - 1], it = last && menuItem(last.id);
-      L.push({ key: i, name: m.name, av: withCos(m.avatar, cosOf(u, m)), m: m, drink: it ? it.emoji : '', away: !fresh(m) });
+      var nOrd = 0; if (OWNER_MODE) { var od = tree.orders || {}; Object.keys(od).forEach(function (q) { if (od[q] && od[q].seat === i) nOrd++; }); }
+      L.push({ key: i, name: m.name, av: withCos(m.avatar, cosOf(u, m)), m: m, drink: it ? it.emoji : '', away: !fresh(m), ord: nOrd });
     }
     return L;
   }
@@ -951,7 +952,7 @@
     if (phOn) { setView(camView); toast('記念撮影なので、お店の画面に もどしました', 2200); return; }
     var L = talkPeople(), box = talkBox(), el = $('talk'), W = Math.min(innerWidth - 16, 900);
     el.style.top = box.top + 'px'; el.style.height = box.h + 'px';
-    if (!L.length) { var e0 = '<div class="tk-empty">まだ だれも来ていません。<br>来たら ここに 顔が ならびます 🏮</div>'; if (el._h !== e0) { el.innerHTML = e0; el._h = e0; } return; }
+    if (!L.length) { var e0 = '<div class="tk-empty">' + (OWNER_MODE ? 'まだ お客さんは いません。<br>来たら ここに 顔が ならびます 🏮' : 'まだ だれも来ていません。<br>来たら ここに 顔が ならびます 🏮') + '</div>'; if (el._h !== e0) { el.innerHTML = e0; el._h = e0; } return; }
     var tvOn = !$('tv').classList.contains('hidden'), tvH = tvOn ? 44 : 0;   // モニターで動画が流れているときは「居酒屋で見る」の案内
     var lay = talkLayout(L.length, W, box.h - tvH), t = Date.now();
     var small = lay.sz < 150, cw = Math.floor(lay.w), ch = Math.floor(lay.h);
@@ -962,7 +963,8 @@
         (pic && pic !== 'x' ? '<img alt="" data-av="' + esc(JSON.stringify(p.av || {})) + '" data-k="' + p.key + '" src="' + pic + '">' : '<span class="tk-wait">' + (pic === 'x' ? '🙂' : '…') + '</span>') +
         (on ? '<span class="tk-bub">' + esc(say.text) + '</span>' : '') +
         '<span class="tk-nm">' + (p.owner ? '🏮 ' : '') + esc(p.owner ? p.name : honor(p.name)) + '</span>' +
-        (p.drink ? '<span class="tk-dr">' + p.drink + '</span>' : '') + (badge ? '<span class="tk-st">' + badge + '</span>' : '') + '</button>';
+        (p.drink ? '<span class="tk-dr">' + p.drink + '</span>' : '') + (badge ? '<span class="tk-st">' + badge + '</span>' : '') +
+        (OWNER_MODE ? (p.ord ? '<span class="tk-ord">📋 注文 ' + p.ord + '</span>' : '') + (p.away ? '' : '<span class="tk-serve" data-tkserve="' + p.key + '">🍶 出す</span>') : '') + '</button>';
     }).join('') + '</div>';
     if (tvOn) html = '<button class="tk-tv" data-tktv="1">📺 モニターで動画が流れています(音だけ) <b>▶ 居酒屋で見る</b></button>' + html;
     if (force || el._h !== html) { el.innerHTML = html; el._h = html; }
@@ -993,8 +995,11 @@
   window.addEventListener('resize', function () { if (talkOn) talkRender(true); });
   $('talk').addEventListener('click', function (e) {
     if (e.target.closest && e.target.closest('[data-tktv]')) { setView(camView); return; }
+    var sv = e.target.closest && e.target.closest('[data-tkserve]'); if (sv) { e.stopPropagation(); serveTo(+sv.getAttribute('data-tkserve')); return; }   // 大将: 🍶 出す
     var c = e.target.closest && e.target.closest('[data-tk]'); if (!c) return;
-    var k = c.getAttribute('data-tk'); replyToSeat(k === 'owner' ? 'owner' : +k, false);
+    var k = c.getAttribute('data-tk');
+    if (OWNER_MODE && k !== 'owner') { var r = c.getBoundingClientRect(); lastTapXY = { x: r.left + r.width / 2, y: r.top + r.height * 0.6 }; ownerPick(+k); return; }   // 大将: 話しかける・料理を出す を選ぶ
+    replyToSeat(k === 'owner' ? 'owner' : +k, false);
   });
   $('tkQuick').innerHTML = TALK_QUICK.map(function (q) { return '<button type="button" data-q="' + esc(q) + '">' + esc(q) + '</button>'; }).join('');
   $('tkQuick').addEventListener('click', function (e) {   // さわるだけで送れる ひとこと(あて先が 入っていれば その人あて)
