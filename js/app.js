@@ -308,6 +308,15 @@
       var p = a.play(); if (p && p.catch) p.catch(function () {});
     })(0);
   }
+  function playAi(id) {   // 常連のアイちゃんの言葉の声。ファイルがなければ 読み上げで代わり
+    if (DEMO || !inside) return;
+    var f = 'voice/ai/' + id + '.m4a', L = (function () { var T = (SHOP.REGULAR || {}).TALK || {}, r = ''; Object.keys(T).forEach(function (k) { T[k].forEach(function (x) { if (x[0] === id) r = x[1]; }); }); return r; })();
+    duck = 0.35; setVol(); setTimeout(function () { duck = 1; setVol(); }, 2600);
+    if (voiceMissing[f]) { if (L) speak(L, (SHOP.REGULAR || {}).VOICE || 'g_zephyr', false); return; }
+    voicePool(); var a = vpool[vpoolI++ % vpool.length];
+    a.onerror = function () { a.onerror = null; voiceMissing[f] = 1; if (L) speak(L, (SHOP.REGULAR || {}).VOICE || 'g_zephyr', false); };
+    a.src = f; a.volume = Math.min(1, vol + 0.3); var p = a.play(); if (p && p.catch) p.catch(function () {});
+  }
   function previewVoice(voiceId, owner, phId) {   // アバター作りで 声を選んだとき・試し聞き
     var ph = SHOP.PHRASES.filter(function (p) { return p.id === (phId || (owner ? 'irasshai' : 'kanpai')); })[0] || SHOP.GUEST_PHRASES[0];
     unlockAudio();
@@ -1138,6 +1147,7 @@
       var m = c[k]; if (m.sys || (m.at || 0) < joinAt - 5000) return;
       if ((m.at || 0) > now() - 15000) regHear(m);
       bubble(m.seat, m.text, false);
+      if (m.ai && m.uid === REG_UID && /^[a-z]\d{1,2}$/.test(m.ai)) playAi(m.ai);   // アイちゃんの声(2026-11-21 録音)
       withScene(function (s) {
         s.talk(m.seat);
         // 話しかけられた人が、話しかけた人のほうを数秒向く(話した人も相手を見る)
@@ -2371,9 +2381,9 @@
   function regPhrase(id) { var m = regMember(), k = regSeat(); if (!m || k < 0) return; net.push('events', { type: 'phrase', id: id, seat: k, at: TS, by: REG_UID, voice: m.voice || '' }); }
   /* 言葉の種類から1つ選んで言う。kind: idle / eat / hello / bye / thanks / kanpai / owner / winter / summer / spring */
   var regLast = '';
-  function regLine(kind, to, filter) { var L = (REG.TALK || {})[kind] || []; if (filter) L = L.filter(filter); if (L.length > 1) L = L.filter(function (x) { return x[0] !== regLast; }); if (!L.length) return false; var x = L[Math.floor(Math.random() * L.length)]; regLast = x[0]; regSay(x[1], to); return true; }   // 同じ言葉を続けて言わない
+  function regLine(kind, to, filter) { var L = (REG.TALK || {})[kind] || []; if (filter) L = L.filter(filter); if (L.length > 1) L = L.filter(function (x) { return x[0] !== regLast; }); if (!L.length) return false; var x = L[Math.floor(Math.random() * L.length)]; regLast = x[0]; regSay(x[1], to, x[0]); return true; }   // 同じ言葉を続けて言わない
   function regSeason() { var mo = new Date(now() + JST).getUTCMonth() + 1; return mo === 12 || mo <= 2 ? 'winter' : mo <= 5 ? 'spring' : mo <= 8 ? 'summer' : ''; }
-  function regSay(text, to) { var m = regMember(), k = regSeat(); if (!m || k < 0) return; var c = { uid: REG_UID, name: m.name, seat: k, text: text, at: TS }; if (to != null) c.to = to; net.push('chat', c); }
+  function regSay(text, to, ai) { var m = regMember(), k = regSeat(); if (!m || k < 0) return; var c = { uid: REG_UID, name: m.name, seat: k, text: text, at: TS }; if (to != null) c.to = to; if (ai) c.ai = ai; net.push('chat', c); }   // ai: アイちゃんの声のファイル名(voice/ai/<ai>.m4a)
   function regEnter(n) {
     var want = Math.min(Math.max(0, REG.SEAT), N - 1), seat = -1, res = reservationsNow();
     var order = [want]; for (var d = 1; d < N; d++) { if (want - d >= 0) order.push(want - d); if (want + d < N) order.push(want + d); }   // ふさがっていたら 近くの空いた席

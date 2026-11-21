@@ -6,6 +6,7 @@
   ~/.local/venvs/ryokoshi/bin/python tools/make-voices.py --voices m1 om2   # その声だけ
   ~/.local/venvs/ryokoshi/bin/python tools/make-voices.py --force    # 全部作り直す
   ~/.local/venvs/ryokoshi/bin/python tools/make-voices.py --resplit  # 注文しなおさず、前の録音から切り直す
+  ~/.local/venvs/ryokoshi/bin/python tools/make-voices.py --ai --chunk 8   # 常連のアイちゃんの言葉(config.js の REGULAR.TALK)→ voice/ai/<id>.m4a
 
 やること
   1. js/config.js の GUEST_PHRASES(お客さん用)と OWNER_PHRASES(大将用)、
@@ -50,7 +51,7 @@ def load():
     return js_list(c, "GUEST_PHRASES"), js_list(c, "OWNER_PHRASES"), js_list(a, "GUEST_VOICES"), js_list(a, "OWNER_VOICES")
 
 
-READ = {"ウケる！": "うけるー！", "はいよ！": "はいよー！", "はい、お待ち！": "はいっ、おまち！"}   # Google の声が読みまちがえる言葉の読み方(2026-11-19「ウケる」が「来る」、威勢のいい声の「はいよ」が「あや」に聞こえた)
+READ = {"大将、がんばってね": "たいしょー、がんばってね", "ウケる！": "うけるー！", "はいよ！": "はいよー！", "はい、お待ち！": "はいっ、おまち！"}   # Google の声が読みまちがえる言葉の読み方(2026-11-19「ウケる」が「来る」、威勢のいい声の「はいよ」が「あや」に聞こえた)
 
 
 def spoken(t):
@@ -187,6 +188,11 @@ def main():
             only.append(args[i]); i += 1
     gp, op, gv, ov = load()
     jobs = [(v, gp) for v in gv if v.get("tts")] + [(v, op) for v in ov if v.get("tts")]
+    if "--ai" in args:   # 常連のアイちゃん(2026-11-21 ノブさんが 明るい声 A=Zephyr を選んだ)。言葉は REGULAR.TALK
+        c = (ROOT / "js/config.js").read_text()
+        a = c.index("TALK: {", c.index("REGULAR:")); b = c.index("\n    }", a)
+        ai = [{"id": i, "say": t} for i, t in re.findall(r"\['(\w+)', '([^']+)'\]", c[a:b])]
+        jobs = [({"id": "ai", "tts": "Zephyr", "style": "20代前半の女性。少し高めで、やわらかく明るい声。居酒屋の常連さんで、ひとりで ゆったり飲んでいる。にこにこして、親しみやすい。自然な日本語の話し言葉。"}, ai)]
     report, calls, chars = [], 0, 0
     for v, phrases in jobs:
         if only and v["id"] not in only: continue

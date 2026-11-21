@@ -4,7 +4,7 @@
      ・白いお皿にのった物 … プラス(+5〜10)。たくさんの種類
      ・赤い丸の 黒く焦げた物 … マイナス(−20)。後半ほど たくさん落ちてくる。よけるのが本番
      ・金色の星 … 大当たり(+50)。1回に4つだけ。少し速い
-     ・でっかい焦げ … −100。1回に3つ。出る前に 上に赤い「!」
+     ・でっかい焦げ … −150。1回に5〜7つ。出る前に 上に赤い「!」
    11-21 夜 2回目: まっすぐ・右ななめ上・左ななめ上から。1つずつ速さがちがう。はじめ少なめ → だんだん どしゃぶり。
    焦げを取らずに 続けて受け止めると、おまけ(+1〜+9)がつく。焦げを取ると おまけは0から。
    ノブさん「マイナスとプラスを ちゃんと見分けられるように」→ 色だけでなく 形でも分ける(丸い皿 / 赤い輪と「−」の札とけむり / 星)。
@@ -37,13 +37,13 @@
     { id: 'b_fish', e: '🐟', type: 'bad', pt: -20, w: 8, name: '焦げた魚' },
     { id: 'b_meat', e: '🥩', type: 'bad', pt: -20, w: 8, name: '焦げた肉' },
     { id: 'b_ika', e: '🦑', type: 'bad', pt: -20, w: 7, name: '焦げたイカ' },
-    { id: 'b_huge', e: '🍖', type: 'bad', pt: -100, w: 0, big: 1, name: '巨大な焦げ肉' },   // たまにだけ出る でっかい焦げ(−100)
+    { id: 'b_huge', e: '🍖', type: 'bad', pt: -150, w: 0, big: 1, name: '巨大な焦げ肉' },   // たまにだけ出る めちゃめちゃ大きい焦げ(−150)
     { id: 'g_beer', e: '🍺', type: 'gold', pt: 50, w: 1, name: '金のジョッキ' },
     { id: 'g_ebi', e: '🦞', type: 'gold', pt: 50, w: 1, name: '金の伊勢えび' }
   ];
   var BY = { good: [], bad: [], gold: [] }, HUGE_I = KINDS.findIndex(function (k) { return k.big; });
   KINDS.forEach(function (k, i) { if (k.w) BY[k.type].push(i); });
-  var TRAY_Y = 0.84, TRAY_W = 0.27, GOLD_N = 4, BIG = 2.6;   // BIG: 巨大な焦げの大きさ(ふつうの何倍)
+  var TRAY_Y = 0.84, TRAY_W = 0.27, GOLD_N = 4, BIG = 3.2;   // BIG: 巨大な焦げの大きさ(ふつうの何倍)
 
   function hash(str) { var h = 2166136261; for (var i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
   function rng(seed) { var s = seed >>> 0 || 1; return function () { s ^= s << 13; s >>>= 0; s ^= s >>> 17; s ^= s << 5; s >>>= 0; return s / 4294967296; }; }
@@ -53,31 +53,55 @@
      「はじめは少なめで、だんだん すごく いっぱい出てくる。たまに ものすごく でっかい 当たっちゃいけないやつ(すごいマイナス)」
      x … お盆の高さに来たときの横の位置。sx … 出てくるときの横の位置(画面の外のこともある=ななめに飛んでくる) */
   var HUGE = HUGE_I;
+  /* 11-21 夜 3回目(ノブさん「簡単すぎて つまらない。本当に よけきれないくらいの、ななめからの 波のような攻撃。
+     ゆっくり・遅い・速いを まぜる。めちゃめちゃ大きなマイナス」) */
   function plan(seed) {
-    var r = rng(hash('jokki3:' + seed)), L = [], t = 0.7;
-    function one(t, p, k, dir, vmul) {
-      var x = 0.08 + r() * 0.84;
-      var v = (0.3 + p * 0.3) * (0.6 + r() * 0.95) * (vmul || 1);   // 1つずつ速さがちがう(遅いのも 速いのも)
-      if (dir == null) { var q = r(), side = 0.25 + p * 0.3; dir = q < side ? -1 : q < side * 2 ? 1 : 0; }   // 後半ほど ななめが多い
-      var sx = x;
-      if (dir) sx = Math.max(-0.3, Math.min(1.3, x - dir * (0.4 + r() * 0.6)));   // dir=1: 右上から左下へ / -1: 左上から右下へ
+    var r = rng(hash('jokki4:' + seed)), L = [], t = 0.6;
+    function speed(p) {   // 遅い・ふつう・速い を まぜる(1つずつ ちがう)
+      var q = r(), base = 0.34 + p * 0.3;
+      return base * (q < 0.25 ? 0.4 + r() * 0.25 : q < 0.75 ? 0.8 + r() * 0.4 : 1.5 + r() * 0.7);
+    }
+    function one(t, p, k, dir, v, x) {
+      if (x == null) x = 0.08 + r() * 0.84;
+      if (v == null) v = speed(p);
+      if (dir == null) { var q = r(), side = 0.3 + p * 0.3; dir = q < side ? -1 : q < side * 2 ? 1 : 0; }
+      var sx = dir ? Math.max(-0.35, Math.min(1.35, x - dir * (0.45 + r() * 0.6))) : x;   // dir=1: 右上から / -1: 左上から
       L.push({ t: t, x: x, sx: sx, k: k, v: v });
     }
-    while (t < SEC - 1.2) {
-      var p = t / SEC, badShare = 0.26 + p * 0.2;   // 焦げの割合: はじめ3割 → 終わり5割弱
-      one(t, p, pickIn(r, r() < badShare ? BY.bad : BY.good));
-      t += 0.62 - p * 0.44 + r() * 0.1;   // はじめは ゆったり(0.6秒に1つ) → 終わりは どしゃぶり(0.2秒に1つ)
+    function bad() { return pickIn(r, BY.bad); }
+    function good() { return pickIn(r, BY.good); }
+    // ふだんの雨: はじめ少なめ → だんだん どしゃぶり
+    while (t < SEC - 1) {
+      var p = t / SEC;
+      one(t, p, r() < 0.28 + p * 0.2 ? bad() : good());
+      t += 0.58 - p * 0.38 + r() * 0.1;
     }
-    // どしゃぶり: 中ごろと後半に、同じ向きから 一気に 6〜9こ
-    [11 + r() * 3, 19 + r() * 3, 25 + r() * 2].forEach(function (bt, i) {
-      var dir = r() < 0.5 ? -1 : 1, n = 6 + i + Math.floor(r() * 2);
-      for (var j = 0; j < n; j++) one(bt + j * 0.09, bt / SEC, pickIn(r, r() < 0.45 ? BY.bad : BY.good), dir, 1.1);
+    // 波の攻撃: ななめ上から、落ちる場所が 端から端へ ずれていく焦げの列(壁のように せまってくる)。だんだん長く・多く
+    var wt = 6;
+    while (wt < SEC - 2) {
+      var p2 = wt / SEC, dir = r() < 0.5 ? -1 : 1, n = 7 + Math.floor(p2 * 8 + r() * 3), v = (0.42 + p2 * 0.35) * (0.85 + r() * 0.3);
+      var gap = 0.2 + r() * 0.6, gw = 0.21 - p2 * 0.03;   // すき間(まん中に おいしい物)。お盆が ぎりぎり入る広さ。ここに入れば よけられる
+      for (var j = 0; j < n; j++) {
+        var x = dir > 0 ? 0.92 - j * (0.84 / (n - 1)) : 0.08 + j * (0.84 / (n - 1));   // 来る向きと 反対へ 流れる
+        var dg = Math.abs(x - gap);
+        if (dg < gw) { if (dg < 0.06) one(wt + j * 0.07, p2, good(), dir, v, gap); continue; }
+        one(wt + j * 0.07, p2, bad(), dir, v, x);
+      }
+      if (p2 > 0.55 && r() < 0.5) {   // 後半は 反対からも 同時に(X の形)
+        var n2 = 5 + Math.floor(r() * 3), d2 = -dir;
+        for (var j2 = 0; j2 < n2; j2++) one(wt + 0.35 + j2 * 0.08, p2, r() < 0.8 ? bad() : good(), d2, v * (0.7 + r() * 0.5));
+      }
+      wt += 4.6 - p2 * 1.8 + r() * 0.8;
+    }
+    // めちゃめちゃ大きい焦げ(−150): 5回。ゆっくり せまってくる。最後だけ 2つ同時(左右に はなれて)
+    [7 + r() * 2, 12 + r() * 2, 17 + r() * 2, 22 + r() * 2, 26 + r()].forEach(function (ht, i) {
+      var hx = 0.2 + r() * 0.6;
+      one(ht, ht / SEC, HUGE, null, 0.3 + r() * 0.12, i === 4 ? 0.2 : hx);
+      if (i === 4) one(ht + 0.6, ht / SEC, HUGE, null, 0.36, 0.8);
     });
-    // 巨大な焦げ(−100): 3回。ゆっくり大きく落ちてくる。よけられるように 少し遅め
-    [8 + r() * 3, 16 + r() * 3, 23 + r() * 3].forEach(function (ht) { one(ht, ht / SEC, HUGE, null, 0.75); });
-    for (var g = 0; g < GOLD_N; g++) {   // 大当たりは 4つ。少し速い
+    for (var g = 0; g < GOLD_N; g++) {   // 大当たりは 4つ。速い
       var gt = 4.5 + g * 7 + r() * 2.5;
-      one(gt, gt / SEC, pickIn(r, BY.gold), null, 1.3);
+      one(gt, gt / SEC, pickIn(r, BY.gold), null, (0.34 + gt / SEC * 0.3) * 1.6);
     }
     L.sort(function (a, b) { return a.t - b.t; });
     return L;
@@ -161,7 +185,7 @@
       if (K.big) {   // 巨大な焦げ: 「−100」の札(下のまんなか)
         var lw = size * 0.62, lh = size * 0.26, ly = cy + R * 0.62;
         x.fillStyle = '#ff3b2f'; x.fillRect(cx - lw / 2, ly - lh / 2, lw, lh); x.lineWidth = Math.max(2, size * 0.02); x.strokeStyle = '#fff'; x.strokeRect(cx - lw / 2, ly - lh / 2, lw, lh);
-        x.fillStyle = '#fff'; x.font = 'bold ' + Math.round(lh * 0.8) + 'px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('−100', cx, ly + lh * 0.04);
+        x.fillStyle = '#fff'; x.font = 'bold ' + Math.round(lh * 0.8) + 'px sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('−150', cx, ly + lh * 0.04);
       } else {
         var bx = cx + R * 0.74, by = cy + R * 0.7, br = size * 0.2;   // 「−」の札(右下)
         circle(x, bx, by, br); x.fillStyle = '#ff3b2f'; x.fill(); x.lineWidth = 2; x.strokeStyle = '#fff'; x.stroke();
@@ -190,14 +214,14 @@
   function startScreen() {
     st.phase = 'ready';
     var good = BY.good.slice(0, 3).map(icon).join(''), bad = BY.bad.slice(0, 2).map(icon).join(''), gold = icon(BY.gold[0]);
-    panel('<h2>🍺 ジョッキ キャッチ</h2>' +
+    panel('<h2>🍺 ジョッキ キャッチ <small style="font-size:13px;opacity:.7">ver.3</small></h2>' +
       '<div class="izg-leg">' +
       '<div class="g">' + good + '<span><b>白いお皿</b> … 取る!<br>+5〜10点</span></div>' +
       '<div class="b">' + bad + '<span><b>赤い丸の焦げ</b> … よける!<br>−20点</span></div>' +
-      '<div class="b">' + icon(HUGE_I) + '<span><b>でっかい焦げ</b> … ぜったい よける!<br>−100点(「!」が出たら来る)</span></div>' +
+      '<div class="b">' + icon(HUGE_I) + '<span><b>でっかい焦げ</b> … ぜったい よける!<br>−150点(「!」が出たら来る)</span></div>' +
       '<div class="o">' + gold + '<span><b>金色の星</b> … 大当たり!<br>+50点(4つだけ)</span></div>' +
       '</div>' +
-      '<p>指で お盆を左右に動かします。30秒。<br>ななめからも飛んでくる! だんだん どしゃぶりに。<br>焦げを取らずに続けると 点数がどんどんふえる!</p>' +
+      '<p>指で お盆を左右に動かします。30秒。<br>ななめから 焦げの波が おそってくる!<br>遅いのも 速いのも。だんだん どしゃぶりに。<br>焦げを取らずに続けると 点数がどんどんふえる!</p>' +
       (opts.best ? '<p>今日の自分の最高: <b>' + opts.best + '点</b></p>' : ''),
       [['スタート', begin], ['やめる', close, 'izg-no']]);
   }
