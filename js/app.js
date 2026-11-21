@@ -2500,13 +2500,13 @@
     // お祝いの日は 仮装(かわいく。なければ その日の帽子)
     var ck = celebKind(); if (ck && !cosOf(REG_UID, m)) { var d0 = SHOP.CELEBRATE[ck]; net.update('members/' + REG_UID, { costume: ck + '/' + d0.hats[0][0] + '||' }); }
   }
-  /* 話しかけられたら(その子あて・名前が入っている)→ 少しして「ありがとう、よろしくね」。同じ人には 2分に1回まで */
+  /* 話しかけられたら(その子あて・名前が入っている)→ 少しして 必ず「ありがとう」の入った ひとこと(続けて送られた分は 6秒に1回) */
   function regHear(msg) {
     if (!amLeader() || !msg || msg.uid === REG_UID || msg.sys) return;
     var k = regSeat(); if (k < 0) return;
     var tx = String(msg.text || ''); if (!(msg.to === k || [REG.NAME].concat(REG.CALL || []).some(function (w) { return w && tx.indexOf(w) >= 0; }))) return;
-    var key = msg.uid || msg.name, n = now(); if (regThanks[key] && n - regThanks[key] < 2 * MIN) return; regThanks[key] = n;
-    setTimeout(function () { regLine('thanks', msg.seat); }, rnd(2, 4) * 1000);
+    var key = msg.uid || msg.name, n = now(); if (regThanks[key] && n - regThanks[key] < 6000) return; regThanks[key] = n;   // 話しかけられたら 毎回(続けて送られた分は 6秒に1回)お礼(ノブさん 2026-11-21「必ず ありがとうと言ってもらいたい」。前は 同じ人に2分に1回)
+    setTimeout(function () { regLine('thanks', msg.seat, function (x) { return x[1].indexOf('ありがとう') >= 0; }); }, rnd(2, 4) * 1000);   // 「ありがとう」が入った言葉だけ
   }
 
   /* ---------------- おためし客(おためしモードだけ) ---------------- */
