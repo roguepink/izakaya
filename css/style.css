@@ -539,8 +539,6 @@ body.talk-on .np-row, body.talk-on #bubbles, body.talk-on #tags, body.talk-on #p
 body.talk-on #tv, body.talk-on #tvBack, body.talk-on #tvClose { visibility: hidden; }
 body.talk-on .log { max-height: 22vh; }
 
-.tk-tv { flex: none; width: 100%; margin-bottom: 8px; background: #2a3a6a; color: #fbf3e4; border: 2px solid #4a5a8a; border-radius: 12px; padding: 8px 10px; font: inherit; font-size: 13.5px; font-weight: 700; }
-.tk-tv b { color: #f5c04a; margin-left: 4px; }
 #talk { flex-direction: column; }
 
 /* 大将用のおしゃべり画面: 注文ありの印・出すボタン(お客さんの画面には出ない) */

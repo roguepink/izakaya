@@ -16,7 +16,7 @@
      abort(), isOpen(),
      maxScore(id, seed),        … その並びで取れる いちばん高い点(読みこみ前は null)
      sec(id),                   … 1回の秒数
-     register(game)             … ゲームのファイルが 自分を登録する
+     register(game)             … ゲームのファイルが 自分を登録する(game.ready に Promise を入れると、絵の読みこみを待ってから始める)
    }
    ===================================================================== */
 (function () {
@@ -40,7 +40,7 @@
     loading[id] = new Promise(function (ok, ng) {
       var s = document.createElement('script'); s.src = d.file || ('games/' + id + '.js'); s.async = true;
       if (window.IZGAME_BASE) s.src = IZGAME_BASE + s.getAttribute('src');   // tools/ から開くとき
-      s.onload = function () { if (GAMES[id]) ok(GAMES[id]); else { delete loading[id]; ng(new Error('登録されていない: ' + id)); } };
+      s.onload = function () { if (GAMES[id]) Promise.resolve(GAMES[id].ready).then(function () { ok(GAMES[id]); }, function () { ok(GAMES[id]); }); else { delete loading[id]; ng(new Error('登録されていない: ' + id)); } };   // ready: 絵などの読みこみを 待つ(ゲームが Promise を渡したとき)
       s.onerror = function () { delete loading[id]; s.remove(); ng(new Error('読めない: ' + id)); };
       document.head.appendChild(s);
     });

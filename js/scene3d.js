@@ -1041,7 +1041,7 @@ function buildAvatar(raw, opt = {}) {
   }
   if (raw && raw.special === 'nobu' && a.owner && a.sex === 'm') {   // 大将ノブ専用の顔・髪型(ノブさん 2026-11-21)。お客さんは選べない。服・頭の手ぬぐい等は これまでどおり選べる。小物は付けない
     const N = Object.assign({ hair: 'n1', brow: 'k1', eye: 'e1', nose: 1, beard: 'b1', face: 'egg', skin: 2 }, (window.SHOP && SHOP.NOBU_FACE) || {}, raw.nobuFace || {});
-    a.special = 'nobu'; a.hair = 'nobu'; a.nHair = N.hair; a.hairColor = 0; a.brows = 'n' + N.brow; a.eyes = 'n' + N.eye; a.beard = 'chin'; a.nBeard = N.beard; a.nNose = N.nose; a.nBeardC = N.beardColor || '';
+    a.special = 'nobu'; a.hair = 'nobu'; a.nHair = N.hair; a.hairColor = 0; a.brows = 'n' + N.brow; a.eyes = 'n' + N.eye; a.beard = N.beard === 'b0' ? 'none' : 'chin'; a.nBeard = N.beard === 'b0' ? '' : N.beard; a.nNose = N.nose; a.nBeardC = N.beardColor || '';
     const col = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : '';   // 大将だけの目印: はちまきの色・背中の文字(11-22)
     a.headColor = col(raw.headColor) || col(N.headColor); a.backTextColor = col(raw.backTextColor) || col(N.backTextColor);
     a.backText = Array.from(String(raw.backText != null ? raw.backText : N.backText || '')).slice(0, 3).join('');
@@ -1062,7 +1062,7 @@ function buildAvatar(raw, opt = {}) {
   const torsoMat = def.tex ? toon(cc, { map: fabricTex(def.tex) }) : toon(cc);
   const torso = new THREE.Mesh(torsoGeo(f), torsoMat); torso.add(outlineOf(torso.geometry, LN)); body.add(torso);
   const lower = buildTop(body, a, f, cc);
-  if (a.backText && a.owner) {   // 大将の 法被の背中の大きな文字(11-22 ノブさん 大将だけの目印)。縦書き。背中の丸みに そわせる
+  if (a.backText && a.owner && ['happi', 'samue', 'jinbei'].includes(a.top)) {   // 大将の 法被の背中の大きな文字(11-22 ノブさん 大将だけの目印)。縦書き。背中の丸みに そわせる
     const tx = canvasTex(256, 384, (g) => {
       g.fillStyle = a.backTextColor || '#f6f2e8'; g.textAlign = 'center'; g.textBaseline = 'middle';
       const ch = Array.from(String(a.backText)).slice(0, 3), fs = ch.length > 2 ? 118 : 172;

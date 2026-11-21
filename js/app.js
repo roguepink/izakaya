@@ -953,8 +953,7 @@
     var L = talkPeople(), box = talkBox(), el = $('talk'), W = Math.min(innerWidth - 16, 900);
     el.style.top = box.top + 'px'; el.style.height = box.h + 'px';
     if (!L.length) { var e0 = '<div class="tk-empty">' + (OWNER_MODE ? 'まだ お客さんは いません。<br>来たら ここに 顔が ならびます 🏮' : 'まだ だれも来ていません。<br>来たら ここに 顔が ならびます 🏮') + '</div>'; if (el._h !== e0) { el.innerHTML = e0; el._h = e0; } return; }
-    var tvOn = !$('tv').classList.contains('hidden'), tvH = tvOn ? 44 : 0;   // モニターで動画が流れているときは「居酒屋で見る」の案内
-    var lay = talkLayout(L.length, W, box.h - tvH), t = Date.now();
+    var lay = talkLayout(L.length, W, box.h), t = Date.now();
     var small = lay.sz < 150, cw = Math.floor(lay.w), ch = Math.floor(lay.h);
     var html = '<div class="tk-grid' + (small ? ' small' : '') + '" style="width:' + Math.ceil(lay.cols * cw + (lay.cols - 1) * 8) + 'px">' + L.map(function (p) {
       var fr = talkPic(p.av), pic = fr.n || '', say = talkSay[String(p.key)], on = say && t < say.until, glow = say && t < say.glow;
@@ -966,7 +965,6 @@
         (p.drink ? '<span class="tk-dr">' + p.drink + '</span>' : '') + (badge ? '<span class="tk-st">' + badge + '</span>' : '') +
         (OWNER_MODE ? (p.ord ? '<span class="tk-ord">📋 注文 ' + p.ord + '</span>' : '') + (p.away ? '' : '<span class="tk-serve" data-tkserve="' + p.key + '">🍶 出す</span>') : '') + '</button>';
     }).join('') + '</div>';
-    if (tvOn) html = '<button class="tk-tv" data-tktv="1">📺 モニターで動画が流れています(音だけ) <b>▶ 居酒屋で見る</b></button>' + html;
     if (force || el._h !== html) { el.innerHTML = html; el._h = html; }
   }
   /* 話した人の カードを光らせ、吹き出しを出す(頭の上の吹き出しと 同じとき) */
@@ -994,7 +992,6 @@
   setInterval(function () { if (talkOn) talkRender(); }, 1000);   // 吹き出しを消す・人の出入り
   window.addEventListener('resize', function () { if (talkOn) talkRender(true); });
   $('talk').addEventListener('click', function (e) {
-    if (e.target.closest && e.target.closest('[data-tktv]')) { setView(camView); return; }
     var sv = e.target.closest && e.target.closest('[data-tkserve]'); if (sv) { e.stopPropagation(); serveTo(+sv.getAttribute('data-tkserve')); return; }   // 大将: 🍶 出す
     var c = e.target.closest && e.target.closest('[data-tk]'); if (!c) return;
     var k = c.getAttribute('data-tk');
@@ -2864,7 +2861,16 @@
       OWNER_PRESETS.forEach(function (p, i) { h += '<button data-opreset="' + i + '">' + esc(p.name) + '</button>'; });
       return h + '</div><div class="mk-sec">顔と髪型は 大将ノブ専用に決まっています(お客さんとは かぶりません)。服・頭・前掛け・声を選べます</div>';
     } },
-    OWNER_TABS[4], OWNER_TABS[5], OWNER_TABS[6]
+    OWNER_TABS[4],
+    { name: '頭と前掛け', build: function () {   // 大将ノブだけ: はちまきの色・背中の文字も(11-22 ノブさん「基本は今の感じ。変えられるように」)
+      var F = SHOP.NOBU_FACE || {}, hc = draft.headColor || F.headColor || '#f6f4ee', bt = draft.backText != null ? draft.backText : (F.backText || '');
+      var HC = [['#2a3a6a', '藍'], ['#f6f4ee', '白'], ['#c8282c', '赤'], ['#e8c060', '金'], ['#1d1d22', '黒']], BT = [['のぶ', 'のぶ'], ['ノブ', 'ノブ'], ['大将', '大将'], ['', 'なし']];
+      return opts('頭', 'head') +
+        '<div class="mk-sec">はちまきの色</div><div class="opts">' + HC.map(function (c) { return '<button data-k="headColor" data-v="' + c[0] + '" class="' + (hc === c[0] ? 'on' : '') + '"><i style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + c[0] + ';margin-right:4px;vertical-align:-1px;box-shadow:0 0 0 1px rgba(0,0,0,.25)"></i>' + c[1] + '</button>'; }).join('') + '</div>' +
+        '<div class="mk-sec">法被の背中の文字</div><div class="opts">' + BT.map(function (c) { return '<button data-k="backText" data-v="' + c[0] + '" class="' + (bt === c[0] ? 'on' : '') + '">' + c[1] + '</button>'; }).join('') + '</div>' +
+        opts('前掛け', 'apron');
+    } },
+    OWNER_TABS[6]
   ];
   function nobuFixed() { return OWNER_MODE && ROLE === 'nobu' && !!SHOP.NOBU_FACE && !!draft && draft.sex === 'm'; }
   function tabs() { return nobuFixed() ? NOBU_TABS : OWNER_MODE ? OWNER_TABS : GUEST_TABS; }
