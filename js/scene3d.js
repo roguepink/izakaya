@@ -243,7 +243,7 @@ function lighten(hex, f) { const c = new THREE.Color(hex); c.lerp(new THREE.Colo
 /* ---------- 顔(キャンバス 512×512 に描く) ---------- */
 const FACE_CACHE = {};
 function faceTexture(a) {
-  const key = JSON.stringify([a.sex, a.eyes, a.eyeColor, a.brows, a.mouth, a.beard, a.lip, a.cheek, a.hairColor, a.skin, a.nBeard || '']);
+  const key = JSON.stringify([a.sex, a.eyes, a.eyeColor, a.brows, a.mouth, a.beard, a.lip, a.cheek, a.hairColor, a.skin, a.nBeard || '', a.nBeardC || '']);
   if (FACE_CACHE[key]) return FACE_CACHE[key];
   const t = canvasTex(512, 512, (g) => {
     const F = a.sex === 'f';
@@ -259,6 +259,22 @@ function faceTexture(a) {
         g.fillStyle = gr; g.beginPath(); g.ellipse(x, y, 44, 26, 0, 0, Math.PI * 2); g.fill();
         if (ck === 2) { g.strokeStyle = 'rgba(220,90,90,0.5)'; g.lineWidth = 3; for (let k = -1; k <= 1; k++) { g.beginPath(); g.moveTo(x + k * 12 - 4, y + 6); g.lineTo(x + k * 12 + 4, y - 6); g.stroke(); } }
       });
+    }
+    const NB = /^ne/.test(a.eyes || '');   // 大将ノブ: ほかの人より 細かく描く(11-22 ノブさん「大将の顔だけ 作りこんで」)
+    let sd = 7; const rnd = () => (sd = (sd * 16807) % 2147483647) / 2147483647;   // いつも同じ形になる でたらめ
+    if (NB) {
+      [[150, 330], [362, 330]].forEach(([x, y]) => {   // ほんのり血色(お酒の場の あたたかさ)
+        const gr = g.createRadialGradient(x, y, 4, x, y, 46); gr.addColorStop(0, 'rgba(232,120,96,0.2)'); gr.addColorStop(1, 'rgba(232,120,96,0)');
+        g.fillStyle = gr; g.beginPath(); g.ellipse(x, y, 50, 30, 0, 0, Math.PI * 2); g.fill();
+      });
+      const bcol = a.nBeardC || '#4a4542';   // ひげの そりあと(口のまわりと あご。ごく うすく)
+      const gr2 = g.createRadialGradient(256, 392, 20, 256, 392, 120); gr2.addColorStop(0, 'rgba(70,66,64,0.05)'); gr2.addColorStop(1, 'rgba(70,66,64,0)');
+      g.fillStyle = gr2; g.beginPath(); g.ellipse(256, 392, 120, 80, 0, 0, Math.PI * 2); g.fill();
+      g.fillStyle = bcol; g.globalAlpha = 0.1;
+      for (let k = 0; k < 420; k++) { const an = rnd() * Math.PI * 2, rr = Math.sqrt(rnd()); const x = 256 + Math.cos(an) * rr * 96, y = 386 + Math.sin(an) * rr * 58; if (Math.abs(x - 256) < 34 && Math.abs(y - 366) < 12) continue; g.fillRect(x, y, 1.6, 1.6); }
+      g.globalAlpha = 1;
+      g.strokeStyle = 'rgba(150,84,64,0.2)'; g.lineWidth = 3;   // 笑いじわ(小鼻から口角へ。うすく)
+      [-1, 1].forEach((d) => { g.beginPath(); g.moveTo(256 + d * 30, 332); g.quadraticCurveTo(256 + d * 44, 350, 256 + d * 40, 370); g.stroke(); });
     }
     // ひげ(男性)
     const bc = shade(hairC, 0.9);
@@ -288,13 +304,29 @@ function faceTexture(a) {
         case 'soft': g.moveTo(x - 28 * s, by + 4); g.quadraticCurveTo(x, by - 10, x + 28 * s, by + 2); break;
         default: g.moveTo(x - 32 * s, by + 4); g.quadraticCurveTo(x, by - 10, x + 32 * s, by);
       }
-      g.stroke();
+      if (!NB) { g.stroke(); return; }
+      const P = { nk1: [[-34, 10], [8, -8], [36, -2]], nk2: [[-32, 8], [1, 0], [34, -8]], nk3: [[-34, 6], [-4, -8], [36, -6]], nk4: [[-34, -2], [0, -12], [36, 7]] }[a.brows] || [[-32, 4], [0, -10], [32, 0]];
+      const pt = (t) => { const u = 1 - t; return [x + s * (u * u * P[0][0] + 2 * u * t * P[1][0] + t * t * P[2][0]), by + u * u * P[0][1] + 2 * u * t * P[1][1] + t * t * P[2][1]]; };
+      const N = 26, up = [], dn = [];
+      for (let k = 0; k <= N; k++) { const t = k / N, [px, py] = pt(t), [qx, qy] = pt(Math.min(1, t + 0.01)), [rx, ry] = pt(Math.max(0, t - 0.01)); let tx = qx - rx, ty = qy - ry; const l = Math.hypot(tx, ty) || 1; tx /= l; ty /= l; const w = bw * (1.35 - 0.8 * t) * (t < 0.08 ? 0.75 + t * 3 : 1); up.push([px + ty * w * 0.5, py - tx * w * 0.5 * Math.sign(s) * Math.sign(s)]); dn.push([px - ty * w * 0.5, py + tx * w * 0.5]); }
+      g.globalAlpha = 0.92; g.beginPath(); up.forEach(([px, py], k) => k ? g.lineTo(px, py) : g.moveTo(px, py)); for (let k = dn.length - 1; k >= 0; k--) g.lineTo(dn[k][0], dn[k][1]); g.closePath(); g.fill();
+      g.globalAlpha = 0.9; g.lineWidth = 2.2;   // 毛を1本ずつ(内がわは 上向き、外がわは 外へ ねる)
+      for (let k = 0; k < 40; k++) { const t = rnd(), [px, py] = pt(t), w = bw * (1.35 - 0.8 * t), o = (rnd() - 0.5) * w * 0.8; const ang = -Math.PI / 2 + s * (0.5 + t * 0.9), L = 6 + rnd() * 5;
+        g.beginPath(); g.moveTo(px, py + o + 2); g.lineTo(px + Math.cos(ang) * L, py + o + 2 + Math.sin(ang) * L * 0.7); g.stroke(); }
+      g.globalAlpha = 1;
     });
     // 目
     [[LX, -1], [RX, 1]].forEach(([cx, s]) => drawEye(g, cx, EY, s, a, eyeC, ink));
     // 鼻
+    if (NB) {   // 大将ノブ: 鼻すじの かげ と 小鼻(立体の鼻に なじませる)
+      const gr = g.createLinearGradient(240, 0, 272, 0); gr.addColorStop(0, 'rgba(160,90,70,0.16)'); gr.addColorStop(1, 'rgba(160,90,70,0)');
+      g.fillStyle = gr; g.beginPath(); g.moveTo(248, 262); g.lineTo(256, 262); g.lineTo(262, 322); g.lineTo(242, 322); g.closePath(); g.fill();
+      g.fillStyle = 'rgba(120,60,48,0.35)'; [-1, 1].forEach((d) => { g.beginPath(); g.ellipse(256 + d * 11, 330, 5, 3, d * 0.3, 0, Math.PI * 2); g.fill(); });
+      g.strokeStyle = 'rgba(150,80,60,0.38)'; g.lineWidth = 2.5; [-1, 1].forEach((d) => { g.beginPath(); g.arc(256 + d * 16, 326, 8, d > 0 ? -0.6 : Math.PI - 0.9, d > 0 ? 0.9 : Math.PI + 0.6); g.stroke(); });
+    } else {
     g.strokeStyle = 'rgba(150,80,60,0.55)'; g.lineWidth = 4;
     g.beginPath(); g.moveTo(258, 308); g.lineTo(252, 322); g.stroke();
+    }
     // 口
     const lip = F ? AVATAR.color(AVATAR.LIP_COLOR, a.lip) : '#b8605a';
     const MY = 366;
@@ -311,7 +343,13 @@ function faceTexture(a) {
       case 'cat': g.beginPath(); g.moveTo(226, MY - 6); g.quadraticCurveTo(241, MY + 12, 256, MY - 2); g.quadraticCurveTo(271, MY + 12, 286, MY - 6); g.stroke(); break;
       case 'soft': g.beginPath(); g.moveTo(232, MY); g.quadraticCurveTo(256, MY + 12, 280, MY); g.stroke(); break;
       case 'nsmile': g.beginPath(); g.moveTo(226, MY - 7); g.quadraticCurveTo(256, MY + 15, 286, MY - 7); g.stroke();   // 大将ノブ: 笑顔の手前(口を閉じて 口角を上げる。楽しそう)
-        g.lineWidth = 3.5; [[-1, 226], [1, 286]].forEach(([d, x]) => { g.beginPath(); g.moveTo(x, MY - 7); g.quadraticCurveTo(x + d * 5, MY - 9, x + d * 7, MY - 14); g.stroke(); }); break;
+        g.lineWidth = 3.5; [[-1, 226], [1, 286]].forEach(([d, x]) => { g.beginPath(); g.moveTo(x, MY - 7); g.quadraticCurveTo(x + d * 5, MY - 9, x + d * 7, MY - 14); g.stroke(); });
+        if (NB) {   // 下くちびる(ほんのり赤み と かげ)・えくぼ
+          g.fillStyle = 'rgba(196,104,92,0.32)'; g.beginPath(); g.moveTo(238, MY + 6); g.quadraticCurveTo(256, MY + 20, 274, MY + 6); g.quadraticCurveTo(256, MY + 11, 238, MY + 6); g.fill();
+          g.strokeStyle = 'rgba(120,60,50,0.28)'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(244, MY + 22); g.quadraticCurveTo(256, MY + 26, 268, MY + 22); g.stroke();
+          g.strokeStyle = 'rgba(140,72,58,0.3)'; [-1, 1].forEach((d) => { g.beginPath(); g.arc(256 + d * 40, MY - 6, 5, d > 0 ? -0.4 : Math.PI - 1.2, d > 0 ? 1.2 : Math.PI + 0.4); g.stroke(); });
+        }
+        break;
       default: g.beginPath(); g.moveTo(222, MY - 6); g.quadraticCurveTo(256, MY + 26, 290, MY - 6); g.stroke();
     }
     if (F && a.mouth !== 'grin' && a.mouth !== 'open') { g.strokeStyle = lip; g.globalAlpha = 0.75; g.lineWidth = 7; g.beginPath(); g.moveTo(240, MY + 6); g.quadraticCurveTo(256, MY + 14, 272, MY + 6); g.stroke(); g.globalAlpha = 1; }
@@ -351,6 +389,11 @@ function drawEye(g, cx, cy, s, a, eyeC, ink) {
   gr.addColorStop(0, shade(eyeC, 0.45)); gr.addColorStop(0.55, eyeC); gr.addColorStop(1, lighten(eyeC, 0.45));
   g.fillStyle = gr; g.beginPath(); g.ellipse(0, iy, ir * 0.82, ir, 0, 0, Math.PI * 2); g.fill();
   g.fillStyle = shade(eyeC, 0.3); g.beginPath(); g.ellipse(0, iy + 2, ir * 0.36, ir * 0.46, 0, 0, Math.PI * 2); g.fill();
+  if (/^ne/.test(a.eyes)) {   // 大将ノブ: 黒目のふち と すじ(深みのある目)
+    g.strokeStyle = shade(eyeC, 0.25); g.lineWidth = 2.5; g.beginPath(); g.ellipse(0, iy, ir * 0.82, ir, 0, 0, Math.PI * 2); g.stroke();
+    g.strokeStyle = 'rgba(255,230,200,0.22)'; g.lineWidth = 1.5;
+    for (let k = 0; k < 14; k++) { const an = k / 14 * Math.PI * 2; g.beginPath(); g.moveTo(Math.cos(an) * ir * 0.42, iy + Math.sin(an) * ir * 0.5); g.lineTo(Math.cos(an) * ir * 0.74, iy + Math.sin(an) * ir * 0.9); g.stroke(); }
+  }
   // 上まぶたの影
   g.fillStyle = 'rgba(80,40,30,0.18)'; g.fillRect(-w, -h, w * 2, h * 0.45);
   g.restore();
@@ -367,6 +410,13 @@ function drawEye(g, cx, cy, s, a, eyeC, ink) {
   if (F) {
     g.lineWidth = 5;
     for (let k = 0; k < 3; k++) { const ang = (s > 0 ? Math.PI * 1.88 : Math.PI * 1.12) + (s > 0 ? -1 : 1) * k * 0.12; const x0 = Math.cos(ang) * w, y0 = Math.sin(ang) * h; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + 14 * s * (1 - k * 0.2), y0 - 10 + k * 3); g.stroke(); }
+  }
+  if (/^ne/.test(a.eyes)) {   // 大将ノブ: 二重の線・目じりを少し下げる・目じりの笑いじわ(やさしく楽しそう)
+    g.strokeStyle = 'rgba(70,36,28,0.45)'; g.lineWidth = 2.5; g.beginPath(); g.ellipse(0, -4, w * 1.0, h * 1.12, 0, Math.PI * 1.18, Math.PI * 1.85); g.stroke();
+    g.strokeStyle = ink; g.lineWidth = 6; g.beginPath(); g.moveTo(Math.cos(Math.PI * (s > 0 ? 1.92 : 1.08)) * w * 1.02, Math.sin(Math.PI * 1.92) * h * 1.02); g.quadraticCurveTo(w * 1.1 * s, -h * 0.1, w * 1.12 * s, h * 0.12); g.stroke();
+    g.strokeStyle = 'rgba(150,84,64,0.32)'; g.lineWidth = 2.2;
+    for (let k = 0; k < 2; k++) { g.beginPath(); g.moveTo(w * (1.22 + k * 0.05) * s, h * (0.05 + k * 0.32)); g.lineTo(w * (1.42 + k * 0.04) * s, h * (-0.1 + k * 0.45)); g.stroke(); }
+    g.strokeStyle = 'rgba(180,110,90,0.3)'; g.lineWidth = 3; g.beginPath(); g.ellipse(0, h * 0.25, w * 0.75, h * 0.95, 0, Math.PI * 0.28, Math.PI * 0.72); g.stroke();   // ふっくらした 下まぶた(笑ったときの ふくらみ)
   }
   // 下まぶた(うすく)
   g.strokeStyle = 'rgba(60,30,24,0.5)'; g.lineWidth = 3;
