@@ -384,8 +384,8 @@ function headDeform(face) {
       const t = Math.min(1, -ny);
       x *= (1 - a * Math.pow(t, 1.5)) * (sq ? 1 + 0.05 * t : 1);
       z *= z > 0 ? 1 - 0.06 * t : 1 - 0.22 * t;
-      y *= 1 + (sq ? 0.02 : lg ? 0.16 : 0.1) * t; if (lg) x *= 0.96;
-    } else { x *= (1 + 0.035 * ny) * (lg ? 0.96 : 1); y *= lg ? 1.03 : 1.02; z *= 1 + 0.02 * ny; }
+      y *= 1 + (sq ? 0.02 : lg ? 0.3 : 0.1) * t; if (lg) x *= 0.92;   // 11-22 ノブさん「もう少し面長に」で 0.16→0.3・はば 0.96→0.92
+    } else { x *= (1 + 0.035 * ny) * (lg ? 0.94 : 1); y *= lg ? 1.05 : 1.02; z *= 1 + 0.02 * ny; }
     return [x, y, z];
   };
 }
@@ -1075,6 +1075,11 @@ function buildAvatar(raw, opt = {}) {
       const x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i), th = Math.acos(Math.max(-1, Math.min(1, y / (R * 1.03))));
       const bulge = kind === 'stubble' ? 1 : 1 + 0.07 * Math.pow(Math.max(0, (th - th0) / (Math.PI - th0)), 1.2) * Math.max(0, z / R);
       bp.setXYZ(i, x * bulge, y * (kind === 'stubble' ? 1 : 1.02), z * bulge);
+      if (a.nBeard) {   // 大将ノブ: 横のはしを あご先へ下げて、Uの字の やわらかい形に(ななめから見て 縦に切れて見えないように 11-22)
+        const X = bp.getX(i), Y = bp.getY(i), Z = bp.getZ(i), r = Math.hypot(X, Y, Z), t0 = Math.acos(Math.max(-1, Math.min(1, Y / r)));
+        const e = Math.min(1, Math.abs(Math.atan2(X, Z)) / ph), t1 = t0 + (Math.PI - 0.12 - t0) * 0.42 * Math.pow(e, 3), sr = Math.sin(t1) / Math.max(1e-4, Math.sin(t0));
+        bp.setXYZ(i, X * sr, r * Math.cos(t1), Z * sr);
+      }
     }
     deformGeo(bg, D, R);
     if (kind === 'stubble') skull.add(new THREE.Mesh(bg, new THREE.MeshBasicMaterial({ color: '#3a2a24', transparent: true, opacity: 0.2, depthWrite: false })));
