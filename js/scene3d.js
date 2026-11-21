@@ -789,6 +789,13 @@ function buildTop(body, a, f, cc) {
   const ribbon = (color) => { [-1, 1].forEach((s) => put(onChest(shapeGeo([[0, 0], [s * 0.035, 0.016], [s * 0.035, -0.016]], 0.006, 0.002), f, 0, 0.4, 0.016), color)); body.add(tm(new THREE.SphereGeometry(0.009, 8, 6), shade(color, 0.85), 0, 0.4, chestZ(f, 0.4) + 0.02, 0)); };
   const turtle = (color) => { const n = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.056, 0.075, 20), toon(shade(color, 0.92), { map: fabricTex('rib') })); n.position.set(0, 0.455, 0); n.add(outlineOf(n.geometry, 0.002)); body.add(n); };   // タートルネック
   const ribbon2 = (y, color) => { [-1, 1].forEach((s) => put(onChest(shapeGeo([[0, 0], [s * 0.04, 0.02], [s * 0.04, -0.02]], 0.007, 0.002), f, 0, y, 0.03), color)); body.add(tm(new THREE.SphereGeometry(0.011, 8, 6), shade(color, 0.85), 0, y, chestZ(f, y) + 0.034, 0)); };   // 腰の リボン
+  /* パーカーのフード(2026-11-21 ノブさん「半分しか描かれず 輪切りに見える」→ 切れ目のない形に): 首まわりの 太い輪 + 背中に たれる ふくらんだフード + フードの口の 影 */
+  const addHood = (cc) => {
+    const ring = tm(new THREE.TorusGeometry(0.066, 0.026, 10, 28), cc, 0, 0.425, -0.012, 0.003); ring.rotation.x = Math.PI / 2 - 0.22; body.add(ring);
+    const back = tm(new THREE.SphereGeometry(0.1, 18, 12), cc, 0, 0.37, -0.082, 0.003); back.scale.set(0.92, 0.95, 0.58); back.rotation.x = -0.18; body.add(back);
+    const tip = tm(new THREE.ConeGeometry(0.045, 0.07, 12), cc, 0, 0.29, -0.1, 0.002); tip.rotation.x = Math.PI + 0.2; tip.scale.z = 0.6; body.add(tip);   // フードの先(下に すぼまる)
+    const seam = tm(new THREE.TorusGeometry(0.06, 0.006, 6, 20, Math.PI), shade(cc, 0.82), 0, 0.36, -0.13, 0); seam.rotation.set(0, 0, Math.PI); seam.scale.set(1, 1.1, 1); body.add(seam);   // フードの ぬい目(まん中に たて)
+  };
   switch (a.top) {
     case 'suit': vShirt(W, 0.22); collarWings(W, 0.8); tie(['#8a1f2a', '#2a3a6a', '#3a5a3a', '#6a2a6a'][typeof a.topColor === 'number' ? a.topColor % 4 : 0]); lapels(cc); buttons(2, 0.028, '#151515', 0.17); pocket(-0.07, 0.14, shade(cc, 0.9), true); break;
     case 'suitopen': vShirt(W, 0.22); collarWings(W, 1.1); lapels(cc); buttons(2, 0.028, '#151515', 0.17); break;
@@ -797,7 +804,7 @@ function buildTop(body, a, f, cc) {
     case 'shirt': collarWings(lighten(cc, 0.12)); placket(shade(cc, 0.95), 0.41, 0.0); buttons(5, 0, lighten(cc, 0.55), 0.39, 0.07); pocket(-0.06, 0.3, shade(cc, 0.94)); break;
     case 'polo': collarWings(lighten(cc, 0.1), 1.1); placket(shade(cc, 0.92), 0.42, 0.33); buttons(2, 0, '#f2f2f2', 0.405, 0.04); break;
     case 'knit': neckRib(shade(cc, 0.85)); hem(shade(cc, 0.82)); break;
-    case 'hoodie': { const hood = tm(new THREE.TorusGeometry(0.075, 0.042, 10, 22, Math.PI * 1.25), cc, 0, 0.43, -0.035, 0.003); hood.rotation.set(Math.PI / 2 - 0.25, 0, Math.PI * 0.375 + Math.PI); body.add(hood);
+    case 'hoodie': { addHood(cc);
       [-1, 1].forEach((s) => { const y = 0.33; body.add(tm(new THREE.CylinderGeometry(0.003, 0.003, 0.09, 5), W, s * 0.028, 0.37, chestZ(f, 0.37, s * 0.028) + 0.006, 0)); body.add(tm(new THREE.CylinderGeometry(0.005, 0.005, 0.014, 6), '#c8c8c8', s * 0.028, 0.32, chestZ(f, 0.32, s * 0.028) + 0.006, 0)); });
       put(onChest(shapeGeo([[-0.075, 0.06], [0.075, 0.06], [0.085, -0.01], [-0.085, -0.01]], 0.003, 0.0015), f, 0, 0.1, 0.004), shade(cc, 0.92)); hem(shade(cc, 0.86)); break; }
     case 'jacket': put(onChest(shapeGeo([[-0.045, 0.43], [0.045, 0.43], [0.045, 0.02], [-0.045, 0.02]], 0.002, 0), f, 0, 0, 0.002), W, 0); neckRib(W, 0.042); lapels(cc, 0.3); break;
@@ -835,7 +842,7 @@ function buildTop(body, a, f, cc) {
       [-1, 1].forEach((s) => put(onChest(shapeGeo([[s * 0.05, 0.432], [s * 0.06, 0.432], [s * 0.026, 0.235], [s * 0.016, 0.238]], 0.002, 0.001), f, 0, 0, 0.006), shade(cc, 0.78)));
       buttons(2, 0, '#e8d8a8', 0.2, 0.06); pocket(-0.07, 0.12, shade(cc, 0.92), true); pocket(0.07, 0.12, shade(cc, 0.92), true); break; }
     case 'ai_satin': neckRib(lighten(cc, 0.12), 0.044); put(onChest(shapeGeo([[-0.004, 0.42], [0.004, 0.42], [0.004, 0.3], [-0.004, 0.3]], 0.001, 0), f, 0, 0, 0.003), shade(cc, 0.85), 0); buttons(1, 0, '#f6f2ea', 0.41); break;   // つやのあるブラウス(えりもとに小さな ボタン)
-    case 'ai_hoodie': case 'ai_zip': { const hood = tm(new THREE.TorusGeometry(0.075, 0.042, 10, 22, Math.PI * 1.25), cc, 0, 0.43, -0.035, 0.003); hood.rotation.set(Math.PI / 2 - 0.25, 0, Math.PI * 0.375 + Math.PI); body.add(hood);   // パーカー(ラフ)
+    case 'ai_hoodie': case 'ai_zip': { addHood(cc);   // パーカー(ラフ)
       if (a.top === 'ai_zip') { put(onChest(shapeGeo([[-0.03, 0.43], [0.03, 0.43], [0.03, 0.02], [-0.03, 0.02]], 0.002, 0), f, 0, 0, 0.002), '#f2ece2', 0); [-1, 1].forEach((s) => put(onChest(shapeGeo([[s * 0.03, 0.43], [s * 0.036, 0.43], [s * 0.036, 0.02], [s * 0.03, 0.02]], 0.002, 0), f, 0, 0, 0.004), '#b8b8c0', 0)); }
       else { [-1, 1].forEach((s) => body.add(tm(new THREE.CylinderGeometry(0.003, 0.003, 0.09, 5), '#f6f4ee', s * 0.028, 0.37, chestZ(f, 0.37, s * 0.028) + 0.006, 0))); put(onChest(shapeGeo([[-0.075, 0.06], [0.075, 0.06], [0.085, -0.01], [-0.085, -0.01]], 0.003, 0.0015), f, 0, 0.1, 0.004), shade(cc, 0.92)); }
       hem(shade(cc, 0.86)); break; }
@@ -1255,13 +1262,16 @@ function buildAcc(head, body, a, R, f) {
     [[0.6, '#f2c14e'], [-0.6, '#e8707a']].forEach(([rz, col]) => { const p = tm(new THREE.BoxGeometry(0.011, 0.075, 0.007), col, 0, 0, 0, 0.0015); p.rotation.z = rz; g.add(p); });
   }
   if (a.special === 'ai' && a.aiRibbon) {   // 髪のリボン(後ろ頭。お客さんの席からは 後ろ姿が よく見えるので目立つ)
-    const HR = head.userData.hairR || R * 1.12, rc = a.aiRibbonC || '#2c3550', g = new THREE.Group(); g.position.set(-HR * 0.42, HR * 0.27, -HR * 0.9); g.rotation.y = -0.5; head.add(g);   // 後ろ頭の 少し横(お客さんの席が多い側)に、斜めに向けて付ける。横の席からも よく見えるように
-    const wing = (sz, x, rz) => { const w = tm(new THREE.ConeGeometry(0.075 * sz, 0.13 * sz, 4), rc, x, 0, 0, 0.003); w.rotation.z = rz; w.scale.z = 0.45; g.add(w); };
+    const HR = head.userData.hairR || R * 1.12, rc = a.aiRibbonC || '#2c3550', g = new THREE.Group(); g.position.set(-HR * 0.3, HR * 0.26, -HR * 1.06); g.rotation.y = Math.PI - 0.28; head.add(g);   // 羽が2つとも 髪から出るように 少し後ろへ(11-21)。後ろ向きに付ける(結び目が外側)   // 後ろ頭の 少し横(お客さんの席が多い側)に、斜めに向けて付ける。横の席からも よく見えるように
+    // 羽: ふっくらした輪(どの向きから見ても リボンに見えるように。2026-11-21 ノブさん「後ろから見ると リボンじゃなくなっている」。前は とがった四角すいで、後ろ・横からは 三角に見えた)
+    const wing = (sz, x) => { const sd = Math.sign(x) || 1, w = new THREE.Group(); w.position.set(x * 1.12, 0.004 * sz, 0); w.rotation.z = sd * 0.22; g.add(w);
+      const loop = tm(new THREE.TorusGeometry(0.04 * sz, 0.017 * sz, 10, 22), rc, 0, 0, 0, 0.0025); loop.scale.set(1.35, 0.92, 1.25); w.add(loop);
+      const fill = tm(new THREE.SphereGeometry(0.04 * sz, 14, 10), shade(rc, 0.86), 0, 0, -0.002 * sz); fill.scale.set(1.3, 0.85, 0.42); w.add(fill); };
     const tail = (len, x, rz, wd = 0.03) => { const t = tm(new THREE.BoxGeometry(wd, len, 0.006), rc, x, -len * 0.62, 0.005, 0.002); t.rotation.z = rz; g.add(t); };
     switch (a.aiRibbon) {
-      case 'big': [-1, 1].forEach((s) => { wing(1, s * 0.06, s * Math.PI / 2); tail(0.1, s * 0.03, s * 0.35); }); g.add(tm(new THREE.SphereGeometry(0.024, 10, 8), shade(rc, 0.82), 0, 0, 0.01)); break;   // 大きなリボン
-      case 'small': [-1, 1].forEach((s) => { wing(0.62, s * 0.037, s * Math.PI / 2); tail(0.06, s * 0.02, s * 0.35, 0.02); }); g.add(tm(new THREE.SphereGeometry(0.015, 10, 8), shade(rc, 0.82), 0, 0, 0.008)); break;   // 小さなリボン
-      case 'tails': [-1, 1].forEach((s) => { wing(0.9, s * 0.054, s * Math.PI / 2); tail(0.2, s * 0.028, s * 0.18, 0.026); }); g.add(tm(new THREE.SphereGeometry(0.022, 10, 8), shade(rc, 0.82), 0, 0, 0.01)); break;   // 長くたれる リボン
+      case 'big': [-1, 1].forEach((s) => { wing(1, s * 0.06); tail(0.1, s * 0.03, s * 0.35); }); g.add(tm(new THREE.SphereGeometry(0.024, 10, 8), shade(rc, 0.82), 0, 0, 0.01)); break;   // 大きなリボン
+      case 'small': [-1, 1].forEach((s) => { wing(0.62, s * 0.037); tail(0.06, s * 0.02, s * 0.35, 0.02); }); g.add(tm(new THREE.SphereGeometry(0.015, 10, 8), shade(rc, 0.82), 0, 0, 0.008)); break;   // 小さなリボン
+      case 'tails': [-1, 1].forEach((s) => { wing(0.9, s * 0.054); tail(0.2, s * 0.028, s * 0.18, 0.026); }); g.add(tm(new THREE.SphereGeometry(0.022, 10, 8), shade(rc, 0.82), 0, 0, 0.01)); break;   // 長くたれる リボン
       case 'thin': [-1, 1].forEach((s) => { const w = tm(new THREE.ConeGeometry(0.03, 0.085, 4), rc, s * 0.04, 0, 0, 0.002); w.rotation.z = s * Math.PI / 2; w.scale.z = 0.35; g.add(w); tail(0.17, s * 0.012, s * 0.12, 0.012); }); g.add(tm(new THREE.SphereGeometry(0.011, 8, 6), shade(rc, 0.82), 0, 0, 0.006)); break;   // 細いリボン(細長い羽 + 長い ひも)
       case 'barrette': { const b = tm(new THREE.BoxGeometry(0.11, 0.026, 0.012), rc, 0, 0, 0, 0.002); g.add(b); for (let k = -2; k <= 2; k++) g.add(tm(new THREE.SphereGeometry(0.006, 8, 6), '#fbf6ee', k * 0.02, 0, 0.008)); break; }   // バレッタ(髪どめ)
     }
