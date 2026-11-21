@@ -1918,7 +1918,7 @@
     $('kpUi').classList.remove('hidden'); document.body.classList.add('kp-on'); kpCount();   // kp-on: 乾杯の間は「🍶 出す」を隠す(ボタンが重なる)
     clearTimeout(kpT); kpT = setTimeout(function () { kpEnd(false); }, rem);
     // おためし客は 少しずつ続く
-    var rk = regSeat(); if (rk >= 0 && amLeader() && e.by !== REG_UID) setTimeout(function () { if (kp && kp.key === key && regSeat() === rk) net.push('events', { type: 'kanpaiJoin', ref: key, seat: rk, at: TS, by: REG_UID }); }, 700 + Math.random() * 1800);   // 常連の子は ほかの人の乾杯に加わる(自分からはしない)
+    var rk = regSeat(); if (rk >= 0 && amLeader() && e.by !== REG_UID) setTimeout(function () { if (kp && kp.key === key && regSeat() === rk) { net.push('events', { type: 'kanpaiJoin', ref: key, seat: rk, at: TS, by: REG_UID }); if (Math.random() < 0.5) setTimeout(function () { regLine('kanpai'); }, 600); } }, 700 + Math.random() * 1800);   // 常連の子は ほかの人の乾杯に加わる(自分からはしない)
     if (LOCAL) Object.keys(bots).forEach(function (u) { var b = bots[u]; if (u === e.by || Math.random() < 0.15) return; setTimeout(function () { if (kp && kp.key === key) net.push('events', { type: 'kanpaiJoin', ref: key, seat: b.seat, at: TS, by: u }); }, 400 + Math.random() * 2000); });
   }
   function kpCount() { if (!kp) return; $('kpCount').textContent = '🍻 ' + kp.n + '人'; }
@@ -2279,7 +2279,7 @@
      店を回す人(まとめ役)のスマホが 1台だけで動かす(tick から)。記録は members/reg-ai(bot:true, regular:true)。
      自分から乾杯はしない(ほかの人の乾杯には加わる)・記念撮影に写らない・話しかけられたら「ありがとう、よろしくね」。
      注文 → 少しずつ食べる・飲む → 食べ終わったら たまに「うまい」「おいしい」→ お皿は大将(自動)が下げる */
-  var REG = Object.assign({ NAME: 'アイちゃん', CALL: ['アイ'], MAX_GUESTS: 2, HAIR: '#3a2219', TOPS: ['blouse'], ACCS: ['none'], OWN_DRESS: 0.25, VOICE: '', WAIT_MIN: 3, SEAT: 1, LEAVE_SEC: [20, 40], LINES: [], THANKS: ['ありがとう！よろしくね'], BYE: 'そろそろ帰るね',
+  var REG = Object.assign({ NAME: 'アイちゃん', CALL: ['アイ'], MAX_GUESTS: 2, HAIR: '#3a2219', TOPS: ['blouse'], ACCS: ['none'], OWN_DRESS: 0.25, VOICE: '', WAIT_MIN: 3, SEAT: 1, LEAVE_SEC: [20, 40], TALK: {},
     EAT_SEC: [50, 65], ORDER_SEC: [90, 170], FIRST_ORDER_SEC: [15, 35], TALK_MIN: [6, 11] }, SHOP.REGULAR || {});
   var REG_UID = 'reg-ai', regSince = 0, regLeaveAt = 0, regNext = 0, regTalkAt = 0, regThanks = {}, regSeen = 0;
   function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -2301,6 +2301,10 @@
     return a;
   }
   function regPhrase(id) { var m = regMember(), k = regSeat(); if (!m || k < 0) return; net.push('events', { type: 'phrase', id: id, seat: k, at: TS, by: REG_UID, voice: m.voice || '' }); }
+  /* 言葉の種類から1つ選んで言う。kind: idle / eat / hello / bye / thanks / kanpai / owner / winter / summer / spring */
+  var regLast = '';
+  function regLine(kind, to, filter) { var L = (REG.TALK || {})[kind] || []; if (filter) L = L.filter(filter); if (L.length > 1) L = L.filter(function (x) { return x[0] !== regLast; }); if (!L.length) return false; var x = L[Math.floor(Math.random() * L.length)]; regLast = x[0]; regSay(x[1], to); return true; }   // 同じ言葉を続けて言わない
+  function regSeason() { var mo = new Date(now() + JST).getUTCMonth() + 1; return mo === 12 || mo <= 2 ? 'winter' : mo <= 5 ? 'spring' : mo <= 8 ? 'summer' : ''; }
   function regSay(text, to) { var m = regMember(), k = regSeat(); if (!m || k < 0) return; var c = { uid: REG_UID, name: m.name, seat: k, text: text, at: TS }; if (to != null) c.to = to; net.push('chat', c); }
   function regEnter(n) {
     var want = Math.min(Math.max(0, REG.SEAT), N - 1), seat = -1, res = reservationsNow();
@@ -2312,6 +2316,7 @@
     net.set('seats/' + seat, REG_UID);
     net.push('events', { type: 'phrase', id: 'irasshai', seat: seat, at: TS, by: REG_UID });
     sys('🏮 ' + honor(REG.NAME) + 'が来店しました');
+    var someone = realGuests() > 0; setTimeout(function () { regLine('hello', null, function (x) { return someone || x[0] !== 'c3'; }); }, rnd(3, 5) * 1000);   // 来たときの あいさつ
     regNext = n + rnd(REG.FIRST_ORDER_SEC[0], REG.FIRST_ORDER_SEC[1]) * 1000; regTalkAt = n + rnd(REG.TALK_MIN[0], REG.TALK_MIN[1]) * MIN; regSeen = n;
     return true;
   }
@@ -2342,7 +2347,7 @@
     // MAX_GUESTS 人より多くなった → 少しして「そろそろ帰るね」
     if (guests > REG.MAX_GUESTS) {
       if (!regLeaveAt) regLeaveAt = n + rnd(REG.LEAVE_SEC[0], REG.LEAVE_SEC[1]) * 1000;
-      else if (n >= regLeaveAt && regLeaveAt > 0) { regSay(REG.BYE); regLeaveAt = -1; setTimeout(function () { if (regMember()) regLeave(false); }, 2500); }
+      else if (n >= regLeaveAt && regLeaveAt > 0) { regLine('bye'); regLeaveAt = -1; setTimeout(function () { if (regMember()) regLeave(false); }, 2500); }
       return;
     } else if (regLeaveAt > 0) regLeaveAt = 0;
     if (regLeaveAt < 0) return;
@@ -2353,7 +2358,7 @@
       if (n < x.at + (x.bites + 1) * gap) return;
       var up = { bites: x.bites + 1 }; if (up.bites >= 2) up.emptyAt = TS;
       net.update('tables/' + k + '/' + x.key, up);
-      if (up.bites >= 2 && Math.random() < (drink ? 0.25 : 0.6)) setTimeout(function () { regPhrase(Math.random() < 0.6 ? 'umai' : 'g_oishii'); }, 1200);   // 食べ終わったら たまに
+      if (up.bites >= 2 && Math.random() < (drink ? 0.25 : 0.6)) setTimeout(function () { var r = Math.random(); if (r < 0.6 || !regLine('eat')) regPhrase(r < 0.36 ? 'umai' : 'g_oishii'); }, 1200);   // 食べ終わったら たまに(「うまい」「おいしい」の声 か、ほかの言葉)
     });
     // 注文: 飲み物がなければ飲み物、料理が1つもなければ料理(一定のリズムで)
     if (n >= regNext) {
@@ -2364,7 +2369,7 @@
       if (pick && !whyNot(k, pick.id)) { net.push('orders', { uid: REG_UID, name: m.name, seat: k, item: pick.id, at: TS }); net.push('events', { type: 'order', seat: k, item: pick.id, at: TS, by: REG_UID }); }
     }
     // たまに ひとこと(少なめ)
-    if (n >= regTalkAt) { regTalkAt = n + rnd(REG.TALK_MIN[0], REG.TALK_MIN[1]) * MIN; if (REG.LINES.length && Math.random() < 0.5) regSay(REG.LINES[Math.floor(Math.random() * REG.LINES.length)]); }
+    if (n >= regTalkAt) { regTalkAt = n + rnd(REG.TALK_MIN[0], REG.TALK_MIN[1]) * MIN; if (Math.random() < 0.5) { var r = Math.random(), se = regSeason(); if (!(r < 0.2 && ownerPresent() && regLine('owner')) && !(r >= 0.2 && r < 0.4 && se && regLine(se))) regLine('idle'); } }   // たまに: 大将へ・季節の言葉・ふだんの ひとこと
     // お祝いの日は 仮装(かわいく。なければ その日の帽子)
     var ck = celebKind(); if (ck && !cosOf(REG_UID, m)) { var d0 = SHOP.CELEBRATE[ck]; net.update('members/' + REG_UID, { costume: ck + '/' + d0.hats[0][0] + '||' }); }
   }
@@ -2374,7 +2379,7 @@
     var k = regSeat(); if (k < 0) return;
     var tx = String(msg.text || ''); if (!(msg.to === k || [REG.NAME].concat(REG.CALL || []).some(function (w) { return w && tx.indexOf(w) >= 0; }))) return;
     var key = msg.uid || msg.name, n = now(); if (regThanks[key] && n - regThanks[key] < 2 * MIN) return; regThanks[key] = n;
-    setTimeout(function () { regSay(REG.THANKS[Math.floor(Math.random() * REG.THANKS.length)], msg.seat); }, rnd(2, 4) * 1000);
+    setTimeout(function () { regLine('thanks', msg.seat); }, rnd(2, 4) * 1000);
   }
 
   /* ---------------- おためし客(おためしモードだけ) ---------------- */
