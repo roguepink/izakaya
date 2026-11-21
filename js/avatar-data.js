@@ -191,6 +191,7 @@ var AVATAR = {
     var VL = AVATAR.voiceList(o.owner), vOld = typeof a.voice === 'number' ? (o.owner ? (o.sex === 'f' ? 'of1' : 'om1') : ['m1', 'm2', 'f1', 'f2'][a.voice]) : a.voice;   // 古いデータは番号だった
     vOld = AVATAR.VOICE_ALIAS[vOld] || vOld;
     o.voice = VL.some(function (v) { return v.id === vOld; }) ? vOld : (o.owner ? (o.sex === 'f' ? 'o_leda' : (SHOP.NOBU_VOICE && SHOP.NOBU_VOICE.length ? 'nobu' : 'o_fenrir')) : (o.sex === 'f' ? 'g_zephyr' : 'g_puck'));
+    if (a.special === 'ai' && !o.owner) o.special = 'ai';   // 常連のアイちゃん専用の見た目(js/scene3d.js)
     var s = +a.size; o.size = s >= AVATAR.SIZE_MIN && s <= AVATAR.SIZE_MAX ? s : 1;
     return o;
   },

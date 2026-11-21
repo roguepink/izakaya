@@ -322,6 +322,7 @@ function drawEye(g, cx, cy, s, a, eyeC, ink) {
     case 'narrow': h *= 0.32; break;
     case 'smile': closed = true; break;
     case 'wink': if (s === 1) closed = true; break;
+    case 'ai': h *= 1.16; w *= 1.08; tilt = 0.08; break;   // アイちゃん: 大きく まるい目(少したれ目)
   }
   g.save(); g.translate(cx, cy); g.rotate(tilt * s);
   if (closed) {   // にこにこ・ウインクは 弧を描く
@@ -345,6 +346,10 @@ function drawEye(g, cx, cy, s, a, eyeC, ink) {
   // ひかり
   g.fillStyle = '#ffffff'; g.beginPath(); g.ellipse(-ir * 0.3 * s * -1 - ir * 0.15, iy - ir * 0.42, ir * 0.26, ir * 0.3, 0, 0, Math.PI * 2); g.fill();
   g.beginPath(); g.arc(ir * 0.3, iy + ir * 0.4, ir * 0.12, 0, Math.PI * 2); g.fill();
+  if (a.eyes === 'ai') {   // アイちゃん: きらっとした ひし形の光
+    const kx = ir * 0.42, ky = iy - ir * 0.05, kr = ir * 0.2; g.fillStyle = '#ffffff';
+    g.beginPath(); g.moveTo(kx, ky - kr); g.lineTo(kx + kr * 0.35, ky); g.lineTo(kx, ky + kr); g.lineTo(kx - kr * 0.35, ky); g.closePath(); g.fill();
+  }
   // 上まぶたの線(太く)と まつげ
   g.strokeStyle = ink; g.lineWidth = F ? 9 : 7;
   g.beginPath(); g.ellipse(0, 0, w * 1.02, h * 1.02, 0, Math.PI * 1.08, Math.PI * 1.92); g.stroke();
@@ -707,8 +712,10 @@ const TOP_DEF = {
   jacket: { sleeve: 'long' }, denim: { sleeve: 'long', color: '#4a6a9a', tex: 'denim' }, work: { sleeve: 'long' }, tee: { sleeve: 'short' },
   blouse: { sleeve: 'puff' }, onepiece: { sleeve: 'short', skirt: true }, cardigan: { sleeve: 'long', tex: 'rib' }, office: { sleeve: 'long', skirt: true }, pantsuit: { sleeve: 'long', pants: 'same' },
   happi: { sleeve: 'wide' }, samue: { sleeve: 'long' }, hakui: { sleeve: 'long', color: '#f4f2ec' }, jinbei: { sleeve: 'wide' },
-  kimono: { sleeve: 'long' }, yukata: { sleeve: 'wide' }, kappogi: { sleeve: 'long', color: '#f8f6f0' }
+  kimono: { sleeve: 'long' }, yukata: { sleeve: 'wide' }, kappogi: { sleeve: 'long', color: '#f8f6f0' },
+  ai: { sleeve: 'puff', skirt: true }   // アイちゃん専用: 大きな白いえりの ワンピース
 };
+const AI_C = '#c8424e';   // アイちゃんの服の しるしの色(居酒屋に合う赤)
 const TEX_CACHE = {};
 function fabricTex(kind) {
   if (TEX_CACHE[kind]) return TEX_CACHE[kind];
@@ -761,6 +768,13 @@ function buildTop(body, a, f, cc) {
     case 'tee': neckRib(shade(cc, 0.86), 0.044); break;
     case 'blouse': roundCollar(lighten(cc, 0.45)); ribbon(shade(cc, 0.7)); buttons(3, 0, lighten(cc, 0.6), 0.36, 0.06); break;
     case 'onepiece': roundCollar(W); body.add(tm(new THREE.CylinderGeometry(0.113, 0.115, 0.03, 28), shade(cc, 0.72), 0, 0.17, 0, 0.002)); ribbon(shade(cc, 0.6)); break;
+    case 'ai': {   // アイちゃん専用: 大きな白い丸えり + 水色のリボン + 白いベルトに 水色の丸い留め具
+      [-1, 1].forEach((s) => { const g = new THREE.CircleGeometry(0.078, 26, s > 0 ? -Math.PI / 2 : Math.PI / 2, Math.PI); put(onChest(g, f, s * 0.004, 0.425, 0.012), W, 0.002); });
+      [-1, 1].forEach((s) => { const g = new THREE.RingGeometry(0.064, 0.071, 26, 1, s > 0 ? -Math.PI / 2 : Math.PI / 2, Math.PI); put(onChest(g, f, s * 0.004, 0.425, 0.0135), AI_C, 0); });   // えりの ふちの線
+      ribbon(AI_C);
+      body.add(tm(new THREE.CylinderGeometry(0.113, 0.115, 0.03, 28), W, 0, 0.17, 0, 0.002));
+      body.add(tm(new THREE.SphereGeometry(0.011, 10, 8), AI_C, 0, 0.17, chestZ(f, 0.17) + 0.014, 0.0015));
+      break; }
     case 'cardigan': put(onChest(shapeGeo([[-0.045, 0.43], [0.045, 0.43], [0.045, 0.03], [-0.045, 0.03]], 0.002, 0), f, 0, 0, 0.002), '#f6efe4', 0); neckRib('#f6efe4', 0.042); buttons(4, 0.05, '#c8b89a', 0.34, 0.075); hem(shade(cc, 0.86)); break;
     case 'happi': crossCollar(W); body.add(tm(new THREE.CylinderGeometry(0.143, 0.146, 0.05, 28), '#2a2018', 0, 0.06, 0, 0.002));
       put(onChest(new THREE.CircleGeometry(0.03, 20), f, 0.07, 0.24, 0.006), W, 0.002); break;
@@ -827,6 +841,11 @@ function bakeAvatar(root, pivots, skip) {
 }
 function buildAvatar(raw, opt = {}) {
   const a = AVATAR.fix(raw) || AVATAR.fallback(1);
+  if (a.special === 'ai') {   // 常連のアイちゃん(ふつうの可愛い女の子。ロボットっぽくしない): 顔・髪型・髪の色・前髪のヘアピンは いつも同じ(覚えてもらえるように)。服と小物は 毎回ちがう(js/app.js の regAvatar)
+    if (raw.aiEyes) a.eyes = 'ai';   // きらっとした大きな目(アイちゃんだけ)
+    if (typeof raw.aiHair === 'string' && /^#[0-9a-f]{6}$/i.test(raw.aiHair)) a.hairColor = raw.aiHair;
+    if (raw.aiDress) a.top = 'ai';   // ときどき アイちゃんだけの服
+  }
   const cos = raw && raw.costume; costumePrep(a, cos);   // お祝いモードの かぶりもの
   const f = a.sex === 'f';
   const skinC = AVATAR.color(AVATAR.SKIN, a.skin); SKIN_SET.add(String(skinC).toLowerCase());
@@ -1129,6 +1148,11 @@ function buildAcc(head, body, a, R, f) {
       const rc = AVATAR.color(AVATAR.CLOTH_COLOR, a.accColor);
       [-1, 1].forEach((s2) => { const w = tm(new THREE.ConeGeometry(0.05, 0.085, 4), rc, s2 * 0.038, 0, 0, 0.003); w.rotation.z = s2 * Math.PI / 2; w.scale.z = 0.5; g.add(w); });
       g.add(tm(new THREE.SphereGeometry(0.018, 8, 6), shade(rc, 0.85))); head.add(g); break; }
+  }
+  if (a.special === 'ai') {   // アイちゃんの目印: 前髪に「×」にとめた ヘアピン2本(どの服・小物でも いつも同じ所に)
+    const HR = head.userData.hairR || R * 1.12, g = new THREE.Group();
+    g.position.set(-HR * 0.5, HR * 0.42, HR * 0.9); g.rotation.set(-0.35, -0.5, 0); head.add(g);
+    [[0.6, '#f2c14e'], [-0.6, '#e8707a']].forEach(([rz, col]) => { const p = tm(new THREE.BoxGeometry(0.011, 0.075, 0.007), col, 0, 0, 0, 0.0015); p.rotation.z = rz; g.add(p); });
   }
   /* ---- イヤリング・ネックレス(キャラクターなので 大きめ・はっきりした形に) ---- */
   const heartGeo = (sz, d = 0.006) => { const pts = []; for (let k = 0; k < 28; k++) { const t = (k / 28) * Math.PI * 2; pts.push([16 * Math.pow(Math.sin(t), 3) * sz / 17, (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) * sz / 17]); } return shapeGeo(pts, d, 0.0015); };

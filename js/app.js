@@ -2279,7 +2279,7 @@
      店を回す人(まとめ役)のスマホが 1台だけで動かす(tick から)。記録は members/reg-ai(bot:true, regular:true)。
      自分から乾杯はしない(ほかの人の乾杯には加わる)・記念撮影に写らない・話しかけられたら「ありがとう、よろしくね」。
      注文 → 少しずつ食べる・飲む → 食べ終わったら たまに「うまい」「おいしい」→ お皿は大将(自動)が下げる */
-  var REG = Object.assign({ NAME: 'アイ', WAIT_MIN: 3, SEAT: 1, LEAVE_SEC: [20, 40], LINES: [], THANKS: ['ありがとう！よろしくね'], BYE: 'そろそろ帰るね',
+  var REG = Object.assign({ NAME: 'アイちゃん', CALL: ['アイ'], MAX_GUESTS: 2, HAIR: '#3a2219', TOPS: ['blouse'], ACCS: ['none'], OWN_DRESS: 0.25, VOICE: '', WAIT_MIN: 3, SEAT: 1, LEAVE_SEC: [20, 40], LINES: [], THANKS: ['ありがとう！よろしくね'], BYE: 'そろそろ帰るね',
     EAT_SEC: [50, 65], ORDER_SEC: [90, 170], FIRST_ORDER_SEC: [15, 35], TALK_MIN: [6, 11] }, SHOP.REGULAR || {});
   var REG_UID = 'reg-ai', regSince = 0, regLeaveAt = 0, regNext = 0, regTalkAt = 0, regThanks = {}, regSeen = 0;
   function rnd(a, b) { return a + Math.random() * (b - a); }
@@ -2287,12 +2287,18 @@
   function regSeat() { var m = regMember(); return m && okSeat(m.seat) && seatUid(m.seat) === REG_UID ? m.seat : -1; }
   function realGuests() { var ms = members(); return Object.keys(ms).filter(function (u) { var m = ms[u]; return m.name && !m.owner && !m.bot && (fresh(m) || away(m)); }).length; }
   function anyHuman() { var ms = members(); return Object.keys(ms).some(function (u) { var m = ms[u]; return m.name && !m.bot && fresh(m); }); }
-  function regAvatar() {   // 顔・髪型は いつも同じ(覚えてもらえるように)。髪の色・服の色だけ 毎回ちがう
-    var base = JSON.parse(JSON.stringify((AVATAR.PRESETS.f || [])[1] || AVATAR.random('f')));
-    base.sex = 'f'; base.owner = false;
-    base.hairColor = Math.floor(Math.random() * Math.min(6, AVATAR.HAIR_COLOR.length));   // 黒〜明るい茶色(灰色・白は 年上に見えるので出さない)
-    base.topColor = Math.floor(Math.random() * AVATAR.CLOTH_COLOR.length);
-    return AVATAR.fix(base);
+  /* 顔・髪型・髪の色・前髪のヘアピンは いつも同じ(覚えてもらえるように。ふつうの可愛い女の子で、ロボットっぽくしない。ノブさん 2026-11-21)。
+     服は お客さんと同じ服から毎回1つ(おそろいになることもある)+ ときどき アイちゃんだけの服。小物も毎回ちがう */
+  function pickOne(L) { return L[Math.floor(Math.random() * L.length)]; }
+  function regAvatar() {
+    var base = Object.assign(JSON.parse(JSON.stringify((AVATAR.PRESETS.f || [])[1] || AVATAR.random('f'))), REG.FACE || {});   // 顔・髪型は REG.FACE(ノブさんが選ぶ)
+    base.sex = 'f'; base.owner = false; base.special = 'ai'; base.aiHair = REG.HAIR;
+    base.top = pickOne(REG.TOPS); base.topColor = Math.floor(Math.random() * AVATAR.CLOTH_COLOR.length);
+    if (Math.random() < REG.OWN_DRESS) { base.aiDress = 1; base.topColor = pickOne([0, 1, 3, 4, 6, 7, 11]); }   // 白いえりが映える 濃い色だけ
+    base.acc = pickOne(REG.ACCS); base.accColor = Math.floor(Math.random() * AVATAR.CLOTH_COLOR.length);
+    var a = AVATAR.fix(base); a.special = 'ai'; a.aiHair = REG.HAIR; if (base.aiDress) a.aiDress = 1; if (REG.FACE && REG.FACE.aiEyes) a.aiEyes = 1;
+    if (REG.VOICE) a.voice = REG.VOICE;
+    return a;
   }
   function regPhrase(id) { var m = regMember(), k = regSeat(); if (!m || k < 0) return; net.push('events', { type: 'phrase', id: id, seat: k, at: TS, by: REG_UID, voice: m.voice || '' }); }
   function regSay(text, to) { var m = regMember(), k = regSeat(); if (!m || k < 0) return; var c = { uid: REG_UID, name: m.name, seat: k, text: text, at: TS }; if (to != null) c.to = to; net.push('chat', c); }
@@ -2323,7 +2329,7 @@
     var s = status(n), open = LOCAL || s.phase === 'open';
     if (!m) {
       if (members()[REG_UID]) net.remove('members/' + REG_UID);   // 名前のない記録の片づけ
-      if (open && human && guests <= 1) { if (!regSince) regSince = n; if (n - regSince >= REG.WAIT_MIN * MIN) regEnter(n); }
+      if (open && human && guests <= REG.MAX_GUESTS) { if (!regSince) regSince = n; if (n - regSince >= REG.WAIT_MIN * MIN) regEnter(n); }
       else regSince = 0;
       return;
     }
@@ -2332,8 +2338,9 @@
     if (n - regSeen > 15000) { regSeen = n; net.update('members/' + REG_UID, { seen: TS }); }
     if (!regNext) regNext = n + rnd(REG.FIRST_ORDER_SEC[0], REG.FIRST_ORDER_SEC[1]) * 1000;   // まとめ役が代わったとき
     if (!regTalkAt) regTalkAt = n + rnd(REG.TALK_MIN[0], REG.TALK_MIN[1]) * MIN;
-    // 2人以上 → 少しして「そろそろ帰るね」
-    if (guests >= 2) {
+    if (m.name !== REG.NAME) net.update('members/' + REG_UID, { name: REG.NAME });   // 名前を変えたとき(前の記録)
+    // MAX_GUESTS 人より多くなった → 少しして「そろそろ帰るね」
+    if (guests > REG.MAX_GUESTS) {
       if (!regLeaveAt) regLeaveAt = n + rnd(REG.LEAVE_SEC[0], REG.LEAVE_SEC[1]) * 1000;
       else if (n >= regLeaveAt && regLeaveAt > 0) { regSay(REG.BYE); regLeaveAt = -1; setTimeout(function () { if (regMember()) regLeave(false); }, 2500); }
       return;
@@ -2365,7 +2372,7 @@
   function regHear(msg) {
     if (!amLeader() || !msg || msg.uid === REG_UID || msg.sys) return;
     var k = regSeat(); if (k < 0) return;
-    if (!(msg.to === k || String(msg.text || '').indexOf(REG.NAME) >= 0)) return;
+    var tx = String(msg.text || ''); if (!(msg.to === k || [REG.NAME].concat(REG.CALL || []).some(function (w) { return w && tx.indexOf(w) >= 0; }))) return;
     var key = msg.uid || msg.name, n = now(); if (regThanks[key] && n - regThanks[key] < 2 * MIN) return; regThanks[key] = n;
     setTimeout(function () { regSay(REG.THANKS[Math.floor(Math.random() * REG.THANKS.length)], msg.seat); }, rnd(2, 4) * 1000);
   }

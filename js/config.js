@@ -239,7 +239,13 @@ var SHOP = {
   /* 常連の女の子(ボット)。お客さんが1人以下の時だけ、少しあとから来て 静かに飲む。2人以上になったら帰る(2026-11-21 ノブさん)
      NAME: 名前(AI を思わせる名前。候補: アイ・アン・ナノ・ピコ) / WAIT_MIN: 何分たったら来るか / SEAT: 座る席(0 から数える。1 = 奥から2番目)
      LEAVE_SEC: 2人以上になってから 帰るまでの秒(少し間をおく) / LINES: たまに言うひとこと(少なめ) / THANKS: 話しかけられた時の返事 */
-  REGULAR: { NAME: 'アイ', WAIT_MIN: 3, SEAT: 1, LEAVE_SEC: [20, 40],
+  REGULAR: { NAME: 'アイちゃん', CALL: ['アイ', 'あいちゃん', '愛ちゃん'], MAX_GUESTS: 2,
+    HAIR: '#3a2219',   // 髪の色はいつも同じ(自然なこげ茶)
+    FACE: { hair: 'bob', bangs: 'patsun', aiEyes: 1, brows: 'soft', mouth: 'soft', cheek: 2, lip: 3, skin: 1, face: 'round' },   // 顔・髪型もいつも同じ(ノブさんが候補から選ぶ 2026-11-21)
+    TOPS: ['blouse', 'onepiece', 'knit', 'cardigan', 'hoodie', 'tee', 'denim'],   // お客さんと同じ服から毎回1つ
+    OWN_DRESS: 0.25,   // このくらいの割合で アイちゃんだけの服(白い丸えりのワンピース)
+    ACCS: ['none', 'none', 'ear_pearl', 'ear_flower', 'ear_heart', 'necklace', 'neck_heart', 'neck_pearl', 'neck_star', 'band', 'ribbon', 'glasses', 'beret'],   // 小物も毎回ちがう(キャップ・ニット帽は髪型が隠れるので入れない)
+    WAIT_MIN: 3, SEAT: 1, LEAVE_SEC: [20, 40],   // 名前はカタカナ+ひらがなの「ちゃん」(ノブさん 2026-11-21)。お客さん MAX_GUESTS 人までのとき来る
     LINES: ['ここ、落ち着くなあ', '今日もおつかれさまです', 'この曲、すき', 'ここの料理、やさしい味がするんだよね'],
     THANKS: ['ありがとう！よろしくね', 'ありがとう〜、よろしくね！'],
     BYE: 'そろそろ帰るね。ごゆっくり〜' },
