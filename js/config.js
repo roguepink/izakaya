@@ -150,15 +150,16 @@ var SHOP = {
     { id: 'm-nidai',    title: '荷台の重さ',           src: 'music/nidai-no-omosa.m4a' }
   ],
   // お店の動画(大将のうしろのモニターで流せる。足すときは ここに1行)。11-20 ホームページの YouTube 動画を全部
+  // tall: true … 縦に撮った動画(モニターを縦にする)。ショートでなくても縦の動画がある。足したら python3 tools/video-shape.py で確かめる(11-21 ノブさん)
   VIDEOS: [
-    { id: 'v-kokoro', src: 'https://youtu.be/WsvsmZkaC2Q', title: '心上等' },
-    { id: 'v-dear-e', src: 'https://youtu.be/pJwx7CJEMoc', title: 'dear feat. EMIRIN' },
-    { id: 'v-dear',   src: 'https://youtu.be/k0y5ZOXHDFg', title: 'dear' },
-    { id: 'v-mama',   src: 'https://youtu.be/EL9wC8z6ERc', title: 'ママへの想い' },
+    { id: 'v-kokoro', src: 'https://youtu.be/WsvsmZkaC2Q', title: '心上等', tall: true },
+    { id: 'v-dear-e', src: 'https://youtu.be/pJwx7CJEMoc', title: 'dear feat. EMIRIN', tall: true },
+    { id: 'v-dear',   src: 'https://youtu.be/k0y5ZOXHDFg', title: 'dear', tall: true },
+    { id: 'v-mama',   src: 'https://youtu.be/EL9wC8z6ERc', title: 'ママへの想い', tall: true },
     { id: 'v-omocha', src: 'https://youtu.be/9gTNoVWstSk', title: 'ひみつのおもちゃ箱' },
-    { id: 'v-code',   src: 'https://youtu.be/Ud0yZ-VS2lU', title: 'CODE LOVE' },
-    { id: 'v-sena',   src: 'https://www.youtube.com/shorts/zTkUrPNrBEo', title: '聖奈のルール(縦長)' },
-    { id: 'v-ganba',  src: 'https://www.youtube.com/shorts/CxY3V32idt0', title: '頑張らなくていい(縦長)' },
+    { id: 'v-code',   src: 'https://youtu.be/Ud0yZ-VS2lU', title: 'CODE LOVE', tall: true },
+    { id: 'v-sena',   src: 'https://www.youtube.com/shorts/zTkUrPNrBEo', title: '聖奈のルール', tall: true },
+    { id: 'v-ganba',  src: 'https://www.youtube.com/shorts/CxY3V32idt0', title: '頑張らなくていい', tall: true },
     { id: 'v-hunter', src: 'https://youtu.be/6-EKdZDA0-Q', title: 'ハンターカブ PV「ARE YOU A HUNTER?」' },
     { id: 'v-ise',    src: 'https://youtu.be/xgdnkC6Zk7E', title: '伊勢神宮巡り' },
     { id: 'v-michi',  src: 'https://youtu.be/EtXsStSuXY8', title: '道の先へ' },

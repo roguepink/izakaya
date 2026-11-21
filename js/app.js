@@ -1648,11 +1648,14 @@
       if (!qk.length) html += '<div class="li"><div class="t"><small>まだありません。下の一覧からリクエストできます。</small></div></div>';
       qk.forEach(function (k, i) { var it = q[k]; html += '<div class="li"><div class="t">' + (i + 1) + '. ' + esc(it.title) + '<small>' + esc(honor(it.byName)) + '</small></div>' + ((it.by === ME.uid || OWNER_MODE) ? '<button class="gray" data-del="' + esc(k) + '">取り消し</button>' : '') + '</div>'; });
       html += '</div>';
-      if (SHOP.ALLOW_YOUTUBE) html += '<div class="sh-sec">📺 動画のリンクを貼ってリクエスト</div><div class="yt-row"><input id="ytIn" placeholder="YouTube などのリンク" inputmode="url"><button id="ytAdd">追加</button></div><p class="small-note">大将のうしろのモニターに、みんな同じ場面で映ります。モニターを押すと大きく見られます。YouTube は公式の埋めこみで流すので、広告が入ることがあります。</p>';
+      if (SHOP.ALLOW_YOUTUBE) html += '<div class="sh-sec">📺 動画のリンクを貼ってリクエスト</div><div class="yt-row"><input id="ytIn" placeholder="YouTube などのリンク" inputmode="url"><button id="ytAdd">追加</button></div><label class="yt-tall"><input type="checkbox" id="ytTall"> 縦に撮った動画(モニターを縦にする)</label><p class="small-note">大将のうしろのモニターに、みんな同じ場面で映ります。モニターを押すと大きく見られます。YouTube は公式の埋めこみで流すので、広告が入ることがあります。</p>';
       if ((SHOP.VIDEOS || []).length) {
         html += '<div class="sh-sec">📺 お店の動画(大将のうしろのモニターに映ります)</div><div class="list">';
-        SHOP.VIDEOS.forEach(function (v) { html += '<div class="li"><div class="t">' + esc(v.title) + '</div><button data-vreq="' + esc(v.id) + '">リクエスト</button></div>'; });
+        var vrow = function (v) { return '<div class="li"><div class="t">' + esc(v.title) + '</div><button data-vreq="' + esc(v.id) + '">リクエスト</button></div>'; };
+        SHOP.VIDEOS.filter(function (v) { return !v.tall; }).forEach(function (v) { html += vrow(v); });
         html += '</div>';
+        var tallV = SHOP.VIDEOS.filter(function (v) { return v.tall; });
+        if (tallV.length) { html += '<div class="sh-sec">📱 お店の縦の動画(モニターが縦になります)</div><div class="list">'; tallV.forEach(function (v) { html += vrow(v); }); html += '</div>'; }   // 縦に撮った動画は 分けて出す(11-21 ノブさん)
       }
       html += '<div class="sh-sec">お店の曲</div><div class="list">';
       SHOP.SONGS.forEach(function (s) { html += '<div class="li"><div class="t">' + esc(s.title) + '</div><button data-req="' + esc(s.id) + '">リクエスト</button></div>'; });
@@ -1742,13 +1745,13 @@
       body.querySelectorAll('[data-req]').forEach(function (b) { b.onclick = function () { requestSong(b.getAttribute('data-req')); }; });
       body.querySelectorAll('[data-vreq]').forEach(function (b) { b.onclick = function () {
         var v = SHOP.VIDEOS.filter(function (x) { return x.id === b.getAttribute('data-vreq'); })[0]; if (!v) return;
-        if (ytId(v.src)) pushYT(v.src, v.title);
+        if (ytId(v.src)) pushYT(v.src, v.title, !!v.tall);
         else pushQueue({ kind: 'video', id: v.id + '-' + Date.now(), src: v.src, title: v.title });
       }; });
       body.querySelectorAll('[data-del]').forEach(function (b) { b.onclick = function () { net.remove('queue/' + b.getAttribute('data-del')); }; });
       var ya = q('#ytAdd'); if (ya) ya.onclick = function () {
         var url = q('#ytIn').value.trim(), id = ytId(url);
-        if (id) pushYT(url);
+        if (id) pushYT(url, '', q('#ytTall') && q('#ytTall').checked);
         else if (/^https:\/\/[^\s]+\.(mp4|webm|m4v|mov)(\?[^\s]*)?$/i.test(url)) pushQueue({ kind: 'video', id: 'v' + Date.now(), src: url, title: '動画' });
         else { toast('リンクが読めませんでした(YouTube か、mp4 などの動画のリンク)'); return; }
         q('#ytIn').value = '';
@@ -1882,12 +1885,13 @@
         .catch(function () { fin('', isShort); });
     } catch (e) { fin('', isShort); }
   }
-  function pushYT(url, title) {
+  function pushYT(url, title, tall) {
     var id = ytId(url); if (!id) return false;
-    var isShort = /\/shorts\//.test(url);
+    var known = (SHOP.VIDEOS || []).filter(function (v) { return ytId(v.src) === id; })[0];   // お店の動画と同じなら その縦・横
+    var isShort = /\/shorts\//.test(url), tallMark = !!tall || !!(known && known.tall);   // ショートでなくても 縦に撮った動画は 縦(YouTube の情報からは見分けられないので 印で)
     if (ytWaiting[id]) return true;
     ytWaiting[id] = 1; toast('動画を調べています…', 2500);
-    ytMeta(id, isShort, function (t, tall) { delete ytWaiting[id]; pushQueue({ kind: 'yt', id: 'yt-' + id, src: 'https://youtu.be/' + id, title: title || t || 'YouTube の動画', tall: !!tall }); });
+    ytMeta(id, isShort, function (t, tl) { delete ytWaiting[id]; pushQueue({ kind: 'yt', id: 'yt-' + id, src: 'https://youtu.be/' + id, title: title || t || 'YouTube の動画', tall: !!(tl || tallMark) }); });
     return true;
   }
   var ytWaiting = {};
