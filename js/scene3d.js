@@ -1090,7 +1090,7 @@ function buildAvatar(raw, opt = {}) {
   buildHair(skull, a, R, D);
   const hairObjs = skull.children.slice(nHair0);
   buildAcc(skull, body, a, R, f);
-  buildCostume(skull, body, a, R, f, cos, skinC);
+  buildCostume(skull, body, a, R, f, cos, skinC, D);
   tuckHair(skull, hairObjs);
   root.scale.setScalar(a.size);
   root.userData = { body, head, arms, fores, hands, legs, cheerMug, torso, t: Math.random() * 10, cheer: 0, talk: 0, face, faceA: a, skin: skinC };
@@ -1154,7 +1154,7 @@ function costumePrep(a, cos) {   // 髪や ふだんの小物と ぶつからな
   if (c.head === 'santa') a._cosHat = true;
   if (c.face && !a.owner && ['glasses', 'thin', 'sun'].includes(a.acc)) a.acc = 'none';
 }
-function buildCostume(head, body, a, R, f, cos, skinC) {
+function buildCostume(head, body, a, R, f, cos, skinC, D) {
   const c = parseCos(cos); if (!c.head && !c.face && !c.body) return;
   const HR = head.userData.hairR || R * 1.12, LN = 0.003, top = HR * 0.98;
   const bm = (col) => new THREE.MeshBasicMaterial({ color: col });
@@ -1211,7 +1211,8 @@ function buildCostume(head, body, a, R, f, cos, skinC) {
       g.add(mesh(new THREE.ConeGeometry(0.075, 0.2, 18), toon('#ffffff', { map: t }), 0, 0.1, 0));
       g.add(tm(new THREE.SphereGeometry(0.025, 10, 8), '#ffd23b', 0, 0.21, 0, LN));
       const rim = tm(new THREE.TorusGeometry(0.075, 0.008, 6, 18), '#ffffff', 0, 0, 0); rim.rotation.x = Math.PI / 2; g.add(rim);
-      const strap = mesh(new THREE.TorusGeometry(R * 1.02, 0.0015, 4, 30, Math.PI), new THREE.MeshBasicMaterial({ color: '#f6f4ee' })); strap.rotation.set(Math.PI, Math.PI / 2, 0); head.add(strap);   // あごひも
+      const pts = []; for (let k = 0; k <= 24; k++) { const u = -Math.PI / 2 + Math.PI * k / 24; pts.push(D ? sp(D, R, Math.PI / 2 + (Math.PI / 2 - 0.42) * Math.cos(u), u, R * 1.012) : new THREE.Vector3(Math.sin(u) * R, -Math.cos(u) * R, 0)); }
+      head.add(mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.0015, 4), new THREE.MeshBasicMaterial({ color: '#f6f4ee' })));   // あごひも: 耳から耳へ、顔の形にそって あごの下を通す(前は 顔のまん中を縦に通って 線に見えた 11-22 ノブさん)
       break; }
     case 'crown': {   // 王冠: 金の輪 + とがった山 + 宝石
       const g = new THREE.Group(); g.position.set(0, top - 0.015, 0); head.add(g);
