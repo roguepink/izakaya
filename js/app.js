@@ -246,21 +246,22 @@
   var voiceMissing = {}, vpool = [], vpoolI = 0;
   function voicePool() {
     if (vpool.length) return;
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 6; i++) {   // 6人まで 同時に話せる(ちがう人どうしは 重なってよい)
       var a = new Audio(); a.preload = 'auto'; vpool.push(a);
       try { a.muted = true; a.src = 'data:audio/mp4;base64,'; var p = a.play(); if (p && p.catch) p.catch(function () {}); a.pause(); a.muted = false; } catch (e) {}
     }
   }
-  function speak(text, voiceId, owner) {
-    if (!window.speechSynthesis) return;
+  function speak(text, voiceId, owner, done) {   // done: 読み終わったら(同じ人の次の言葉へ)
+    if (!window.speechSynthesis) { if (done) setTimeout(done, 1500); return; }
     try {
       var v = AVATAR.voiceOf(voiceId, owner);
       var u = new SpeechSynthesisUtterance(text);
       u.lang = 'ja-JP'; u.pitch = v.pitch; u.rate = v.rate; u.volume = Math.min(1, vol + 0.3);
       var jv = speechSynthesis.getVoices().filter(function (x) { return /ja/i.test(x.lang); })[0];
       if (jv) u.voice = jv;
+      if (done) { u.onend = done; u.onerror = done; }
       speechSynthesis.speak(u);
-    } catch (e) {}
+    } catch (e) { if (done) done(); }
   }
   /* 大将の声: 大将の画面なら自分の、お客さんなら店にいる大将(またはマスター)の選んだ声 */
   function ownerVoiceId() {
@@ -291,31 +292,45 @@
     if (v.tts) L.push('voice/' + v.id + '/' + ph.id + '.m4a');
     return { files: L, v: v };
   }
-  function playPhrase(ph, voiceId) {
-    if (DEMO) return;
-    if (!inside) return;
-    var owner = ph.who === 'owner';
-    if (owner) voiceId = ownerVoiceId();
-    duck = 0.35; setVol();
-    setTimeout(function () { duck = 1; setVol(); }, 2200);
-    var c = voiceFiles(ph, voiceId), files = c.files.filter(function (f) { return !voiceMissing[f]; });
+  /* 声は 話す人ごとに 順番待ち(ノブさん 2026-11-21「自分1人の言葉は重ならないように。みんなの話は重なってもいい」)。
+     key: 'owner'(大将)/ 's<席>'(お客さん・アイちゃん)。同じ人の前の声が終わってから 次を鳴らす */
+  var spQ = {};
+  function speakerQueue(key, job) {
+    var q = spQ[key] || (spQ[key] = { busy: false, list: [] });
+    if (q.list.length >= 3) q.list.shift();   // 押しすぎたときは 古いものから捨てる(ずっと しゃべり続けないように)
+    q.list.push(job); if (!q.busy) runSpeaker(q);
+  }
+  function runSpeaker(q) {
+    var job = q.list.shift(); if (!job) { q.busy = false; return; }
+    q.busy = true;
+    var d = false, fin = function () { if (d) return; d = true; setTimeout(function () { runSpeaker(q); }, 300); };
+    setTimeout(fin, 7000);   // 鳴らなかったときも 止まらないように
+    try { job(fin); } catch (e) { fin(); }
+  }
+  function freeAudio() { voicePool(); for (var i = 0; i < vpool.length; i++) { var a = vpool[(vpoolI + i) % vpool.length]; if (a.paused || a.ended) { vpoolI = (vpoolI + i + 1) % vpool.length; return a; } } return vpool[vpoolI++ % vpool.length]; }
+  function playFiles(files, fallback, done) {   // files を順に試して 1つ鳴らす。全部だめなら fallback(読み上げ)
+    files = files.filter(function (f) { return !voiceMissing[f]; });
+    duck = 0.35; setVol(); setTimeout(function () { duck = 1; setVol(); }, 2400);
     (function next(i) {
-      if (i >= files.length) { speak(ph.say, c.v.id, owner); return; }
-      voicePool();
-      var a = vpool[vpoolI++ % vpool.length];
-      a.onerror = function () { a.onerror = null; voiceMissing[files[i]] = 1; next(i + 1); };
+      if (i >= files.length) { fallback(done); return; }
+      var a = freeAudio();
+      a.onended = function () { a.onended = null; done(); };
+      a.onerror = function () { a.onerror = null; a.onended = null; voiceMissing[files[i]] = 1; next(i + 1); };
       a.src = files[i]; a.volume = Math.min(1, vol + 0.3);
-      var p = a.play(); if (p && p.catch) p.catch(function () {});
+      var p = a.play(); if (p && p.catch) p.catch(function () { done(); });
     })(0);
   }
-  function playAi(id) {   // 常連のアイちゃんの言葉の声。ファイルがなければ 読み上げで代わり
+  function playPhrase(ph, voiceId, key) {
     if (DEMO || !inside) return;
-    var f = 'voice/ai/' + id + '.m4a', L = (function () { var T = (SHOP.REGULAR || {}).TALK || {}, r = ''; Object.keys(T).forEach(function (k) { T[k].forEach(function (x) { if (x[0] === id) r = x[1]; }); }); return r; })();
-    duck = 0.35; setVol(); setTimeout(function () { duck = 1; setVol(); }, 2600);
-    if (voiceMissing[f]) { if (L) speak(L, (SHOP.REGULAR || {}).VOICE || 'g_zephyr', false); return; }
-    voicePool(); var a = vpool[vpoolI++ % vpool.length];
-    a.onerror = function () { a.onerror = null; voiceMissing[f] = 1; if (L) speak(L, (SHOP.REGULAR || {}).VOICE || 'g_zephyr', false); };
-    a.src = f; a.volume = Math.min(1, vol + 0.3); var p = a.play(); if (p && p.catch) p.catch(function () {});
+    var owner = ph.who === 'owner';
+    if (owner) voiceId = ownerVoiceId();
+    var c = voiceFiles(ph, voiceId);
+    speakerQueue(owner ? 'owner' : (key || 'x'), function (done) { playFiles(c.files, function (d) { speak(ph.say, c.v.id, owner, d); }, done); });
+  }
+  function playAi(id, seat) {   // 常連のアイちゃんの言葉の声(voice/ai/)。アイちゃんの席の順番待ちに入れる
+    if (DEMO || !inside) return;
+    var L = ''; var T = (SHOP.REGULAR || {}).TALK || {}; Object.keys(T).forEach(function (k) { T[k].forEach(function (x) { if (x[0] === id) L = x[1]; }); });
+    speakerQueue('s' + seat, function (done) { playFiles(['voice/ai/' + id + '.m4a'], function (d) { if (L) speak(L, (SHOP.REGULAR || {}).VOICE || 'g_zephyr', false, d); else d(); }, done); });
   }
   function previewVoice(voiceId, owner, phId) {   // アバター作りで 声を選んだとき・試し聞き
     var ph = SHOP.PHRASES.filter(function (p) { return p.id === (phId || (owner ? 'irasshai' : 'kanpai')); })[0] || SHOP.GUEST_PHRASES[0];
@@ -1149,7 +1164,7 @@
       var m = c[k]; if (m.sys || (m.at || 0) < joinAt - 5000) return;
       if ((m.at || 0) > now() - 15000) regHear(m);
       bubble(m.seat, m.text, false);
-      if (m.ai && m.uid === REG_UID && /^[a-z]\d{1,2}$/.test(m.ai)) playAi(m.ai);   // アイちゃんの声(2026-11-21 録音)
+      if (m.ai && m.uid === REG_UID && /^[a-z]{1,2}\d{1,2}$/.test(m.ai)) playAi(m.ai, m.seat);   // アイちゃんの声(2026-11-21 録音)
       withScene(function (s) {
         s.talk(m.seat);
         // 話しかけられた人が、話しかけた人のほうを数秒向く(話した人も相手を見る)
@@ -1386,7 +1401,7 @@
         if (ph.who === 'owner') ownerTo(e.seat, true);
         if (isK) { floater(who, '🍻'); kpStart(k, e, who); }   // 乾杯の連鎖: 声をかけた人だけ先に。ほかの人は「一緒に乾杯」で続く
         else if (ph.emoji) floater(who, ph.emoji);
-        playPhrase(ph, e.voice);
+        playPhrase(ph, e.voice, who === 'owner' ? 'owner' : 's' + who);
       } else if (e.type === 'kanpaiJoin') {
         kpJoined(e);
       } else if (e.type === 'boom') {   // お祝いの合図: 紙吹雪
@@ -2439,7 +2454,11 @@
     regLine('idle');
   }
   function regSeason() { var mo = new Date(now() + JST).getUTCMonth() + 1; return mo === 12 || mo <= 2 ? 'winter' : mo <= 5 ? 'spring' : mo <= 8 ? 'summer' : ''; }
-  function regSay(text, to, ai) { var m = regMember(), k = regSeat(); if (!m || k < 0) return; var c = { uid: REG_UID, name: m.name, seat: k, text: text, at: TS }; if (to != null) c.to = to; if (ai) c.ai = ai; net.push('chat', c); }   // ai: アイちゃんの声のファイル名(voice/ai/<ai>.m4a)
+  var regSayNext = 0;
+  function regSay(text, to, ai) {   // ai: アイちゃんの声のファイル名(voice/ai/<ai>.m4a)。言葉が重ならないよう、前の言葉から 3.5秒あけて 順番に(ノブさん 2026-11-21)
+    var t = Date.now(), at = Math.max(t, regSayNext); regSayNext = at + 3500;
+    setTimeout(function () { var m = regMember(), k = regSeat(); if (!m || k < 0) return; var c = { uid: REG_UID, name: m.name, seat: k, text: text, at: TS }; if (to != null) c.to = to; if (ai) c.ai = ai; net.push('chat', c); }, at - t);
+  }   // ai: アイちゃんの声のファイル名(voice/ai/<ai>.m4a)
   function regEnter(n) {
     var want = Math.min(Math.max(0, REG.SEAT), N - 1), seat = -1, res = reservationsNow();
     var order = [want]; for (var d = 0; d < N; d++) if (d !== want) order.push(d);   // 決まりは 奥から2番目。ふさがっていたら 奥(0番)から順に 空いた席(ノブさん 2026-11-21)
