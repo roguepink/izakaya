@@ -941,7 +941,7 @@
   var talkAuto = false;
   function talkRender(force) {
     if (!talkOn) {   // 前に おしゃべり画面を使っていた人は、座ったら そのまま おしゃべり画面に
-      if (!talkAuto && inside && !DEMO && !OWNER_MODE && mySeat >= 0) { talkAuto = true; var pf = null; try { pf = localStorage.getItem('iz-talk'); } catch (e) {} if (pf !== '0' && !phOn) setView('talk'); }   // 座ったら はじめから おしゃべり画面(11-22 ノブさん「このアプリの一番の弱点は 相手の顔が見えないこと」)
+      if (!talkAuto && inside && !DEMO && !OWNER_MODE && mySeat >= 0) { talkAuto = true; var pf = null; try { pf = localStorage.getItem('iz-talk'); } catch (e) {} if (pf === '1' && !phOn) setView('talk'); }   // はじめは 居酒屋の画面(メイン)。おしゃべり画面を 自分で選んで使っていた人だけ、次も おしゃべり画面から(11-22 ノブさん「居酒屋の形がメイン。おしゃべりは サブ」)
       return;
     }
     if (phOn) { setView(camView); toast('記念撮影なので、お店の画面に もどしました', 2200); return; }
