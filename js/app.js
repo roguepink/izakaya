@@ -1691,6 +1691,7 @@
         '<button id="openBtn">🏮 臨時で開ける(1時間)</button><button id="closeBtn" class="red">🌙 閉店する</button></div>' +
         '<p class="small-note">いま: ' + (LOCAL ? 'おためしモード' : s.phase === 'open' ? '営業中(' + fmtTime(s.end) + 'まで)' : s.phase === 'doors' ? 'まもなく開店' : '準備中') + '</p>' +
         '<div class="sh-sec">片づけ</div><div class="btn-row"><button id="clearChat">💬 会話を全部消す</button><button id="clearTables">🍽️ 料理を下げる</button></div>' +
+        regSheetHTML() +
         celebSheetHTML() +
         '<div class="sh-sec">大将の見た目</div><div class="btn-row"><button id="ownerLook">👕 着がえる(アバターを変える)</button></div>' +
         '<div class="sh-sec">記念写真</div><div class="btn-row"><button id="phListBtn">📸 記念写真を見る</button></div>' +
@@ -1770,7 +1771,7 @@
         setTimeout(function () { refreshSheet(true); }, 150);
       }; });
     } else if (sheetKind === 'owner') {
-      wireCeleb(q);
+      wireCeleb(q); wireReg(q);
       q('#openBtn').onclick = function () { net.update('state', { forceFrom: now(), forceUntil: now() + 60 * MIN, closedAt: null, closedFor: null }); sys('🏮 臨時で開店しました(1時間)'); closeSheet(); };
       q('#closeBtn').onclick = function () { if (confirm('閉店しますか?(会話と料理は片づけられます)')) { closeSheet(); closeShop(); } };
       q('#clearChat').onclick = function () { if (confirm('会話を全部消しますか?')) { net.remove('chat'); closeSheet(); } };
@@ -2026,6 +2027,22 @@
       if (inside) { buildPhrases(); if (sheetKind === 'menu' || sheetKind === 'seat' || sheetKind === 'phrases') refreshSheet(true); }
       if (k && inside) { menuCat = 'gentei'; toast(SHOP.CELEBRATE[k].hello, 6000, OWNER_MODE ? '' : '🎭 仮装する', OWNER_MODE ? null : function () { openSheet('costume'); }); withScene(function (s) { s.confetti(k); }); }
     }
+  }
+  /* 常連のアイちゃんを 大将が呼ぶ・帰す(ノブさん 2026-11-21)。state.aiMode = { m: 'stay'(ずっといる)| 'away'(来ない), at }。8時間で もとの「おまかせ」に戻る */
+  function regMode() { var x = (tree.state || {}).aiMode; return x && x.m && now() - (x.at || 0) < 8 * 3600 * 1000 ? x.m : ''; }
+  function regSheetHTML() {
+    var md = regMode(), here = !!regMember();
+    return '<div class="sh-sec">👧 ' + esc(REG.NAME) + '(常連さん)</div><div class="btn-row">' +
+      '<button id="regCall"' + (md === 'stay' ? ' class="on"' : '') + '>👋 ' + esc(REG.NAME) + 'を呼ぶ</button>' +
+      '<button id="regBye" class="red">🌙 ' + esc(REG.NAME) + 'を帰す</button></div>' +
+      '<p class="small-note">いま: ' + (here ? 'お店にいます' : 'いません') + '・' + (md === 'stay' ? '呼んだので、お客さんが多くても ずっといます' : md === 'away' ? '帰したので、呼ぶまで来ません' : 'おまかせ(お客さんが ' + REG.MAX_GUESTS + '人までのとき来て、' + (REG.MAX_GUESTS + 1) + '人目が来たら帰ります)') +
+      (md ? ' <a href="#" id="regAuto">おまかせに戻す</a>' : '') + '</p>';
+  }
+  function wireReg(q) {
+    var set = function (m) { net.update('state', { aiMode: m ? { m: m, at: TS } : null }); setTimeout(function () { refreshSheet(true); }, 300); };
+    var a = q('#regCall'); if (a) a.onclick = function () { set('stay'); toast(REG.NAME + 'を呼びました。ずっといてくれます', 2200); };
+    var b = q('#regBye'); if (b) b.onclick = function () { set('away'); toast(REG.NAME + 'に帰ってもらいます', 2200); };
+    var c = q('#regAuto'); if (c) c.onclick = function (e) { e.preventDefault(); set(''); };
   }
   function celebSheetHTML() {
     var k = celebKind(), c = celeb(), h = '<div class="sh-sec">🎉 お祝いモード</div><div class="ph-chips cel-pick">';
@@ -2363,7 +2380,7 @@
   var REG = Object.assign({ NAME: 'アイちゃん', CALL: ['アイ'], MAX_GUESTS: 2, GAME_MIN: [2, 5], GAME_RATE: [0.4, 0.7], HAIR: '#c4a27e', FITS: [], ACCS: [], VOICE: '', WAIT_MIN: 3, SEAT: 1, LEAVE_SEC: [20, 40], TALK: {},
     EAT_SEC: [50, 65], ORDER_SEC: [90, 170], FIRST_ORDER_SEC: [15, 35], TALK_MIN: [6, 11] }, SHOP.REGULAR || {});
   var regGameAt = 0, regGaming = 0;   // 常連の子の ミニゲーム
-  var REG_UID = 'reg-ai', regSince = 0, regLeaveAt = 0, regNext = 0, regTalkAt = 0, regThanks = {}, regSeen = 0;
+  var REG_UID = 'reg-ai', regTried = 0, regSince = 0, regLeaveAt = 0, regNext = 0, regTalkAt = 0, regThanks = {}, regSeen = 0;
   function rnd(a, b) { return a + Math.random() * (b - a); }
   function regMember() { var m = members()[REG_UID]; return m && m.name ? m : null; }
   function regSeat() { var m = regMember(); return m && okSeat(m.seat) && seatUid(m.seat) === REG_UID ? m.seat : -1; }
@@ -2399,7 +2416,7 @@
   function regSay(text, to, ai) { var m = regMember(), k = regSeat(); if (!m || k < 0) return; var c = { uid: REG_UID, name: m.name, seat: k, text: text, at: TS }; if (to != null) c.to = to; if (ai) c.ai = ai; net.push('chat', c); }   // ai: アイちゃんの声のファイル名(voice/ai/<ai>.m4a)
   function regEnter(n) {
     var want = Math.min(Math.max(0, REG.SEAT), N - 1), seat = -1, res = reservationsNow();
-    var order = [want]; for (var d = 1; d < N; d++) { if (want - d >= 0) order.push(want - d); if (want + d < N) order.push(want + d); }   // ふさがっていたら 近くの空いた席
+    var order = [want]; for (var d = 0; d < N; d++) if (d !== want) order.push(d);   // 決まりは 奥から2番目。ふさがっていたら 奥(0番)から順に 空いた席(ノブさん 2026-11-21)
     for (var i = 0; i < order.length; i++) { var k = order[i], u = seatUid(k); if ((!u || !members()[u]) && !res[k]) { seat = k; break; } }
     if (seat < 0) return false;
     var av = regAvatar();
@@ -2426,10 +2443,14 @@
     var s = status(n), open = LOCAL || s.phase === 'open';
     if (!m) {
       if (members()[REG_UID]) net.remove('members/' + REG_UID);   // 名前のない記録の片づけ
-      if (open && human && guests <= REG.MAX_GUESTS) { if (!regSince) regSince = n; if (n - regSince >= REG.WAIT_MIN * MIN) regEnter(n); }
+      var md0 = regMode();
+      if (open && human && md0 === 'stay') { if (n - regTried > 5000) { regTried = n; regEnter(n); } return; }   // 大将が呼んだ → すぐ来る
+      if (open && human && md0 !== 'away' && guests <= REG.MAX_GUESTS) { if (!regSince) regSince = n; if (n - regSince >= REG.WAIT_MIN * MIN) regEnter(n); }
       else regSince = 0;
       return;
     }
+    var md = regMode();
+    if (md === 'away' && regLeaveAt >= 0) { regLine('bye'); regLeaveAt = -1; setTimeout(function () { if (regMember()) regLeave(false); }, 2500); return; }   // 大将が帰した
     if (k < 0) { regLeave(true); return; }   // 席がなくなった(片づけられた)
     if (!human || !open) { regLeave(false); return; }   // だれもいない・閉店
     if (n - regSeen > 15000) { regSeen = n; net.update('members/' + REG_UID, { seen: TS }); }
@@ -2445,7 +2466,7 @@
       postScore(REG_UID, REG.NAME, sc);
     }   // 名前を変えたとき(前の記録)
     // MAX_GUESTS 人より多くなった → 少しして「そろそろ帰るね」
-    if (guests > REG.MAX_GUESTS) {
+    if (guests > REG.MAX_GUESTS && md !== 'stay') {   // 大将が呼んだときは 多くても帰らない
       if (!regLeaveAt) regLeaveAt = n + rnd(REG.LEAVE_SEC[0], REG.LEAVE_SEC[1]) * 1000;
       else if (n >= regLeaveAt && regLeaveAt > 0) { regLine('bye'); regLeaveAt = -1; setTimeout(function () { if (regMember()) regLeave(false); }, 2500); }
       return;
