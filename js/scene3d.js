@@ -243,7 +243,7 @@ function lighten(hex, f) { const c = new THREE.Color(hex); c.lerp(new THREE.Colo
 /* ---------- 顔(キャンバス 512×512 に描く) ---------- */
 const FACE_CACHE = {};
 function faceTexture(a) {
-  const key = JSON.stringify([a.sex, a.eyes, a.eyeColor, a.brows, a.mouth, a.beard, a.lip, a.cheek, a.hairColor, a.skin]);
+  const key = JSON.stringify([a.sex, a.eyes, a.eyeColor, a.brows, a.mouth, a.beard, a.lip, a.cheek, a.hairColor, a.skin, a.nBeard || '']);
   if (FACE_CACHE[key]) return FACE_CACHE[key];
   const t = canvasTex(512, 512, (g) => {
     const F = a.sex === 'f';
@@ -266,17 +266,22 @@ function faceTexture(a) {
       g.fillStyle = 'rgba(60,45,40,0.22)'; g.beginPath(); g.moveTo(150, 340); g.quadraticCurveTo(256, 470, 362, 340); g.quadraticCurveTo(256, 400, 150, 340); g.fill();
       g.fillStyle = 'rgba(40,30,28,0.35)'; for (let k = 0; k < 260; k++) { const tt = Math.random() * Math.PI, r = 70 + Math.random() * 40; g.fillRect(256 + Math.cos(tt) * r * 1.2, 330 + Math.sin(tt) * r * 0.75, 2, 2); }
     }
+    if (a.nBeard === 'b2' || a.nBeard === 'b3') { g.fillStyle = bc; g.beginPath(); g.ellipse(256, 404, 13, 9, 0, 0, Math.PI * 2); g.fill(); }   // 大将ノブ: 下くちびるの下の ちょびひげ
+    if (a.nBeard === 'b3') { g.fillStyle = 'rgba(28,23,20,0.75)'; g.beginPath(); g.moveTo(214, 352); g.quadraticCurveTo(256, 336, 298, 352); g.quadraticCurveTo(256, 346, 214, 352); g.fill(); }   // 大将ノブ: うすい口ひげ
     if (a.beard === 'mustache' || a.beard === 'full') { g.fillStyle = bc; g.beginPath(); g.moveTo(206, 356); g.quadraticCurveTo(232, 336, 256, 348); g.quadraticCurveTo(280, 336, 306, 356); g.quadraticCurveTo(256, 352, 206, 356); g.fill(); }
     // まゆ
     const browC = shade(hairC === '#e8e2d8' ? '#9a8a7a' : hairC, 0.85);
     g.strokeStyle = browC; g.fillStyle = browC;
-    const bw = { thick: 11, natural: 7, straight: 8, up: 8, worry: 7, soft: 6, thin: 4 }[a.brows] || 7;
+    const bw = { thick: 11, natural: 7, straight: 8, up: 8, worry: 7, soft: 6, thin: 4, nk1: 11, nk2: 9, nk3: 12 }[a.brows] || 7;
     g.lineWidth = bw;
     [[LX, -1], [RX, 1]].forEach(([x, s]) => {
       const by = EY - (F ? 92 : 80);
       g.beginPath();
       switch (a.brows) {
         case 'up': g.moveTo(x - 30 * s, by + 8); g.quadraticCurveTo(x, by - 8, x + 32 * s, by - 10); break;
+        case 'nk1': g.moveTo(x - 34 * s, by + 10); g.lineTo(x + 8 * s, by - 6); g.quadraticCurveTo(x + 24 * s, by - 10, x + 36 * s, by - 2); break;   // 大将ノブ: きりっ(山のある まゆ)
+        case 'nk2': g.moveTo(x - 32 * s, by + 8); g.lineTo(x + 34 * s, by - 8); break;   // 大将ノブ: きりっ(まっすぐ上がる)
+        case 'nk3': g.moveTo(x - 34 * s, by + 6); g.quadraticCurveTo(x - 4 * s, by - 8, x + 36 * s, by - 6); break;   // 大将ノブ: きりっ(太く ゆるい弧)
         case 'worry': g.moveTo(x - 30 * s, by - 4); g.quadraticCurveTo(x, by - 4, x + 30 * s, by + 10); break;
         case 'straight': g.moveTo(x - 30 * s, by); g.lineTo(x + 30 * s, by - 2); break;
         case 'soft': g.moveTo(x - 28 * s, by + 4); g.quadraticCurveTo(x, by - 10, x + 28 * s, by + 2); break;
@@ -323,6 +328,9 @@ function drawEye(g, cx, cy, s, a, eyeC, ink) {
     case 'smile': closed = true; break;
     case 'wink': if (s === 1) closed = true; break;
     case 'ai': h *= 1.16; w *= 1.08; tilt = 0.08; break;   // アイちゃん: 大きく まるい目(少したれ目)
+    case 'ne1': w *= 1.12; h *= 1.12; tilt = 0.1; break;   // 大将ノブ: やさしい大きめの目(少したれ目)
+    case 'ne2': w *= 1.18; h *= 1.0; tilt = 0.14; break;   // 大将ノブ: やさしい横長の大きめの目
+    case 'ne3': w *= 1.08; h *= 1.2; tilt = 0.06; break;   // 大将ノブ: くりっと大きい目
   }
   g.save(); g.translate(cx, cy); g.rotate(tilt * s);
   if (closed) {   // にこにこ・ウインクは 弧を描く
@@ -646,12 +654,25 @@ function buildHair(head, a, R, D) {
         fBacks(-0.5, 9, -0.1, 0.05, 0, 2.2); break;
       case 'long':     shell({ f: 0.85, s: 1.75, b: 2.05, vol: 0.06, part: 0 }); pull(1.35, Math.PI, 16); frame(-0.8, 0.03, -0.1); roundTail(0, -R * 0.32, -R * 1.0, L(1.3), 0, 9, 0.028, 0, 0.1); break;
       case 'buzz':     { const m = add(hairShell(D, R, { f: 0.98, s: 1.6, b: 1.95, vol: 0.012, crown: 0 }), mixC(hc, skinC, 0.15), 0.003); m.scale.setScalar(1.0); } head.userData.hairR = R * 1.07; return;   // ぼうず: 地肌に近い色の短い毛
+      case 'nobu': {   // 大将ノブ専用(2026-11-21): 前髪を上げて おでこを見せる(ツンツンでも オールバックでもない)。横は短め、えり足なし。黒
+        const v = a.nHair || 'n1';
+        const sd = add(hairShell(D, R, { f: 0.95, s: 1.66, b: 1.9, vol: 0.016, crown: 0 }), mixC(hc, skinC, 0.03), 0.003); sd.scale.setScalar(1.0);   // 横と後ろ: 短く そろえた毛
+        const P = { n1: { f: 0.74, vol: 0.1, rise: 0.2, len: 0.6, sw: 0.08, n: 10, w: 0.072 }, n2: { f: 0.74, vol: 0.09, rise: 0.17, len: 0.66, sw: 0.5, n: 10, w: 0.07 },
+          n3: { f: 0.77, vol: 0.12, rise: 0.3, len: 0.42, sw: 0.12, n: 12, w: 0.06 }, n4: { f: 0.72, vol: 0.08, rise: 0.12, len: 0.82, sw: 0.0, n: 11, w: 0.074 },
+          n5: { f: 0.74, vol: 0.1, rise: 0.22, len: 0.58, sw: -0.45, n: 10, w: 0.07 } }[v] || {};
+        shell({ f: P.f, s: 1.45, b: 1.72, vol: P.vol });   // 上: ふんわり(横・後ろとの段差は小さく)
+        crown(15, 0.8);
+        if (!HAT) {
+          row(P.n, -1.0, 1.0, (ph, t, k) => st({ th: P.f + 0.03, ph, len: R * (P.len + jit(k, 0.06)), up: true, rise: P.rise + jit(k + 2, 0.05), sweep: P.sw + (t - 0.5) * 0.3 }, P.w, 0.3, 0.3));   // 前髪: 根もとから 立ち上げて 後ろへ流す(てっぺんで まとまらない長さ)
+          row(P.n - 3, -0.75, 0.75, (ph, t, k) => st({ th: P.f + 0.2, ph: ph + 0.06, len: R * (P.len * 0.75 + jit(k + 4, 0.05)), up: true, rise: P.rise * 0.6, sweep: P.sw * 0.8 }, P.w * 0.95, 0.3, 0.3));   // 2段目(厚み)
+        }
+        VOL = P.vol; break; }
       default: shell({}); crown();
     }
   }
   head.userData.hairR = R * (1.045 + VOL + 0.04);   // 髪のいちばん外がわ(帽子・カチューシャの大きさの目安)
   if (a.hair !== 'buzz' && !HAT) { const cp = new THREE.Mesh(hairTint(new THREE.SphereGeometry(R * (1.045 + VOL + 0.032), 28, 6, 0, Math.PI * 2, 0, 0.4), R), toon(hc, { vertexColors: true })); cp.rotation.x = -0.12; head.add(cp); }   // つむじ
-  if (!(a.sex === 'm' && (a.hair === 'back' || a.hair === 'buzz'))) bangs();
+  if (!(a.sex === 'm' && (a.hair === 'back' || a.hair === 'buzz' || a.hair === 'nobu'))) bangs();
   if (a.ahoge === 'on' && !HAT) ahoge();
 }
 
@@ -949,6 +970,11 @@ function buildAvatar(raw, opt = {}) {
     if (AI_OPEN.includes(a.top) && !a.aiNeck) a.aiNeck = 'pearl1';   // 胸元が開いた服は 必ずネックレス
     if (typeof raw.aiRibbon === 'string' && raw.aiRibbon) a.aiRibbon = raw.aiRibbon;   // 髪のリボン(形)
   }
+  if (raw && raw.special === 'nobu' && a.owner && a.sex === 'm') {   // 大将ノブ専用の顔・髪型(ノブさん 2026-11-21)。お客さんは選べない。服・頭の手ぬぐい等は これまでどおり選べる。小物は付けない
+    const N = Object.assign({ hair: 'n1', brow: 'k1', eye: 'e1', nose: 1, beard: 'b1', face: 'egg', skin: 2 }, (window.SHOP && SHOP.NOBU_FACE) || {}, raw.nobuFace || {});
+    a.special = 'nobu'; a.hair = 'nobu'; a.nHair = N.hair; a.hairColor = 0; a.brows = 'n' + N.brow; a.eyes = 'n' + N.eye; a.beard = 'chin'; a.nBeard = N.beard; a.nNose = N.nose;
+    if (['round', 'egg', 'sharp', 'square'].includes(N.face)) a.face = N.face; if (N.skin >= 0 && N.skin <= 5) a.skin = N.skin; a.acc = 'none';
+  }
   const cos = raw && raw.costume; costumePrep(a, cos);   // お祝いモードの かぶりもの
   const f = a.sex === 'f';
   const skinC = AVATAR.color(AVATAR.SKIN, a.skin); SKIN_SET.add(String(skinC).toLowerCase());
@@ -1034,9 +1060,13 @@ function buildAvatar(raw, opt = {}) {
   const faceGeo = deformGeo(new THREE.SphereGeometry(R * 1.004, 36, 28, Math.PI / 2 - 0.95, 1.9, Math.PI / 2 - 0.8, 1.6), D, R);
   const face = new THREE.Mesh(faceGeo, new THREE.MeshBasicMaterial({ map: faceTexture(a), transparent: true, depthWrite: false }));
   skull.add(face);
+  if (a.special === 'nobu') {   // 大将ノブ: 高い鼻(顔から少し出た形)
+    const big = a.nNose === 2 ? 1.18 : 1, np = sp(D, R, 1.68, 0, R * 0.99), nose = tm(new THREE.SphereGeometry(R * 0.075 * big, 14, 10), shade(skinC, 0.97), np.x, np.y, np.z, LN * 0.6);
+    nose.scale.set(0.6, 1.3, 1.25); nose.rotation.x = -0.3; skull.add(nose);
+  }
   if (!f && a.beard && a.beard !== 'none' && a.beard !== 'mustache') {   // ひげ: あごの形に そった殻(あごひげ=あごの先、フル=もみあげから あご全体、ぶしょう=うすく)
     const hcB = shade(AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor), 0.92);
-    const kind = a.beard, ph = kind === 'chin' ? 0.62 : 1.45, th0 = kind === 'chin' ? 2.25 : kind === 'full' ? 1.95 : 1.9;
+    const kind = a.beard, ph = kind === 'chin' ? (a.nBeard === 'b4' ? 0.95 : 0.62) : 1.45, th0 = kind === 'chin' ? (a.nBeard === 'b4' ? 2.18 : 2.25) : kind === 'full' ? 1.95 : 1.9;   // b4: 大将ノブの 広めの あごひげ
     const bg = new THREE.SphereGeometry(R * (kind === 'stubble' ? 1.006 : 1.03), 28, 14, Math.PI / 2 - ph, ph * 2, th0, Math.PI - 0.1 - th0), bp = bg.attributes.position;
     for (let i = 0; i < bp.count; i++) {   // 上のふちを ぎざぎざに、あご先は 少し ふくらませる
       const x = bp.getX(i), y = bp.getY(i), z = bp.getZ(i), th = Math.acos(Math.max(-1, Math.min(1, y / (R * 1.03))));

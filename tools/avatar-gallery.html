@@ -28,7 +28,8 @@ if (mode === 'ohats') {
   [['m', ['spiky', 'perm', 'back']], ['f', ['bun', 'wave', 'twin']]].forEach(([sx, hs]) => hs.forEach((h) => (Q.get('heads') ? Q.get('heads').split(',') : ['tenugui', 'itamae', 'bandana', sx === 'f' ? 'sankaku' : 'hachimaki']).forEach((hd) => { const a = JSON.parse(JSON.stringify(AVATAR.OWNER)); a.sex = sx; a.hair = h; a.head = hd; list.push([a, h + '/' + hd]); })));
 }
 if (mode.startsWith('bangs-')) vary(mode.slice(6), 'bangs', 0);
-if (mode === 'ai') (window.__AI || []).forEach((x) => list.push(x));   // アイちゃんの服・小物の確認(試しの台本から渡す)
+if (mode === 'ai') (window.__AI || []).forEach((x) => list.push(x));
+if (mode === 'nobu') (window.__NOBU || []).forEach(([nf, nm, top]) => { const a = JSON.parse(JSON.stringify(AVATAR.OWNER)); a.special = 'nobu'; a.nobuFace = nf; if (top) Object.assign(a, top); list.push([a, nm]); });   // 大将ノブの顔・髪型の候補   // アイちゃんの服・小物の確認(試しの台本から渡す)
 if (mode === 'owner') AVATAR.OWNER_PARTS.top.forEach(([id, nm], i) => { const a = JSON.parse(JSON.stringify(AVATAR.OWNER)); a.top = id; a.head = AVATAR.OWNER_PARTS.head[i + 1] ? AVATAR.OWNER_PARTS.head[i + 1][0] : 'none'; a.apron = AVATAR.OWNER_PARTS.apron[(i % 4) + 1][0]; list.push([a, nm + ' / ' + a.head]); });
 const cv = document.getElementById('c');
 const R = new THREE.WebGLRenderer({ canvas: cv, antialias: true }); R.setPixelRatio(Math.min(devicePixelRatio, 2)); R.outputColorSpace = THREE.SRGBColorSpace;

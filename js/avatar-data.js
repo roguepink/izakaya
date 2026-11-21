@@ -192,6 +192,7 @@ var AVATAR = {
     vOld = AVATAR.VOICE_ALIAS[vOld] || vOld;
     o.voice = VL.some(function (v) { return v.id === vOld; }) ? vOld : (o.owner ? (o.sex === 'f' ? 'o_leda' : (SHOP.NOBU_VOICE && SHOP.NOBU_VOICE.length ? 'nobu' : 'o_fenrir')) : (o.sex === 'f' ? 'g_zephyr' : 'g_puck'));
     if (a.special === 'ai' && !o.owner) o.special = 'ai';   // 常連のアイちゃん専用の見た目(js/scene3d.js)
+    if (a.special === 'nobu' && o.owner && o.sex === 'm') { o.special = 'nobu'; o.acc = 'none'; }   // 大将ノブ専用の顔・髪型(js/scene3d.js。中身は config.js の NOBU_FACE)。お客さんには付かない
     var s = +a.size; o.size = s >= AVATAR.SIZE_MIN && s <= AVATAR.SIZE_MAX ? s : 1;
     return o;
   },
