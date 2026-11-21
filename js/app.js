@@ -1421,6 +1421,7 @@
         ownerTo(e.seat, true);
         var ph2 = SHOP.PHRASES.filter(function (p) { return p.id === (e.svc ? 'o_service' : 'omachi'); })[0];   // サービスのときは「こちらはサービスです！」
         if (ph2) { bubble('owner', ph2.say + ' ' + (it ? it.emoji + ' ' + it.name + (it.pun && it.real ? '(中身は' + it.real + 'です)' : '') : ''), true); playPhrase(ph2); }
+        if (e.svc && amLeader() && regSeat() >= 0 && e.seat === regSeat()) setTimeout(function () { regLine('svc', 'owner'); }, rnd(2, 3.5) * 1000);   // アイちゃんにサービス → 必ず「ありがとう」(11-21 ノブさん)
       }
     });
   }
