@@ -2333,9 +2333,14 @@
       net.push('events', { type: 'record', at: TS, by: uid });
       return '🎉 本日の最高得点です!';
     }
-    if (better && rank === 1) return '🎉 自分の記録を こえました!(いまも1位)';
+    if (better && mine && uid !== REG_UID) {   // 自己ベスト更新: 大将「おめでとうございます!」+ 常連の子「すごーい!/おめでとう〜!」(11-22 ノブさん「最高得点を更新した時も あの声を」)
+      sys('🎉 ' + honor(name) + 'が 自己ベスト更新!(' + gameName() + ' ' + mine.score + '→' + score + '点)');
+      if (!(OWNER_MODE && uid === ME.uid)) net.push('events', { type: 'phrase', id: 'o_omedeto', seat: 'owner', at: TS, by: uid });   // 大将が自分で遊んだときは 大将の声は出さない
+      net.push('events', { type: 'record', at: TS, by: uid });
+    }
+    if (better && rank === 1) return '🎉 自己ベスト更新!(いまも1位)';
     if (!better) return '今日の自分の最高は ' + mine.score + '点(いま ' + (1 + L.filter(function (x) { return x.uid !== uid && x.score >= mine.score; }).length) + '位)';
-    return '今日の ' + rank + '位です!';
+    return mine ? '🎉 自己ベスト更新! 今日の ' + rank + '位です' : '今日の ' + rank + '位です!';
   }
   function myGameName() { return OWNER_MODE ? ownerLabel() : currentName(); }
   function setGaming(on) { if (!inside || DEMO) return; if (OWNER_MODE) net.update('state', { ownerGame: on ? now() : null }); else net.update('members/' + ME.uid, { game: on ? now() : null }); }
@@ -3039,5 +3044,5 @@
   initEntrance();
   // 確認用(画面の自動テストから使う)
   setTimeout(batonAutoEnter, 900);   // バトンタッチで開きなおしたときは 自動で店に入る
-  window.IZ = { scene: function () { return scene; }, get tree() { return tree; }, get inside() { return inside; }, get seat() { return mySeat; }, net: function () { return net; }, addBot: addBot, status: status, upcoming: upcoming, voiceFiles: voiceFiles, playAi: playAi, reg: REG };
+  window.IZ = { scene: function () { return scene; }, get tree() { return tree; }, get inside() { return inside; }, get seat() { return mySeat; }, net: function () { return net; }, addBot: addBot, postScore: function (u, n, s) { return postScore(u, n, s); }, status: status, upcoming: upcoming, voiceFiles: voiceFiles, playAi: playAi, reg: REG };
 })();
