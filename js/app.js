@@ -171,7 +171,7 @@
       scene = make2D();
     }
     scene.onTap = function (seat) { if (seat >= 0) onSeatTap(seat); };
-    scene.onAvatarTap = function (k) { if (isMe(k)) selfPick(); else if (OWNER_MODE && typeof k === 'number') ownerPick(k); else replyToSeat(k, true); };
+    scene.onAvatarTap = function (k) { if (isMe(k)) selfPick(); else if (OWNER_MODE && typeof k === 'number') ownerPick(k); else if (k === 'owner' && !OWNER_MODE) guestOwnerPick(); else replyToSeat(k, true); };
     scene.onItemTap = function (seat, key) { if (!inside) return; if (OWNER_MODE) { serveTo(seat); return; } if (seat === mySeat) eat(key); };   // 大将が料理を押す → その席に出す
     scene.onTableTap = function (seat) { if (inside && OWNER_MODE) serveTo(seat); };   // 大将がその人のテーブルを押す → 料理を出す
     scene.onTagTap = function (id) {   // 壁の木札を押すと、すぐ注文(取り消しもできる)
@@ -1041,6 +1041,7 @@
     var c = e.target.closest && e.target.closest('[data-tk]'); if (!c) return;
     var k = c.getAttribute('data-tk');
     if (OWNER_MODE && k !== 'owner') { var r = c.getBoundingClientRect(); lastTapXY = { x: r.left + r.width / 2, y: r.top + r.height * 0.6 }; ownerPick(+k); return; }   // 大将: 話しかける・料理を出す を選ぶ
+    if (k === 'owner' && !OWNER_MODE) { var r2 = c.getBoundingClientRect(); lastTapXY = { x: r2.left + r2.width / 2, y: r2.top + r2.height * 0.6 }; guestOwnerPick(); return; }
     replyToSeat(k === 'owner' ? 'owner' : +k, false);
   });
   $('tkQuick').innerHTML = TALK_QUICK.map(function (q) { return '<button type="button" data-q="' + esc(q) + '">' + esc(q) + '</button>'; }).join('');
@@ -1068,12 +1069,15 @@
   function dropCall(v) { var c = callOf(v); return c ? v.slice(c[0].length) : v; }
   function toChip() {
     var m = callOf(chatIn.value), c = $('toChip');
+    c.classList.toggle('wh', !!whMode);
+    if (whMode) { $('toName').textContent = '🤫 ' + whMode.name + 'にだけ こそっと'; c.classList.remove('hidden'); return; }
     if (!m) { if (!c.classList.contains('hidden')) c.classList.add('hidden'); return; }
     $('toName').textContent = '💬 ' + m[1] + 'へ';
     c.classList.remove('hidden');
   }
   $('toClear').addEventListener('pointerdown', function (e) { e.preventDefault(); });   // 押しても入力欄から外れないように(そのあと自分で閉じる)
   $('toClear').onclick = function () {
+    if (whMode) { setWhisper(null); return; }
     chatIn.value = dropCall(chatIn.value); replyPick = null; growInput();
     if (!chatIn.value.trim()) { chatIn.value = ''; growInput(); try { chatIn.blur(); } catch (e) {} }   // 何も書いていなければ キーボードも閉じる
   };
@@ -1091,6 +1095,8 @@
   }
   $('logBtn').onclick = function () { toggleLog(); };
   $('log').addEventListener('click', function (e) {
+    var wl = e.target.closest && e.target.closest('.ln.wh[data-whseat]');
+    if (wl) { var ws = wl.getAttribute('data-whseat'); if (ws !== '') { if (document.querySelector('.log-wrap').classList.contains('big')) toggleLog(false); setWhisper(ws === 'owner' ? 'owner' : +ws); } return; }
     var ln = e.target.closest && e.target.closest('.ln[data-seat]'), big = document.querySelector('.log-wrap').classList.contains('big');
     if (ln && !ln.getAttribute('data-me') && ln.getAttribute('data-seat') !== '') {
       var k = ln.getAttribute('data-seat'); if (k !== 'owner') k = +k;
@@ -1108,7 +1114,7 @@
     if (!DEMO && e.target.closest && (e.target.closest('.tag.me') || (OWNER_MODE && e.target.closest('.tag.owner')))) { selfPick(); return; }   // 自分の名札 → 着がえ
     var t = e.target.closest && e.target.closest('.tag[data-seat]'); if (!t) return;
     var k = t.getAttribute('data-seat');
-    if (OWNER_MODE && k !== 'owner') ownerPick(+k); else replyToSeat(k === 'owner' ? 'owner' : +k, false);
+    if (OWNER_MODE && k !== 'owner') ownerPick(+k); else if (k === 'owner') guestOwnerPick(); else replyToSeat(+k, false);
   });
   $('chatForm').addEventListener('submit', function (e) {
     e.preventDefault();
@@ -1119,8 +1125,16 @@
     if (!t) return false;
     if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return false; }
     if (Date.now() - lastSent < 1500) { toast('少し間をあけて送ってください', 1500); return false; }
-    lastSent = Date.now();
     var msg = { uid: ME.uid, name: currentName(), seat: OWNER_MODE ? 'owner' : mySeat, owner: OWNER_MODE, text: t, at: TS };
+    if (whMode) {   // こそっと: 相手がまだいるか 確かめてから
+      var wt = whTarget(whMode.seat);
+      if (!wt || wt.uid !== whMode.uid) { toast('相手がいなくなったので、こそっと話すのを やめました', 2400); setWhisper(null); return false; }
+      lastSent = Date.now();
+      msg.wh = 1; msg.to = wt.seat; msg.toUid = wt.uid;
+      net.push('chat', msg);
+      return true;
+    }
+    lastSent = Date.now();
     var to = replyPick && t.indexOf(replyPick.call) === 0 && (replyPick.seat === 'owner' || nameOfSeat(replyPick.seat)) ? replyPick.seat : addressee(t);
     replyPick = null;
     if (to !== null && to !== msg.seat) msg.to = to;
@@ -1141,11 +1155,44 @@
   function replyTo(name, isOwner) {
     if (!name || !inside || DEMO) return;   // 見本は 見るだけ
     if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return; }
+    if (whMode) setWhisper(null);
     var call = isOwner ? ((tree.state || {}).ownerRole === 'master' ? 'マスター、' : '大将、') : honor(name) + '、';
     var v = dropCall(chatIn.value);
     chatIn.value = call + v; growInput();
     try { chatIn.focus(); chatIn.setSelectionRange(chatIn.value.length, chatIn.value.length); } catch (e) {}
     chatIn.classList.remove('to-flash'); void chatIn.offsetWidth; chatIn.classList.add('to-flash');
+  }
+  /* ---------------- 🤫 こそっと話す(2026-11-23 ノブさん) ----------------
+     お客さん ⇄ 大将 だけ。書いた人と あて先の人の画面にだけ出る(ほかの人には 吹き出しも 記録も 出ない)。
+     お客さんどうしは できない(見えない所での 嫌がらせを防ぐ・お店の様子を大将が分かるように)。
+     ※ 同じ記録の場所を通るので、パスワードのような「秘密」ではない(ふつうの画面には出ない、というしくみ) */
+  var whMode = null;   // {seat:'owner'|席, uid, name}
+  function whTarget(k) {
+    if (k === 'owner') { var ou = ownerUid(); return ou ? { seat: 'owner', uid: ou, name: (tree.state || {}).ownerRole === 'master' ? 'マスター' : '大将' } : null; }
+    var u = seatUid(+k), m = u && members()[u]; if (!m || !fresh(m) || m.bot || m.regular || u === REG_UID) return null;
+    return { seat: +k, uid: u, name: honor(m.name) };
+  }
+  function setWhisper(k) {
+    if (k == null) { whMode = null; }
+    else {
+      if (DEMO || !inside) return;
+      if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return; }
+      var t = whTarget(k);
+      if (!t) { toast(k === 'owner' ? 'いま大将がいないので、こそっとは話せません' : 'その人には こそっと話せません', 2200); return; }
+      whMode = t; replyPick = null; chatIn.value = dropCall(chatIn.value);
+    }
+    $('chatForm').classList.toggle('wh-on', !!whMode);
+    chatIn.placeholder = whMode ? whMode.name + 'にだけ聞こえます…' : '話しかける…';
+    growInput();
+    if (whMode) { try { chatIn.focus(); } catch (e) {} chatIn.classList.remove('to-flash'); void chatIn.offsetWidth; chatIn.classList.add('to-flash'); }
+  }
+  function canSee(m) { return !m.wh || m.uid === ME.uid || (!!m.toUid && m.toUid === ME.uid); }
+  /* お客さんが 大将を押したとき: ふつうに話すか、こそっと話すか */
+  function guestOwnerPick() {
+    if (DEMO || !inside || OWNER_MODE || mySeat < 0 || !ownerUid()) { replyToSeat('owner', false); return; }
+    var w = popWho('<div class="wp-name">' + esc(whTarget('owner').name) + '</div><button data-w="talk">💬 話しかける<small>みんなに聞こえる</small></button><button data-w="wh" class="wp-wh">🤫 こそっと話す<small>' + esc(whTarget('owner').name) + 'にだけ</small></button>');
+    w.querySelector('[data-w=talk]').onclick = function () { closeWho(); setWhisper(null); replyToSeat('owner', false); };
+    w.querySelector('[data-w=wh]').onclick = function () { closeWho(); setWhisper('owner'); };
   }
   var replyPick = null;   // 押した人(名前が同じ人がいても、押した席の人あてにする)
   function replyToSeat(k, fromAvatar) {
@@ -1184,13 +1231,14 @@
     var nm = nameOfSeat(k); if (!nm) return;
     var w = $('whoPick');
     var bm = members()[seatUid(k)] || {};
-    w.innerHTML = '<div class="wp-name">' + esc(honor(nm)) + '</div><button data-w="talk">💬 話しかける</button><button data-w="serve">🍶 料理を出す</button>' + (!bm.bot && !DEMO ? '<button data-w="baton">🤝 大将を交代する</button>' : '');
+    w.innerHTML = '<div class="wp-name">' + esc(honor(nm)) + '</div><button data-w="talk">💬 話しかける</button><button data-w="serve">🍶 料理を出す</button>' + (!DEMO && whTarget(k) ? '<button data-w="wh" class="wp-wh">🤫 こそっと話す</button>' : '') + (!bm.bot && !DEMO ? '<button data-w="baton">🤝 大将を交代する</button>' : '');
     w.classList.remove('hidden'); w._at = Date.now();
     var bw = w.offsetWidth, bh = w.offsetHeight, x = Math.max(8, Math.min(innerWidth - bw - 8, lastTapXY.x - bw / 2)), y = lastTapXY.y + 14;
     if (y + bh > innerHeight - 90) y = Math.max(8, lastTapXY.y - bh - 14);
     w.style.left = x + 'px'; w.style.top = y + 'px';
-    w.querySelector('[data-w=talk]').onclick = function () { closeWho(); replyToSeat(k, false); };
+    w.querySelector('[data-w=talk]').onclick = function () { closeWho(); setWhisper(null); replyToSeat(k, false); };
     w.querySelector('[data-w=serve]').onclick = function () { serveTo(k); };
+    var wb = w.querySelector('[data-w=wh]'); if (wb) wb.onclick = function () { closeWho(); setWhisper(k); };
     var bb = w.querySelector('[data-w=baton]'); if (bb) bb.onclick = function () { closeWho(); openSheet('baton', k); };
   }
   /* ---------------- 🤝 バトンタッチ(大将の交代) ----------------
@@ -1337,12 +1385,17 @@
   var ME_TAG = '<i class="me-tag">あなた</i>';
   function renderLog() {
     var c = tree.chat || {}, keys = Object.keys(c).sort(); lastOwnerAt = 0;
-    var shown = keys.filter(function (k) { return (c[k].at || 0) >= joinAt - 10 * MIN; }).slice(-120);
+    var shown = keys.filter(function (k) { return (c[k].at || 0) >= joinAt - 10 * MIN && canSee(c[k]); }).slice(-120);
     shown.forEach(function (k) { if (c[k].owner) lastOwnerAt = Math.max(lastOwnerAt, c[k].at || 0); });
     var log = $('log'), atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
     var html = shown.map(function (k) {
       var m = c[k];
       if (m.sys) return '<div class="ln sys">' + esc(m.text) + '</div>';
+      if (m.wh) {   // こそっと(書いた人と 相手にだけ)
+        var wme = m.uid === ME.uid, wseat = m.owner ? 'owner' : (okSeat(m.seat) ? m.seat : '');
+        var wlab = wme ? '🤫 ' + (m.to === 'owner' ? ((tree.state || {}).ownerRole === 'master' ? 'マスター' : '大将') : esc(honor(nameOfSeat(m.to) || 'お客さん'))) + 'へ こそっと' : '🤫 ' + esc(m.owner ? (m.name || '大将') : honor(m.name || '')) + 'から こそっと';
+        return '<div class="ln wh' + (wme ? ' me' : '') + '" data-whseat="' + (wme ? m.to : wseat) + '"' + (wme ? ' data-me="1"' : '') + '><b>' + wlab + '</b>' + esc(m.text) + '</div>';
+      }
       if (m.owner) { return '<div class="ln owner' + (OWNER_MODE ? ' me' : '') + '" data-seat="owner">' + (OWNER_MODE ? ME_TAG : '') + '<b>🏮 ' + esc(m.name || '') + '</b>' + esc(m.text) + '</div>'; }   // 大将の画面では 大将の言葉が「自分の言葉」
       var col = typeof m.seat === 'number' ? SEAT_COLORS[m.seat % SEAT_COLORS.length] : '';
       var fresh2 = OWNER_MODE && (m.at || 0) > lastOwnerAt && m.uid !== ME.uid;   // 大将が まだ返事していない新しいコメント
@@ -1353,6 +1406,16 @@
     keys.forEach(function (k) {
       if (seenChat[k]) return; seenChat[k] = 1;
       var m = c[k]; if (m.sys || (m.at || 0) < joinAt - 5000) return;
+      if (!canSee(m)) return;   // ほかの人の こそっと話は、何も出さない
+      if (m.wh) {
+        bubble(m.seat, '🤫 ' + m.text, false, m.uid === ME.uid && !m.owner);
+        if (m.uid !== ME.uid && (m.at || 0) > now() - 15000) {
+          toast('🤫 ' + (m.owner ? '大将' : honor(m.name || '')) + 'から こそっと話がきました', 3500, '返す', function () { setWhisper(m.owner ? 'owner' : m.seat); });
+          try { if (navigator.vibrate) navigator.vibrate([60, 60, 60]); } catch (e) {}
+        }
+        withScene(function (s) { s.talk(m.seat); });
+        return;
+      }
       if ((m.at || 0) > now() - 15000) regHear(m);
       bubble(m.seat, m.text, false, m.uid === ME.uid && !m.owner);
       if (m.ai && m.uid === REG_UID && /^[a-z]{1,2}\d{1,2}$/.test(m.ai)) playAi(m.ai, m.seat);   // アイちゃんの声(2026-11-21 録音)
@@ -1378,7 +1441,7 @@
     if (!b) { b = bubbles[key] = { el: document.createElement('div'), bn: document.createElement('div'), bt: document.createElement('div') }; b.bn.className = 'bn'; b.bt.className = 'bt'; b.el.appendChild(b.bn); b.el.appendChild(b.bt); }
     b.el.style.display = 'none';   // 中身が変わったら、次に置き場所が決まるまで隠す(古い場所で一瞬重ならないように)
     $('bubbles').appendChild(b.el);   // いちばん新しい吹き出しを、いちばん手前に
-    b.el.className = 'bubble' + (phrase ? ' phrase' : '') + (key === 'owner' ? ' owner' : '') + (mine ? ' me' : '') + (text.length > 50 ? ' long' : '');
+    b.el.className = 'bubble' + (phrase ? ' phrase' : '') + (key === 'owner' ? ' owner' : '') + (mine ? ' me' : '') + (text.length > 50 ? ' long' : '') + (text.indexOf('🤫 ') === 0 ? ' wh' : '');
     b.bt.textContent = text; b.bt.scrollTop = 0;
     b.start = Date.now();
     b.until = b.start + Math.min(20000, 3500 + text.length * 90);
@@ -2997,7 +3060,7 @@
   }
   /* 話しかけられたら(その子あて・名前が入っている)→ 少しして 必ず「ありがとう」の入った ひとこと(続けて送られた分は 6秒に1回) */
   function regHear(msg) {
-    if (!amLeader() || !msg || msg.uid === REG_UID || msg.sys) return;
+    if (!amLeader() || !msg || msg.uid === REG_UID || msg.sys || msg.wh) return;   // こそっと話には 反応しない
     var k = regSeat(); if (k < 0) return;
     var tx = String(msg.text || ''); if (!(msg.to === k || [REG.NAME].concat(REG.CALL || []).some(function (w) { return w && tx.indexOf(w) >= 0; }))) return;
     var key = msg.uid || msg.name, n = now(); if (regThanks[key] && n - regThanks[key] < 6000) return; regThanks[key] = n;   // 話しかけられたら 毎回(続けて送られた分は 6秒に1回)お礼(ノブさん 2026-11-21「必ず ありがとうと言ってもらいたい」。前は 同じ人に2分に1回)
