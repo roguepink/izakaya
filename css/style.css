@@ -303,7 +303,8 @@ button.mini { background: rgba(0,0,0,.1); border-radius: 999px; width: 30px; hei
 /* 大将の接客画面: 会話の欄を大きく、右のボタンは「☰」にたたむ */
 #bMore { display: none; }
 body.owner-view #bMore { display: flex; }
-body.owner-view:not(.side-open) .side > .sbtn:not(#bMore):not(#bOrders) { display: none; }
+body.owner-view:not(.side-open) .side > .sbtn:not(#bMore):not(#bOrders):not(#bView) { display: none; }
+body.owner-view .side > #bView { order: -1; }   /* 大将も 👁 は いつも いちばん上(右上)。おしゃべり画面と 同じ所で 続けて押せる 11-22 ノブさん */
 body.owner-view .log { max-height: 27vh; font-size: 14.5px; background: rgba(20,12,8,.55); border-radius: 12px; padding: 14px 6px 6px; }
 body.owner-view .log .ln { background: rgba(255,255,255,.07); }
 body.owner-view .log .ln.owner { background: rgba(140,29,22,.9); }
@@ -525,7 +526,8 @@ body.demo .side > #bGame { display: none !important; }   /* 着がえ中は 💬
 .tk-quick::-webkit-scrollbar { display: none; }
 .tk-quick button { flex: none; background: #4a3a2c; color: #fbf3e4; border-radius: 999px; padding: 8px 12px; font-weight: 800; font-size: 14px; }
 /* おしゃべり画面の間: 右のボタンは 上に 横ならび。頭の上の吹き出し・名札・モニターは かくす。会話の欄は 少し広く */
-body.talk-on .side { flex-direction: row; flex-wrap: wrap; left: 8px; right: 8px; max-height: none !important; gap: 5px; justify-content: center; align-content: flex-start; }   /* ボタンは 全部見えるように(入りきらなければ 2段に) */
+body.talk-on .side { flex-direction: row-reverse; flex-wrap: wrap; left: 8px; right: 8px; max-height: none !important; gap: 5px; justify-content: flex-start; align-content: flex-start; }
+body.talk-on .side > #bView { order: -1; }   /* 👁 は いちばん右上(ふつうの画面の 👁 と だいたい同じ所。続けて押せるように 11-22 ノブさん) */   /* ボタンは 全部見えるように(入りきらなければ 2段に) */
 body.talk-on .side::-webkit-scrollbar { display: none; }
 body.talk-on .sbtn { flex: none; width: 49px; padding: 5px 0 4px; }
 body.talk-on .sbtn span { font-size: 19px; }
