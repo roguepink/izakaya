@@ -2339,11 +2339,11 @@
   function boardTick() {
     var top = scoresToday().slice(0, 3), d = todayGame(), k = JSON.stringify([d && d.id, top.map(function (x) { return [x.name, x.score]; })]);
     if (k === boardKey) return; boardKey = k;
-    withScene(function (sc) { if (sc.setScores) sc.setScores(top, d ? d.icon + ' ' + d.name : ''); });
+    withScene(function (sc) { if (sc.setScores) sc.setScores(top, d ? d.icon + ' ' + d.name : '', (d && d.unit) || '点'); });
   }
   function postScore(uid, name, score, gid, key) {   // 自分の最高より高ければ 記録。1位になったら お知らせ。結果の文を返す。gid・key は 遊びはじめた時のゲーム(途中で 大将が ゲームを変えても まざらない 11-22)
     gid = gid || gameId(); key = key || gameKey();
-    var gname = (window.IZGAME && IZGAME.def && IZGAME.def(gid)) ? (IZGAME.def(gid).name || gameName()) : gameName();
+    var gdef = (window.IZGAME && IZGAME.def && IZGAME.def(gid)) || null, gname = gdef ? (gdef.name || gameName()) : gameName(), U = (gdef && gdef.unit) || '点';   // U: 点数の単位(ゴルフは ヤード)
     var mx = window.IZGAME ? IZGAME.maxScore(gid, key) : null; if (mx == null) mx = 99999; score = Math.max(0, Math.min(score | 0, mx));   // ありえない点は 上限まで
     if (score <= 0) return '';
     var L = scoresToday(key), mine = L.filter(function (x) { return x.uid === uid; })[0], top = L[0];
@@ -2351,18 +2351,18 @@
     if (better) net.set('scores/' + key + '/' + uid, { name: name, score: score, at: TS });
     var rank = 1 + L.filter(function (x) { return x.uid !== uid && x.score >= score; }).length;
     if (better && rank === 1 && (!top || top.uid !== uid)) {   // 1位が かわった(または はじめての記録)
-      sys('🎉 ' + honor(name) + 'が 本日の最高得点!(' + gname + ' ' + score + '点)');
+      sys('🎉 ' + honor(name) + 'が 本日の最高得点!(' + gname + ' ' + score + U + ')');
       if (!(OWNER_MODE && uid === ME.uid)) net.push('events', { type: 'phrase', id: 'o_iine', seat: 'owner', at: TS, by: uid });   // 大将「いいねえ！」(大将が自分で1位のときは 出さない)
       net.push('events', { type: 'record', at: TS, by: uid });
       return '🎉 本日の最高得点です!';
     }
     if (better && mine && uid !== REG_UID) {   // 自己ベスト更新: 大将「おめでとうございます!」+ 常連の子「すごーい!/おめでとう〜!」(11-22 ノブさん「最高得点を更新した時も あの声を」)
-      sys('🎉 ' + honor(name) + 'が 自己ベスト更新!(' + gname + ' ' + mine.score + '→' + score + '点)');
+      sys('🎉 ' + honor(name) + 'が 自己ベスト更新!(' + gname + ' ' + mine.score + '→' + score + U + ')');
       if (!(OWNER_MODE && uid === ME.uid)) net.push('events', { type: 'phrase', id: 'o_omedeto', seat: 'owner', at: TS, by: uid });   // 大将が自分で遊んだときは 大将の声は出さない
       net.push('events', { type: 'record', at: TS, by: uid });
     }
     if (better && rank === 1) return '🎉 自己ベスト更新!(いまも1位)';
-    if (!better) return '今日の自分の最高は ' + mine.score + '点(いま ' + (1 + L.filter(function (x) { return x.uid !== uid && x.score >= mine.score; }).length) + '位)';
+    if (!better) return '今日の自分の最高は ' + mine.score + U + '(いま ' + (1 + L.filter(function (x) { return x.uid !== uid && x.score >= mine.score; }).length) + '位)';
     return mine ? '🎉 自己ベスト更新! 今日の ' + rank + '位です' : '今日の ' + rank + '位です!';
   }
   function myGameName() { return OWNER_MODE ? ownerLabel() : currentName(); }

@@ -2258,7 +2258,7 @@ function createShop(canvas, opts) {
 
   // 本日の最高得点の黒板(今日のミニゲーム。上位3人。上に ゲームの名前 11-22)
   const boardTex = canvasTex(256, 336, () => {});
-  let boardList = null, boardTitle = '';
+  let boardList = null, boardTitle = '', boardUnit = '点';
   function drawBoard() {
     const c = boardTex.image, g = c.getContext('2d'), W = c.width, H = c.height;
     g.fillStyle = '#6b4728'; g.fillRect(0, 0, W, H);   // 木のわく
@@ -2275,7 +2275,7 @@ function createShop(canvas, opts) {
       const y = 108 + i * 72;
       g.textAlign = 'left'; g.fillStyle = ['#f5c04a', '#e8e8f0', '#e0a070'][i]; g.font = 'bold 26px ' + FONT_JP; g.fillText((i + 1) + '', 24, y + 4);
       g.fillStyle = '#f6f0e0'; g.font = '22px ' + FONT_JP; g.fillText(Array.from(String(x.name || '')).slice(0, 7).join(''), 52, y + 2);
-      g.textAlign = 'right'; g.font = 'bold 24px ' + FONT_JP; g.fillText((x.score | 0) + '点', W - 22, y + 34);
+      g.textAlign = 'right'; g.font = 'bold 24px ' + FONT_JP; g.fillText((x.score | 0) + (boardUnit || '点'), W - 22, y + 34);
     });
     boardTex.needsUpdate = true;
   }
@@ -2983,7 +2983,7 @@ function createShop(canvas, opts) {
         seats: seatAvatars.map((a, i) => (a && a.visible ? headPos(a) : null)), owner: headPos(owner), empty: stools.map((s, i) => { tmp.set(seatX(i, N), STOOL_Y + 0.25, GUEST_Z); const v = tmp.clone().project(camera); if (v.z > 1) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }) }; },
     get name() { return SHOPNAME; },
     /* 店の名前を その場で変える(ちょうちん・のれん・モニター)。バトンタッチのとき */
-    setScores(list, title) { boardList = (list || []).slice(0, 3); boardTitle = title || ''; drawBoard(); },   // 本日の最高得点(上位3人)と 今日のゲームの名前
+    setScores(list, title, unit) { boardList = (list || []).slice(0, 3); boardTitle = title || ''; boardUnit = unit || '点'; drawBoard(); },   // unit: 点数の単位(ゴルフは ヤード)   // 本日の最高得点(上位3人)と 今日のゲームの名前
     setName(nm) {
       nm = nm || SHOP.NAME; if (nm === SHOPNAME) return;
       SHOPNAME = nm;

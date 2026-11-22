@@ -53,6 +53,7 @@
     '#izg{position:fixed;inset:0;z-index:100000;background:#1a120c;color:#fbf3e4;display:flex;flex-direction:column;font-family:inherit;touch-action:none;user-select:none;-webkit-user-select:none}',
     '#izg .izg-top{display:flex;justify-content:space-between;align-items:center;padding:calc(10px + env(safe-area-inset-top,0px)) 16px 8px;font-size:18px;gap:10px}',
     '#izg .izg-top b{font-size:24px;font-variant-numeric:tabular-nums}',
+    '#izg .izg-top>span{white-space:nowrap}#izg .izg-top .izg-u{font-size:14px}#izg .izg-top .izg-combo{flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis}',   /* 上の帯は 1行(小さいスマホで「ヤード」が 折れていた 11-22) */
     '#izg .izg-combo{color:#f5c04a;font-weight:700;min-width:5em;text-align:center}',
     '#izg canvas{flex:1;width:100%;min-height:0;display:block}',
     '#izg .izg-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(90vw,370px);max-height:calc(100% - 24px);overflow:auto;background:#2a1d14;border:2px solid #8a5a2a;border-radius:16px;padding:18px 16px;text-align:center;box-shadow:0 8px 30px rgba(0,0,0,.5)}',
@@ -128,7 +129,7 @@
     var intro = ''; try { intro = G.intro ? G.intro(kit) : ''; } catch (e) {}
     panel((opts.today ? '<div class="izg-today">🎮 今日のゲーム</div>' : '') +
       '<h2>' + (G.title || D.name) + (G.ver ? ' <small style="font-size:13px;opacity:.7">' + G.ver + '</small>' : '') + '</h2>' + intro +
-      (opts.best ? '<p>今日の自分の最高: <b>' + opts.best + '点</b></p>' : ''),
+      (opts.best ? '<p>今日の自分の最高: <b>' + opts.best + (D.unit || '点') + '</b></p>' : ''),
       [['スタート', begin], ['やめる', close, 'izg-no']]);
   }
   function begin() {
@@ -146,7 +147,7 @@
     var msg = ''; try { msg = opts.onEnd ? opts.onEnd(score, !!aborted) || '' : ''; } catch (e) {}
     if (aborted) { close(); return; }
     var extra = ''; try { extra = G.result ? G.result(kit) || '' : ''; } catch (e) {}
-    panel('<h2>おしまい!</h2><div class="izg-big">' + score + '<small style="font-size:20px">点</small></div>' +
+    panel('<h2>おしまい!</h2><div class="izg-big">' + score + '<small style="font-size:20px">' + (D.unit || '点') + '</small></div>' +
       (extra ? '<p>' + extra + '</p>' : '') + (msg ? '<p class="izg-res">' + msg + '</p>' : ''),
       [['もう一回', function () { opts.best = Math.max(opts.best || 0, score); begin(); }], ['お店にもどる', close, 'izg-no']]);
   }
@@ -185,7 +186,7 @@
     opts = o || {};
     D = def(opts.game, opts.any) || today(opts.game) || null;
     if (!D) return;
-    root = el('div', null, '<div class="izg-top"><span>' + (D.icon || '🎮') + ' <b id="izgScore">0</b>点</span><span class="izg-combo"></span><span>残り <b id="izgTime">' + (D.sec || 30) + '</b>秒</span></div><canvas></canvas><div class="izg-wait">じゅんび中…</div>');
+    root = el('div', null, '<div class="izg-top"><span>' + (D.icon || '🎮') + ' <b id="izgScore">0</b><span class="izg-u">' + (D.unit || '点') + '</span></span><span class="izg-combo"></span><span' + (D.noTimer ? ' style="visibility:hidden"' : '') + '>残り <b id="izgTime">' + (D.sec || 30) + '</b>秒</span></div><canvas></canvas><div class="izg-wait">じゅんび中…</div>');
     root.id = 'izg';
     var x = el('button', 'izg-x', '✕ やめる'); x.onclick = function () { if (kit && kit.phase === 'play') finish(true); else close(); }; root.appendChild(x);
     document.body.appendChild(root);

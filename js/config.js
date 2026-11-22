@@ -311,6 +311,7 @@ var SHOP = {
     { id: 'jokki', name: 'ジョッキ キャッチ', icon: '🍺', sec: 30, file: 'games/jokki.js', note: '落ちてくる料理を お盆で受け止める。焦げは よける' },
     { id: 'tataki', name: '大将をたたくな!', icon: '🔨', sec: 30, file: 'games/tataki.js', note: '大将そっくりの にせものを たたく。本物の大将は たたかない' },
     { id: 'bowling', name: 'ハンドレッド ボウリング', icon: '🎳', sec: 60, file: 'games/bowling.js', note: 'でたらめに ならんだ 100本のピンを、1投で 何本 倒せるか' },
+    { id: 'golf', name: 'ナイスショット ゴルフ', icon: '⛳', sec: 150, unit: 'ヤード', noTimer: true, file: 'games/golf.js', note: '動く目もりの まん中で 打つ!を10回。飛んだヤードが点数(最高390)' },
     { id: '_template', name: '焼き鳥タップ(お手本)', icon: '🍢', sec: 20, file: 'games/_template.js', note: '新しいゲームの お手本', off: true }
   ],
   NOBU_FACE: { hair: 'n2', brow: 'k4', eye: 'e2', nose: 2, beard: 'b1', beardColor: '#4a4542', face: 'tall', skin: 2, mouth: 'nsmile', headColor: '#2a3a6a', backText: 'のぶ' },   // 11-22 ノブさんが決めた: 顔は 髪を横に流す(8番)で統一。服の基本は 紺の法被+藍のはちまき+背中「のぶ」(6番)。はちまきの色・背中の文字は 着がえで 変えられる
