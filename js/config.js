@@ -313,7 +313,7 @@ var SHOP = {
     { id: 'bowling', name: 'ハンドレッド ボウリング', icon: '🎳', sec: 60, file: 'games/bowling.js', note: 'でたらめに ならんだ 100本のピンを、1投で 何本 倒せるか' },
     { id: '_template', name: '焼き鳥タップ(お手本)', icon: '🍢', sec: 20, file: 'games/_template.js', note: '新しいゲームの お手本', off: true }
   ],
-  NOBU_FACE: { hair: 'n2', brow: 'k4', eye: 'e2', nose: 2, beard: 'b1', beardColor: '#4a4542', face: 'egg', skin: 2, mouth: 'nsmile', headColor: '#2a3a6a', backText: 'のぶ' },   // 11-22 ノブさんが決めた: 顔は 髪を横に流す(8番)で統一。服の基本は 紺の法被+藍のはちまき+背中「のぶ」(6番)。はちまきの色・背中の文字は 着がえで 変えられる
+  NOBU_FACE: { hair: 'n2', brow: 'k4', eye: 'e2', nose: 2, beard: 'b1', beardColor: '#4a4542', face: 'tall', skin: 2, mouth: 'nsmile', headColor: '#2a3a6a', backText: 'のぶ' },   // 11-22 ノブさんが決めた: 顔は 髪を横に流す(8番)で統一。服の基本は 紺の法被+藍のはちまき+背中「のぶ」(6番)。はちまきの色・背中の文字は 着がえで 変えられる
   NOBU_VOICE: ['irasshai', 'o_okaeri', 'o_nani', 'haiyo', 'omachi', 'o_service', 'o_shosho', 'o_atsui', 'o_kanpai', 'o_iine', 'o_moriagari', 'o_omedeto', 'o_okawari', 'o_arigato', 'o_maido', 'o_goyukkuri', 'lastcall', 'mataokoshi', 'o_kiwotsukete', 'oyasumi', 'o_photo', 'o_cheese']
 };
 SHOP.GUEST_PHRASES.forEach(function (p) { p.who = 'guest'; });

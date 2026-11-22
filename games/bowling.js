@@ -3,7 +3,8 @@
    1回投げるだけで 100本のピンを 倒す。ピンは ふつうの並びではなく、レーンに でたらめに 100本(毎回ちがう)。
    えらべるもの: ボールの色・重さ・回転の量・右回転/左回転・投げる場所(左/まん中/右)。
    右回転は 左へ曲がる、左回転は 右へ曲がる。ガーターは なし(はしの かべで 跳ね返る)。左から 右回転で投げると、はじめは 右へ転がって あとで 左へ曲がる(右からは その逆)。
-   はじめに カメラが 上から下へ レーンを なぞって ピンの並びを見せる → タップで投げる。
+   はじめに カメラが 上から下へ レーンを なぞって ピンの並びを見せる → 指で 投げる向きを決めて(ななめもOK)、はなすと投げる。
+   ななめに投げると かべで 何回も 跳ね返りながら ジグザグに 進む(11-22 ノブさん「斜めにも投げれるように」)。
    倒れたピンが ほかのピンを たおす(れんさ)。倒れた本数が そのまま点数(100点満点)。3D は使わない(平らな絵)。
    ===================================================================== */
 (function () {
@@ -14,7 +15,7 @@
   var SPIN = [['なし', 0], ['少し', 1], ['ふつう', 2], ['すごく', 3]];
   var DIR = [['右回転', -1], ['左回転', 1]];   // 右回転 → 左へ曲がる
   var POS = [['左', 0.2], ['まん中', 0.5], ['右', 0.8]];
-  var opt = { c: 0, w: 1, s: 2, d: 0, p: 0 };
+  var opt = { c: 0, w: 1, s: 2, d: 0, p: 0 }, MAX_ANG = 0.95;   // 投げる向き: まっすぐから 左右に 55度まで
   try { var sv = JSON.parse(localStorage.getItem('iz-bowl') || 'null'); if (sv) Object.keys(opt).forEach(function (k) { if (typeof sv[k] === 'number') opt[k] = sv[k]; }); } catch (e) {}
   var st = null, tries = 0;
 
@@ -49,22 +50,28 @@
     try { localStorage.setItem('iz-bowl', JSON.stringify(opt)); } catch (e2) {}
   });
 
+  function aimAt(p) {   // 指の場所 → 投げる向き(ボールから 指へ)。指がボールより下なら 横の位置だけで決める
+    var v = st.view; if (!v) return;
+    var dx = (p.x - v.bx) * v.W, dy = (v.by - p.y) * v.H;
+    st.ang = Math.max(-MAX_ANG, Math.min(MAX_ANG, Math.atan2(dx, Math.max(40, dy))));
+  }
   function hit(p, k) { if (p.st !== 'stand') return; p.st = 'fly'; st.down++; k.add(1); st.chain.push(k.t); }
 
   window.IZGAME.register({
-    id: 'bowling', title: '🎳 ハンドレッド ボウリング', ver: 'ver.1', sec: SEC,
+    id: 'bowling', title: '🎳 ハンドレッド ボウリング', ver: 'ver.2', sec: SEC,
     maxScore: function () { return N_PIN; },
     intro: function () {
-      return '<p>1回 投げるだけ。レーンに でたらめに ならんだ <b>100本</b>の ピンを、何本 倒せるか!<br>倒れたピンが ほかのピンも たおします。ガーターは なし(かべで 跳ね返る)。</p>' +
+      return '<p>1回 投げるだけ。レーンに でたらめに ならんだ <b>100本</b>の ピンを、何本 倒せるか!<br>倒れたピンが ほかのピンも たおします。ガーターは なし(かべで 跳ね返る)。<br><b>ななめに投げる</b>と かべで 何回も 跳ね返って、たくさん 倒せるかも!</p>' +
         chips('c', COLORS) + chips('w', WEIGHT) + chips('s', SPIN) + chips('d', DIR) + chips('p', POS) +
-        '<p style="font-size:13px;opacity:.8">右回転は 左へ、左回転は 右へ 曲がります。<br>左から 右回転で投げると、はじめは 右へ転がって あとで 左へ曲がります。<br>スタートすると ピンの並びを 上から見せます。見たら タップで投げる!</p>';
+        '<p style="font-size:13px;opacity:.8">右回転は 左へ、左回転は 右へ 曲がります。<br>左から 右回転で投げると、はじめは 右へ転がって あとで 左へ曲がります。<br>スタートすると ピンの並びを 上から見せます。<br>見たら <b>指で 投げる向きを決めて、はなすと 投げます</b>。</p>';
     },
     init: function () { st = {}; },
     start: function (k, seed) {
       tries++;
       st.pins = layout(seed + ':' + Date.now() + ':' + tries);
       var W = WEIGHT[opt.w], sp = SPIN[opt.s][1], dir = DIR[opt.d][1], x0 = POS[opt.p][1];
-      st.ball = { x: x0, y: 0.35, vx: -dir * sp * 0.06 * (x0 === 0.5 ? 0.5 : x0 < 0.5 === dir < 0 ? 1 : 0.35), vy: 2.55 + (W[2] - 1) * 0.15, r: W[1], m: W[2], rot: 0 };
+      st.speed = 2.6 + (W[2] - 1) * 0.15; st.ang = 0; st.aiming = false;
+      st.ball = { x: x0, y: 0.35, vx: 0, vy: st.speed, r: W[1], m: W[2], rot: 0 };
       st.spin = sp; st.dir = dir; st.color = COLORS[opt.c][1];
       st.phase = 'look'; st.lookT = 0; st.cam = TOP; st.down = 0; st.chain = []; st.slow = 0; st.endT = 0; st.msg = ''; st.msgT = 0; st.bigAt = 0;
     },
@@ -75,7 +82,7 @@
         st.cam = TOP - (TOP - 0.0) * e; if (q >= 1) st.phase = 'aim';
         k.combo(''); return;
       }
-      if (st.phase === 'aim') { k.combo('👆 タップで投げる!'); return; }
+      if (st.phase === 'aim') { k.combo(st.aiming ? '👉 はなすと投げる!' : '🎯 ねらってね'); return; }
       if (st.slow > 0) { st.slow -= dt; dt *= 0.45; }
       if (st.phase === 'roll') {
         var steps = 4, h = dt / steps;
@@ -83,7 +90,7 @@
           b.vx += st.dir * st.spin * 0.16 * Math.max(0, Math.min(1.4, (b.y - 1.0) / 2.4)) * h;   // あとから 大きく曲がる(フック)
           b.x += b.vx * h; b.y += b.vy * h; b.rot += (b.vy * 9 + st.spin * 4) * h;
           if (b.x - b.r < 0 || b.x + b.r > 1) {   // ガーターは なし: はしの かべで 跳ね返る(11-22 ノブさん「確実に点がつく形で」)
-            b.x = b.x < 0.5 ? b.r : 1 - b.r; b.vx = -b.vx * 0.7 + (b.x < 0.5 ? 0.12 : -0.12); k.shake(0.6);
+            b.x = b.x < 0.5 ? b.r : 1 - b.r; b.vx = -b.vx * 0.88 + (b.x < 0.5 ? 0.1 : -0.1); k.shake(0.6);   // ななめに投げたときは 勢いを あまり落とさず ジグザグに
             if (k.t - (st.bumpAt || 0) > 0.4) { st.bumpAt = k.t; st.msg = 'ボヨーン!'; st.msgT = 0.9; }
           }
           st.pins.forEach(function (p) {
@@ -151,6 +158,7 @@
         }
       });
       var b = st.ball, bx = lx + b.x * lw, by = Y(b.y), br = b.r * s;
+      st.view = { bx: bx / W, by: by / H, W: W, H: H };
       if (st.phase === 'aim' || st.phase === 'roll' || st.phase === 'settle') {
         g.fillStyle = 'rgba(0,0,0,.3)'; g.beginPath(); g.arc(bx + 3, by + 4, br, 0, Math.PI * 2); g.fill();
         var bg2 = g.createRadialGradient(bx - br * 0.35, by - br * 0.35, br * 0.1, bx, by, br); bg2.addColorStop(0, '#ffffff'); bg2.addColorStop(0.25, st.color); bg2.addColorStop(1, st.color);
@@ -159,18 +167,26 @@
       }
       if (st.phase === 'aim') {   // 曲がり方の 目安(点線)
         g.setLineDash([6, 8]); g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 2; g.beginPath();
-        var sx = b.x, sy = b.y, vx = b.vx; g.moveTo(lx + sx * lw, Y(sy));
-        for (var t = 0; t < 1.3; t += 0.05) { vx += st.dir * st.spin * 0.16 * Math.max(0, Math.min(1.4, (sy - 1.0) / 2.4)) * 0.05; sx += vx * 0.05; sy += b.vy * 0.05; g.lineTo(lx + sx * lw, Y(sy)); }
+        var sx = b.x, sy = b.y, vx = Math.sin(st.ang) * st.speed, vy = Math.cos(st.ang) * st.speed; g.moveTo(lx + sx * lw, Y(sy));
+        for (var t = 0; t < 1.5; t += 0.04) { vx += st.dir * st.spin * 0.16 * Math.max(0, Math.min(1.4, (sy - 1.0) / 2.4)) * 0.04; sx += vx * 0.04; sy += vy * 0.04;
+          if (sx - b.r < 0 || sx + b.r > 1) { sx = sx < 0.5 ? b.r : 1 - b.r; vx = -vx * 0.88 + (sx < 0.5 ? 0.1 : -0.1); }   // かべで 跳ね返る所も 見せる
+          g.lineTo(lx + sx * lw, Y(sy)); }
         g.stroke(); g.setLineDash([]);
-        g.fillStyle = 'rgba(20,12,8,.75)'; g.fillRect(W / 2 - 120, H * 0.42, 240, 54); g.fillStyle = '#ffd23f'; g.font = 'bold 24px sans-serif'; g.textAlign = 'center'; g.fillText('👆 タップで投げる!', W / 2, H * 0.42 + 36);
+        var ax = bx + Math.sin(st.ang) * br * 3.2, ay = by - Math.cos(st.ang) * br * 3.2;   // 向きの矢印
+        g.save(); g.translate(ax, ay); g.rotate(st.ang); g.fillStyle = '#ffd23f'; g.strokeStyle = '#3a2210'; g.lineWidth = 3; g.beginPath(); g.moveTo(0, -br * 1.1); g.lineTo(-br * 0.8, br * 0.3); g.lineTo(-br * 0.3, br * 0.3); g.lineTo(-br * 0.3, br * 1.2); g.lineTo(br * 0.3, br * 1.2); g.lineTo(br * 0.3, br * 0.3); g.lineTo(br * 0.8, br * 0.3); g.closePath(); g.stroke(); g.fill(); g.restore();
+        if (!st.aiming) { g.fillStyle = 'rgba(20,12,8,.78)'; g.fillRect(W / 2 - 150, H * 0.36, 300, 76); g.fillStyle = '#ffd23f'; g.font = 'bold 21px sans-serif'; g.textAlign = 'center'; g.fillText('👆 指で 向きを決めて', W / 2, H * 0.36 + 32); g.fillText('はなすと 投げる!', W / 2, H * 0.36 + 62); }
       }
       if (st.phase === 'look') { g.fillStyle = 'rgba(20,12,8,.7)'; g.fillRect(W / 2 - 110, 14, 220, 40); g.fillStyle = '#fbf3e4'; g.font = 'bold 18px sans-serif'; g.textAlign = 'center'; g.fillText('ピンの並びを 見てね…', W / 2, 41); }
       if (st.msgT > 0) { g.fillStyle = '#fbf3e4'; g.font = 'bold 30px sans-serif'; g.textAlign = 'center'; g.fillText(st.msg, W / 2, H * 0.4); }
     },
     pointer: function (k, p, type) {
-      if (type !== 'down' || k.phase !== 'play') return;
-      if (st.phase === 'look') { st.lookT = 99; return; }   // 見るのを とばす
-      if (st.phase === 'aim') { st.phase = 'roll'; }
+      if (k.phase !== 'play') return;
+      if (st.phase === 'look') { if (type === 'down') st.lookT = 99; return; }   // 見るのを とばす
+      if (st.phase === 'aim') {   // 指を おいた方へ 投げる(ななめもOK)。はなすと 投げる
+        if (type === 'down') { st.aiming = true; aimAt(p); }
+        else if (type === 'move' && st.aiming) aimAt(p);
+        else if (type === 'up' && st.aiming) { st.aiming = false; var b = st.ball; b.vx = Math.sin(st.ang) * st.speed; b.vy = Math.cos(st.ang) * st.speed; st.phase = 'roll'; }
+      }
     },
     result: function () { return st.down >= N_PIN ? '🎉 パーフェクト! 100本 ぜんぶ!' : st.down >= 80 ? 'すごい! もう少しで 100本!' : st.down >= 50 ? 'なかなか! 半分 こえた!' : '回転や 投げる場所を 変えてみよう'; }
   });

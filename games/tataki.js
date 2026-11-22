@@ -1,32 +1,32 @@
 /* =====================================================================
    ミニゲーム「大将をたたくな!」(ノブさん 2026-11-22)
-   9つの穴から、大将によく似た顔が つぎつぎ出てくる。にせものを たたくと +1、本物の大将を たたくと −10。
+   9つの穴から、大将と にせものの顔が つぎつぎ出てくる。にせものは 色・メガネ・帽子などで ひと目で ちがう(11-22 ノブさん「パッと見で全然違う形に」)。そのぶん 後半は とても速い。にせものを たたくと +1、本物の大将を たたくと −10。
    はじめは ゆっくり・少なめ → だんだん 速く・たくさん → 最後は 3つの顔が いっしょに出てくる。
-   顔の絵は games/tataki.webp(1枚に まとめた 顔写真。上の段: ふつう / 下の段: たたかれた顔。0番が本物の大将)
+   顔の絵は games/tataki.webp(1枚に まとめた 顔写真。上の段: ふつう / 下の段: たたかれた顔。0番が本物の大将、1〜12番が にせもの)
    スタート画面・点数・おしまい画面などは js/game-kit.js(わく)が受け持つ。
    ===================================================================== */
 (function () {
   'use strict';
-  var SEC = 30, N_CH = 9, CELL = 176;
+  var SEC = 30, N_CH = 13, CELL = 176;
   var img = new Image(), ready = new Promise(function (ok) { img.onload = ok; img.onerror = ok; });
   img.src = (window.IZGAME_BASE || '') + 'games/tataki.webp';
   var st = null;
 
   /* 出てくる順番(seed が同じなら いつも同じ) */
   function plan(seed) {
-    var r = window.IZGAME._rngOf('tataki1:' + seed), L = [], t = 0.8, busy = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+    var r = window.IZGAME._rngOf('tataki2:' + seed), L = [], t = 0.8, busy = [0, 0, 0, 0, 0, 0, 0, 0, 0];
     function one(t, p, real) {
       var free = []; for (var h = 0; h < 9; h++) if (busy[h] <= t) free.push(h);
       if (!free.length) return;
-      var hole = free[Math.floor(r() * free.length)], life = 1.55 - p * 0.95 + r() * 0.15;
+      var hole = free[Math.floor(r() * free.length)], life = 1.35 - p * 0.92 + r() * 0.12;   // 最後は 0.45秒くらいで ひっこむ
       var ch = real ? 0 : 1 + Math.floor(r() * (N_CH - 1));
-      busy[hole] = t + life + 0.25; L.push({ t: t, hole: hole, ch: ch, life: life });
+      busy[hole] = t + life + 0.18; L.push({ t: t, hole: hole, ch: ch, life: life });
     }
     while (t < SEC - 0.6) {
-      var p = t / SEC, realRate = 0.22 + p * 0.14;
-      if (p > 0.72) { for (var k = 0; k < 3; k++) one(t + k * 0.05, p, r() < realRate); t += 0.85 - (p - 0.72) * 1.2 + r() * 0.1; }   // 最後は 3つの顔が いっしょに
-      else if (p > 0.4 && r() < 0.35) { one(t, p, r() < realRate); one(t + 0.08, p, r() < realRate); t += 0.7 - p * 0.4 + r() * 0.15; }   // ときどき 2つ
-      else { one(t, p, r() < realRate); t += 0.95 - p * 0.75 + r() * 0.15; }
+      var p = t / SEC, realRate = 0.25 + p * 0.15;
+      if (p > 0.66) { for (var k = 0; k < 3; k++) one(t + k * 0.05, p, r() < realRate); t += 0.72 - (p - 0.66) * 1.1 + r() * 0.08; }   // 最後は 3つの顔が いっしょに
+      else if (p > 0.3 && r() < 0.45) { one(t, p, r() < realRate); one(t + 0.08, p, r() < realRate); t += 0.66 - p * 0.4 + r() * 0.12; }   // ときどき 2つ
+      else { one(t, p, r() < realRate); t += 0.85 - p * 0.75 + r() * 0.12; }
     }
     return L;
   }
@@ -38,13 +38,13 @@
   function iconOf(ch) { try { return '<img alt="" src="' + face(ch, false).toDataURL() + '">'; } catch (e) { return ''; } }
 
   window.IZGAME.register({
-    id: 'tataki', title: '🔨 大将をたたくな!', ver: 'ver.1', sec: SEC, ready: ready,
+    id: 'tataki', title: '🔨 大将をたたくな!', ver: 'ver.2', sec: SEC, ready: ready,
     maxScore: function (seed) { return plan(seed).filter(function (x) { return x.ch !== 0; }).length; },
     intro: function () {
       return '<div class="izg-leg">' +
         '<div class="b">' + iconOf(0) + '<span><b>本物の大将</b> … たたかない!<br>たたくと −10点</span></div>' +
-        '<div class="g">' + iconOf(1) + iconOf(4) + iconOf(2) + '<span><b>にせもの</b> … たたく!<br>+1点</span></div>' +
-        '</div><p>9つの穴から 大将に そっくりな顔が 出てきます。<br>どこか ちがうのが にせもの。よく見て たたこう!<br>だんだん 速く、たくさん出てきます。30秒。</p>';
+        '<div class="g">' + iconOf(1) + iconOf(6) + iconOf(4) + iconOf(8) + '<span><b>にせもの</b> … たたく!<br>+1点</span></div>' +
+        '</div><p>9つの穴から 大将と にせものが 出てきます。<br>はちまきが 紺色で、メガネも帽子もないのが 本物の大将。<br>ほかは ぜんぶ たたこう! どんどん 速くなります。30秒。</p>';
     },
     init: function () { st = { list: [], holes: [], hit: 0, ouch: 0, faces: {} }; },
     start: function (k, seed) {

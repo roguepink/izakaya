@@ -442,16 +442,16 @@ function drawEye(g, cx, cy, s, a, eyeC, ink) {
 
 /* ---------- 頭の形(ただの丸ではなく、上が広く あごに向かって細いアニメの頭) ---------- */
 function headDeform(face) {
-  const a = { round: 0.12, egg: 0.21, sharp: 0.29, square: 0.08, long: 0.2 }[face] ?? 0.18;
-  const sq = face === 'square', lg = face === 'long';   // long: 面長(大将ノブ専用。11-21 ノブさん)
+  const a = { round: 0.12, egg: 0.21, sharp: 0.29, square: 0.08, long: 0.2, tall: 0.22 }[face] ?? 0.18;
+  const sq = face === 'square', lg = face === 'long', tl = face === 'tall';   // tall: たまご型を 縦に のばした形(大将ノブ。11-22 ノブさん「もう少し 長細く 縦に」)   // long: 面長(大将ノブ専用。11-21 ノブさん)
   return (x, y, z, R) => {
     const ny = y / R;
     if (ny < 0) {
       const t = Math.min(1, -ny);
       x *= (1 - a * Math.pow(t, 1.5)) * (sq ? 1 + 0.05 * t : 1);
       z *= z > 0 ? 1 - 0.06 * t : 1 - 0.22 * t;
-      y *= 1 + (sq ? 0.02 : lg ? 0.3 : 0.1) * t; if (lg) x *= 0.92;   // 11-22 ノブさん「もう少し面長に」で 0.16→0.3・はば 0.96→0.92
-    } else { x *= (1 + 0.035 * ny) * (lg ? 0.94 : 1); y *= lg ? 1.05 : 1.02; z *= 1 + 0.02 * ny; }
+      y *= 1 + (sq ? 0.02 : lg ? 0.3 : tl ? 0.32 : 0.1) * t; if (lg) x *= 0.92; if (tl) x *= 0.92;   // 11-22 ノブさん「もう少し面長に」で 0.16→0.3・はば 0.96→0.92
+    } else { x *= (1 + 0.035 * ny) * (lg ? 0.94 : tl ? 0.94 : 1); y *= lg ? 1.05 : tl ? 1.07 : 1.02; z *= 1 + 0.02 * ny; }
     return [x, y, z];
   };
 }
@@ -567,7 +567,7 @@ function hairTint(geo, R) {
   return geo;
 }
 function buildHair(head, a, R, D) {
-  const HAT = (!a.owner && (a.acc === 'cap' || a.acc === 'beanie' || a.acc === 'beret')) || a._cosHat;   // 帽子をかぶっているときは、帽子の中に入る てっぺんの毛は作らない(帽子から突きぬけないように)
+  const HAT = ((!a.owner || a._decoy) && (a.acc === 'cap' || a.acc === 'beanie' || a.acc === 'beret')) || a._cosHat;   // 帽子をかぶっているときは、帽子の中に入る てっぺんの毛は作らない(帽子から突きぬけないように)
   const hc = AVATAR.color(AVATAR.HAIR_COLOR, a.hairColor);
   const dark = shade(hc, 0.78);
   const F = a.sex === 'f';
@@ -1045,7 +1045,7 @@ function buildAvatar(raw, opt = {}) {
     const col = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v : '';   // 大将だけの目印: はちまきの色・背中の文字(11-22)
     a.headColor = col(raw.headColor) || col(N.headColor); a.backTextColor = col(raw.backTextColor) || col(N.backTextColor);
     a.backText = Array.from(String(raw.backText != null ? raw.backText : N.backText || '')).slice(0, 3).join('');
-    if (['round', 'egg', 'sharp', 'square', 'long'].includes(N.face)) a.face = N.face; if (N.mouth) a.mouth = N.mouth; if (N.skin >= 0 && N.skin <= 5) a.skin = N.skin; a.acc = 'none';
+    if (['round', 'egg', 'sharp', 'square', 'long', 'tall'].includes(N.face)) a.face = N.face; if (N.mouth) a.mouth = N.mouth; if (N.skin >= 0 && N.skin <= 5) a.skin = N.skin; a.acc = 'none';
   }
   if (raw && raw._face) Object.assign(a, raw._face);   // おしゃべり画面の顔写真だけ: まばたき・笑顔・口をあける(大将ノブの決まった顔より あとに)
   const cos = raw && raw.costume; costumePrep(a, cos);   // お祝いモードの かぶりもの
@@ -1336,7 +1336,7 @@ function buildAcc(head, body, a, R, f) {
     });
     head.add(mesh(new THREE.BoxGeometry(R * 0.18, 0.004, 0.004), new THREE.MeshBasicMaterial({ color }), 0, -R * 0.0, ez + 0.016));
   };
-  if (!a.owner) switch (a.acc) {
+  if (!a.owner || a._decoy) switch (a.acc) {   // _decoy: ゲーム「大将をたたくな!」の にせもの顔だけ、大将にも メガネ・帽子を付ける
     case 'glasses': glasses('#1a1414'); break;
     case 'thin': glasses('#b8963a', true); break;
     case 'sun': glasses('#1a1414', false, true); break;
@@ -1479,7 +1479,7 @@ function buildAcc(head, body, a, R, f) {
     const Rh = f ? R * 1.2 : R;   // 女性は髪がふくらんでいるので、頭の飾りを ひとまわり大きく(髪にうもれないように)
     switch (a.head) {
       case 'hachimaki': case 'nejiri': { const Rb = f ? R * 0.98 : R, up = a.special === 'nobu' ? 0.07 : 0, tlt = a.special === 'nobu' ? 0.06 : 0.15;   // 大将ノブ: おでこを出した髪なので 少し上に巻く(まゆを隠さない)
-        const band = tm(new THREE.TorusGeometry(Rb * (a.special === 'nobu' ? (a.face === 'long' ? 0.97 : 0.995) : 1.03), a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), a.headColor || '#f6f4ee', 0, Rb * (0.3 + up), 0, 0.003); band.rotation.x = Math.PI / 2 + tlt; if (a.special === 'nobu') band.scale.x = a.face === 'long' ? 0.93 : 0.955; head.add(band);   // 大将ノブ: 面長のときは横はばが せまいので 横を しぼる(浮かないように)。卵型は ほぼ そのまま(しぼると髪に うまる 11-22)
+        const band = tm(new THREE.TorusGeometry(Rb * (a.special === 'nobu' ? (a.face === 'long' ? 0.97 : a.face === 'tall' ? 0.97 : 0.995) : 1.03), a.head === 'nejiri' ? 0.02 : 0.016, 8, 36), a.headColor || '#f6f4ee', 0, Rb * (0.3 + up), 0, 0.003); band.rotation.x = Math.PI / 2 + tlt; if (a.special === 'nobu') band.scale.x = a.face === 'long' ? 0.93 : a.face === 'tall' ? 0.92 : 0.955; head.add(band);   // 大将ノブ: 面長のときは横はばが せまいので 横を しぼる(浮かないように)。卵型は ほぼ そのまま(しぼると髪に うまる 11-22)
         if (a.head === 'nejiri') for (let k = 0; k < 24; k++) { const ang = k / 24 * Math.PI * 2; head.add(tm(new THREE.BoxGeometry(0.006, 0.03, 0.01), '#2a3a6a', Math.sin(ang) * Rb * 1.04, Rb * (0.3 + up) + Math.cos(ang) * Rb * tlt * 0.98, Math.cos(ang) * Rb * 1.04)); }
         const knot = tm(new THREE.SphereGeometry(0.025, 8, 6), a.headColor || '#f6f4ee', 0, Rb * (0.25 + up), -Rb * 1.02, 0.003); head.add(knot);
         [-1, 1].forEach((s) => { const tl = tm(new THREE.BoxGeometry(0.03, 0.09, 0.006), a.headColor || '#f6f4ee', s * 0.03, Rb * (0.12 + up), -Rb * 1.04); tl.rotation.z = s * 0.4; head.add(tl); });
