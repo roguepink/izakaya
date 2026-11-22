@@ -1908,12 +1908,17 @@
       title = '臨時の日を足す';
       html = '<div class="pl-form"><label>日にち<input type="date" id="paDate"></label><label>はじまり<input type="time" id="paStart" value="21:00"></label><label>おわり<input type="time" id="paEnd" value="22:00"></label>' +
         '<div class="btn-row"><button id="paSave" class="red">足す</button><button id="paBack">もどる</button></div><p class="small-note">足したあと、その日の店の名前・マスター・席の数を決められます。</p></div>';
+    } else if (sheetKind === 'aichan') {
+      title = '👧 ' + REG.NAME + 'の操作';
+      html = aiSheetHTML();
+      if (!force && body._h === html) return;
     } else if (sheetKind === 'bot') {
       if (!force) return;
       title = 'おためし客';
       html = '<p class="small-note">ひとりでも試せるように、作りもののお客さんを呼べます(おためしモードだけ)。</p><div class="btn-row"><button id="botAdd">🙋 1人呼ぶ</button><button id="botAll">👥 満席にする</button><button id="botOut" class="red">👋 全員帰す</button></div>';
     }
-    body._h = html; body.innerHTML = html; $('shTitle').textContent = title;
+    var keepY = sheetKind === 'aichan' && body._k === 'aichan' ? body.scrollTop : 0;   // 押しても 上に戻らない
+    body._h = html; body.innerHTML = html; $('shTitle').textContent = title; body._k = sheetKind; if (keepY) body.scrollTop = keepY;
     wireSheet();
   }
   function wireSheet() {
@@ -1942,6 +1947,8 @@
     } else if (sheetKind === 'batonAsk') {
       body.querySelector('#btYes').onclick = function () { batonAnswer(true); };
       body.querySelector('#btNo').onclick = function () { batonAnswer(false); };
+    } else if (sheetKind === 'aichan') {
+      wireAi(body);
     } else if (sheetKind === 'costume') {
       wireCostume(body);
     } else if (sheetKind === 'phrases') {
@@ -2204,7 +2211,9 @@
     ['xmas', 'newyear', 'birthday'].forEach(function (x) { document.body.classList.toggle('celeb-' + x, k === x); });
     boardTick();
     $('bGame').classList.toggle('hidden', !inside || DEMO || !window.IZGAME || !todayGame() || (!OWNER_MODE && mySeat < 0));   // 🎮 ミニゲーム(座ってから)
-    $('bCos').classList.toggle('hidden', !inside || DEMO);   // 👕 着がえ: いつも出す(お祝いの日は 仮装も ここから)
+    $('bCos').classList.toggle('hidden', !inside || DEMO);
+    $('bAi').classList.toggle('hidden', !inside || DEMO || !OWNER_MODE || !(REG.FITS || []).length);   // 👧 アイちゃん(大将だけ)
+    $('aiDot').classList.toggle('hidden', !regMember());   // いる間は 緑の点   // 👕 着がえ: いつも出す(お祝いの日は 仮装も ここから)
     var lbl = $('tbCeleb'); if (lbl) { lbl.innerHTML = k ? SHOP.CELEBRATE[k].emoji + '<i>' + esc(SHOP.CELEBRATE[k].name) + '</i>' : ''; lbl.classList.toggle('hidden', !k); }
     if (lastCeleb === null) { lastCeleb = k; return; }
     if (k !== lastCeleb) {
@@ -2215,22 +2224,151 @@
   }
   /* 常連のアイちゃんを 大将が呼ぶ・帰す(ノブさん 2026-11-21)。state.aiMode = { m: 'stay'(ずっといる)| 'away'(来ない), at }。8時間で もとの「おまかせ」に戻る */
   function regMode() { var x = (tree.state || {}).aiMode; return x && x.m && now() - (x.at || 0) < 8 * 3600 * 1000 ? x.m : ''; }
+  /* 店主の操作の中は 案内だけ(アイちゃんの操作は 右の「👧 アイちゃん」パネルへ 2026-11-23) */
   function regSheetHTML() {
     var md = regMode(), here = !!regMember();
-    return '<div class="sh-sec">👧 ' + esc(REG.NAME) + '(常連さん)</div><div class="btn-row">' +
-      '<button id="regCall"' + (md === 'stay' ? ' class="on"' : '') + '>👋 ' + esc(REG.NAME) + 'を呼ぶ</button>' +
-      '<button id="regBye" class="red">🌙 ' + esc(REG.NAME) + 'を帰す</button></div>' +
-      '<p class="small-note">いま: ' + (here ? 'お店にいます' : 'いません') + '・' + (md === 'stay' ? '呼んだので、お客さんが多くても ずっといます' : md === 'away' ? '帰したので、呼ぶまで来ません' : 'おまかせ(お客さんが ' + REG.MAX_GUESTS + '人までのとき来て、' + (REG.MAX_GUESTS + 1) + '人目が来たら帰ります)') +
-      (md ? ' <a href="#" id="regAuto">おまかせに戻す</a>' : '') + '</p>' +
-      '<p class="small-note" style="margin-bottom:4px">' + esc(REG.NAME) + 'が自分から話す間かく(お客さんへの話しかけ・大将への ひとこと など。だれかが話している間は 少し待ちます)</p><div class="ph-chips cel-pick">' +
-      (LOCAL ? [0.5, 1, 2, 5, 10] : [1, 2, 5, 10]).map(function (v) { return '<button data-aitalk="' + v + '"' + (regEvery() === v ? ' class="on"' : '') + '>' + (v < 1 ? '30秒' : v + '分') + 'に1回</button>'; }).join('') + '</div>';
+    return '<div class="sh-sec">👧 ' + esc(REG.NAME) + '(常連さん)</div><div class="btn-row"><button id="toAi">👧 ' + esc(REG.NAME) + 'の操作を開く</button></div>' +
+      '<p class="small-note">いま: ' + (here ? 'お店にいます' : 'いません') + '・' + (md === 'stay' ? '呼んだ' : md === 'away' ? '帰した' : 'おまかせ') + '。呼ぶ・帰す・話す間かく・服・ひとことは、右の「👧」ボタンからも開けます。</p>';
   }
-  function wireReg(q) {
-    var set = function (m) { net.update('state', { aiMode: m ? { m: m, at: TS } : null }); setTimeout(function () { refreshSheet(true); }, 300); };
-    var a = q('#regCall'); if (a) a.onclick = function () { set('stay'); toast(REG.NAME + 'を呼びました。ずっといてくれます', 2200); };
-    var b = q('#regBye'); if (b) b.onclick = function () { set('away'); toast(REG.NAME + 'に帰ってもらいます', 2200); };
-    var c = q('#regAuto'); if (c) c.onclick = function (e) { e.preventDefault(); set(''); };
-    document.querySelectorAll('#shBody [data-aitalk]').forEach(function (bt) { bt.onclick = function () { var v = +bt.getAttribute('data-aitalk'); net.update('state', { aiTalk: v }); regTalkAt = 0; toast(REG.NAME + 'は ' + (v < 1 ? '30秒' : v + '分') + 'に1回くらい 話します', 1800); setTimeout(function () { refreshSheet(true); }, 300); }; });
+  function wireReg(q) { var a = q('#toAi'); if (a) a.onclick = function () { openSheet('aichan'); }; }
+
+  /* ---------------- 大将の「👧 アイちゃん」パネル(ノブさん 2026-11-23) ----------------
+     「アイコンで操作したい。帰す・来てもらう・1分に1回話す 2分に1回話す・服装も選べるように」
+     state.aiMode(呼ぶ/帰す)・state.aiTalk(話す間かく。0 = 自分からは話さない)・state.aiLook(大将が選んだ服。なければ おまかせ=来るたびに組み合わせ)。
+     どれも state に入れるので、だれの画面にも同じに見える。着がえは まとめ役の regTick でも 合わせる(来たときも 選んだ服) */
+  function fitDef(id) { return (REG.FITS || []).filter(function (f) { return f[0] === id; })[0]; }
+  function regLook() { var L = (tree.state || {}).aiLook; return L && typeof L === 'object' && fitDef(L.fit) ? L : null; }
+  function lookOf(av) { av = av || {}; return { fit: av.aiFit || '', top: av.topColor || '', col2: av.aiCol2 || '', col3: av.aiCol3 || '', neck: av.aiNeck || '', rib: av.aiRibbon || '', ribC: av.aiRibbonC || '', acc: av.aiAcc || '' }; }
+  function fixLook(L) {   // 服の決まりに そろえる(胸元が開いた服は ネックレス・パーカーなどは ネックレスなし・花とリボンは 重ねない)
+    var f = fitDef(L.fit) || (REG.FITS || [['turtle2', 'paleB']])[0], hex = function (c) { return typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c) ? c : ''; };
+    var o = { fit: f[0], top: hex(L.top) || (REG.PALE || ['#f3efe8'])[0], col2: '', col3: '', neck: L.neck || '', rib: L.rib || '', ribC: hex(L.ribC), acc: L.acc || '' };
+    if (f[1]) o.col2 = hex(L.col2) || ((f[1] === 'calm' ? REG.CALM : REG.PALE_B) || ['#cfc4b4'])[0];
+    if (o.fit === 'quilt') o.col3 = hex(L.col3) || '#c8bca8';
+    if ((REG.NO_NECK || []).indexOf(o.fit) >= 0) o.neck = '';
+    else if ((REG.OPEN || []).indexOf(o.fit) >= 0 && !o.neck) o.neck = (REG.NECKS || ['pearl1'])[0];
+    if (o.rib) { if (!o.ribC) o.ribC = (REG.RIBBON_COLORS || ['#2c3550'])[0]; } else o.ribC = '';
+    if (o.acc === 'flower' && o.rib) o.acc = '';
+    return o;
+  }
+  function lookKey(L) { return [L.fit, L.top, L.col2, L.col3, L.neck, L.rib, L.ribC, L.acc].join('|'); }
+  function wearLook(av, L) {   // 顔・髪型は そのまま、服と小物だけ 着がえる
+    var a = JSON.parse(JSON.stringify(av || {}));
+    ['aiDress', 'aiCol2', 'aiCol3', 'aiNeck', 'aiRibbon', 'aiRibbonC', 'aiAcc'].forEach(function (k) { delete a[k]; });
+    a.aiFit = L.fit; a.topColor = L.top;
+    if (L.col2) a.aiCol2 = L.col2; if (L.col3) a.aiCol3 = L.col3; if (L.neck) a.aiNeck = L.neck;
+    if (L.rib) { a.aiRibbon = L.rib; a.aiRibbonC = L.ribC; } if (L.acc) a.aiAcc = L.acc;
+    return a;
+  }
+  var aiRand = null, aiPics = {}, aiPicQ = '', aiSayAt = 0, aiMoreOpen = false;
+  function aiBaseAv() { var m = regMember(); if (m && m.avatar) return m.avatar; if (!aiRand) aiRand = regAvatar(true); return aiRand; }
+  function aiCur() { var L = regLook(); return fixLook(L || lookOf(aiBaseAv())); }   // パネルで 今 選ばれている服
+  function aiDress(L, keep) {   // keep: 大将が選んだ服として覚える(次に来るときも この服)
+    L = fixLook(L);
+    if (keep) net.update('state', { aiLook: Object.assign({ at: TS }, L) });
+    var m = regMember(); if (m && m.avatar) net.update('members/' + REG_UID, { avatar: wearLook(m.avatar, L) });
+    else aiRand = wearLook(aiBaseAv(), L);
+  }
+  function aiPic(L) {   // 今の服の 全身の絵(1枚ずつ。同じ服は 覚えておく)
+    var k = lookKey(L); if (aiPics[k]) return aiPics[k] === 'x' ? '' : aiPics[k];
+    if (aiPicQ !== k) {
+      aiPicQ = k;
+      setTimeout(function () {
+        if (aiPicQ !== k || aiPics[k]) return;
+        var u = ''; try { if (window.IZ3D && IZ3D.portrait) u = IZ3D.portrait(wearLook(aiBaseAv(), L), 280, { full: true }); } catch (e) {}
+        var ks = Object.keys(aiPics); if (ks.length > 24) delete aiPics[ks[0]];
+        aiPics[k] = u || 'x'; aiPicQ = '';
+        if (sheetKind === 'aichan') refreshSheet(true);
+      }, 60);
+    }
+    return '';
+  }
+  function aiEveryList() { return LOCAL ? [0, 0.5, 1, 2, 5, 10] : [0, 1, 2, 5, 10]; }
+  function aiEveryName(v) { return v === 0 ? '話さない' : v < 1 ? '30秒に1回' : v + '分に1回'; }
+  var AI_SAY = [['ask', '🙋', 'お客さんへ'], ['owner', '🏮', '大将へ'], ['idle', '☁️', 'ひとりごと'], ['react', '😋', 'よろこぶ']];
+  function aiSayList(kind) {
+    var T = REG.TALK || {};
+    if (kind === 'react') return [].concat(T.yum || [], T.cheer || [], (T.kanpai || []).slice(0, 1), (T.svc || []).slice(0, 1), (T.thanks || []).slice(2, 3));
+    return T[kind] || [];
+  }
+  function aiSheetHTML() {
+    var m = regMember(), k = regSeat(), here = !!m && k >= 0, md = regMode(), keep = !!regLook(), L = aiCur(), FN = REG.FIT_NAMES || {};
+    var fitName = (FN[L.fit] || [L.fit])[0].replace(/\|/g, ''), pic = aiPic(L), ev = regEvery();
+    var h = '<div class="ai-top">' + (pic ? '<img class="ai-pic" alt="" src="' + pic + '">' : '<div class="ai-pic ai-pic-wait">👧</div>') +
+      '<div class="ai-st"><b class="ai-here' + (here ? ' on' : '') + '">' + (here ? '● お店にいます(' + (k + 1) + '番の席)' : '○ いまは いません') + '</b>' +
+      '<span>' + (md === 'stay' ? '👋 呼んだので、お客さんが多くても ずっといます' : md === 'away' ? '🌙 帰したので、呼ぶまで来ません' : '🎲 おまかせ: お客さんが ' + REG.MAX_GUESTS + '人までのとき来て、' + (REG.MAX_GUESTS + 1) + '人目で帰ります') + '</span>' +
+      '<span>⏱ ' + (ev === 0 ? '自分からは話さない' : aiEveryName(ev) + 'くらい 話す') + '</span>' +
+      '<span>👗 ' + esc(fitName) + (keep ? '(大将が選んだ服)' : here ? '(おまかせ)' : '(おまかせ・来るたびに変わる)') + '</span></div></div>';
+    h += '<div class="sh-sec">来る・帰る</div><div class="ai-seg">' +
+      [['', '🎲', 'おまかせ', '人数で決める'], ['stay', '👋', '呼ぶ', 'ずっといる'], ['away', '🌙', '帰す', '呼ぶまで来ない']].map(function (x) {
+        return '<button data-aimode="' + x[0] + '" class="' + (md === x[0] ? 'on' : '') + (x[0] === 'away' ? ' bye' : '') + '"><i>' + x[1] + '</i>' + x[2] + '<small>' + x[3] + '</small></button>'; }).join('') + '</div>' +
+      '<p class="small-note">呼ぶ・帰すは 8時間たつと おまかせに戻ります。</p>';
+    h += '<div class="sh-sec">💬 今すぐ ひとこと言わせる</div>' + (here ? '' : '<p class="small-note">' + esc(REG.NAME) + 'が お店にいるときだけ 言わせられます。</p>');
+    AI_SAY.forEach(function (g) {
+      var L2 = aiSayList(g[0]); if (!L2.length) return;
+      h += '<div class="ai-say"><span class="ai-say-h"><i>' + g[1] + '</i>' + g[2] + '</span><div class="ph-chips">' + L2.map(function (x) { return '<button data-aisay="' + g[0] + ':' + esc(x[0]) + '"' + (here ? '' : ' disabled') + '>' + esc(x[1]) + '</button>'; }).join('') + '</div></div>';
+    });
+    h += '<div class="sh-sec">⏱ 自分から話す間かく</div><div class="ph-chips cel-pick ai-chips">' +
+      aiEveryList().map(function (v) { return '<button data-aitalk="' + v + '"' + (ev === v ? ' class="on"' : '') + '>' + (v === 0 ? '🤐 ' : '') + aiEveryName(v) + '</button>'; }).join('') + '</div>' +
+      '<p class="small-note">お客さんへの話しかけ・大将への ひとこと など。だれかが話している間は 少し待ちます。「話さない」でも、あいさつ・返事・お礼は します。</p>';
+    h += '<div class="sh-sec">👗 服</div><div class="ai-seg two">' +
+      '<button data-aikeep="0" class="' + (keep ? '' : 'on') + '"><i>🎲</i>おまかせ<small>来るたびに変わる</small></button>' +
+      '<button data-aikeep="1" class="' + (keep ? 'on' : '') + '"><i>👗</i>大将が選ぶ<small>毎回 この服で来る</small></button></div>' +
+      '<p class="small-note">服や色を押すと、' + (here ? 'すぐ着がえて、' : '') + '次に来るときも その服で来ます。</p>';
+    (REG.FIT_GROUPS || [['', '']]).forEach(function (g) {
+      var ids = (REG.FITS || []).map(function (f) { return f[0]; }).filter(function (id) { return !g[0] || (FN[id] || [])[1] === g[0]; }); if (!ids.length) return;
+      h += '<div class="ai-g">' + g[1] + ' ' + esc(g[0]) + '</div><div class="ai-fits">' + ids.map(function (id) { return '<button data-aifit="' + id + '"' + (L.fit === id ? ' class="on"' : '') + '>' + esc((FN[id] || [id])[0]).replace(/\|/g, '<br>') + '</button>'; }).join('') + '</div>';
+    });
+    var sw = function (attr, list, cur) { return '<div class="ai-sw">' + list.filter(function (c, i) { return list.indexOf(c) === i; }).map(function (c) { return '<button data-' + attr + '="' + c + '" style="background:' + c + '"' + (cur === c ? ' class="on"' : '') + ' aria-label="色"></button>'; }).join('') + '</div>'; };
+    h += '<div class="ai-g">🎨 服の色</div>' + sw('aitop', REG.PALE || [], L.top);
+    if (L.col2) h += '<div class="ai-g">🎨 スカート・パンツの色</div>' + sw('aicol2', (REG.PALE_B || []).concat(REG.CALM || []), L.col2);
+    var chip = function (attr, val, name, on, off) { return '<button data-' + attr + '="' + val + '"' + (on ? ' class="on"' : '') + (off ? ' disabled' : '') + '>' + name + '</button>'; };
+    var noNeck = (REG.NO_NECK || []).indexOf(L.fit) >= 0, mustNeck = (REG.OPEN || []).indexOf(L.fit) >= 0;
+    h += '<details class="ai-more"' + (aiMoreOpen ? ' open' : '') + '><summary>🎀 リボン・ネックレス・小物 も選ぶ</summary>' +
+      '<div class="ai-g">🎀 髪のリボン</div><div class="ph-chips cel-pick ai-chips">' + chip('airib', '', 'なし', !L.rib) + Object.keys(REG.RIBBON_NAMES || {}).map(function (r) { return chip('airib', r, esc(REG.RIBBON_NAMES[r]), L.rib === r); }).join('') + '</div>' +
+      (L.rib ? sw('airibc', REG.RIBBON_COLORS || [], L.ribC) : '') +
+      '<div class="ai-g">📿 ネックレス</div><div class="ph-chips cel-pick ai-chips">' + chip('aineck', '', 'なし', !L.neck, mustNeck) + Object.keys(REG.NECK_NAMES || {}).map(function (n) { return chip('aineck', n, esc(REG.NECK_NAMES[n]), L.neck === n, noNeck); }).join('') + '</div>' +
+      (noNeck ? '<p class="small-note">この服には ネックレスを付けません。</p>' : mustNeck ? '<p class="small-note">胸元が開いた服なので、ネックレスは いつも付けます。</p>' : '') +
+      '<div class="ai-g">👓 小物</div><div class="ph-chips cel-pick ai-chips">' + chip('aiacc', '', 'なし', !L.acc) + Object.keys(REG.ACC_NAMES || {}).map(function (a) { return chip('aiacc', a, esc(REG.ACC_NAMES[a]), L.acc === a); }).join('') + '</div></details>';
+    if (here || keep) h += '<div class="btn-row ai-shuffle"><button id="aiShuffle">🎲 ほかの服に おまかせで着がえる</button></div>';
+    return h;
+  }
+  function wireAi(body) {
+    var redo = function () { setTimeout(function () { if (sheetKind === 'aichan') refreshSheet(true); }, 250); };
+    body.querySelectorAll('[data-aimode]').forEach(function (b) { b.onclick = function () {
+      var m = b.getAttribute('data-aimode'); if (m === regMode()) return;
+      net.update('state', { aiMode: m ? { m: m, at: TS } : null });
+      toast(m === 'stay' ? REG.NAME + 'を呼びました。ずっといてくれます' : m === 'away' ? REG.NAME + 'に帰ってもらいます' : REG.NAME + 'は おまかせ(人数で来る・帰る)にしました', 2200); redo();
+    }; });
+    body.querySelectorAll('[data-aitalk]').forEach(function (b) { b.onclick = function () {
+      var v = +b.getAttribute('data-aitalk'); net.update('state', { aiTalk: v }); regTalkAt = 0;
+      toast(v === 0 ? REG.NAME + 'は 自分からは話しません(返事は します)' : REG.NAME + 'は ' + aiEveryName(v) + 'くらい 話します', 1800); redo();
+    }; });
+    body.querySelectorAll('[data-aisay]').forEach(function (b) { b.onclick = function () {
+      if (Date.now() - aiSayAt < 1200) return; aiSayAt = Date.now();   // 二度押しで 2回 言わない
+      var v = b.getAttribute('data-aisay'), i = v.indexOf(':'), kind = v.slice(0, i), id = v.slice(i + 1), x = aiSayList(kind).filter(function (y) { return y[0] === id; })[0];
+      if (!x || regSeat() < 0) { toast(REG.NAME + 'は いま お店にいません'); return; }
+      var to = null;
+      if (kind === 'owner') to = 'owner';
+      else if (kind === 'ask') { var ms = members(), gs = Object.keys(ms).filter(function (u) { var m = ms[u]; return m.name && !m.owner && !m.bot && (fresh(m) || away(m)) && okSeat(m.seat); }); if (gs.length) to = ms[gs[Math.floor(Math.random() * gs.length)]].seat; }
+      regSay(x[1], to, x[0]); regLast = x[0]; regTalkAt = now() + Math.max(regGap(), 30000);   // 言わせたあとは しばらく 自分からは話さない
+      b.classList.add('said'); setTimeout(function () { b.classList.remove('said'); }, 900);
+      toast('💬 ' + REG.NAME + '「' + x[1] + '」', 1600);
+    }; });
+    var pick = function (attr, fn) { body.querySelectorAll('[data-' + attr + ']').forEach(function (b) { b.onclick = function () { var L = aiCur(); fn(L, b.getAttribute('data-' + attr)); aiDress(L, true); redo(); }; }); };
+    pick('aifit', function (L, v) { L.fit = v; });   // 下の色・ネックレスは fixLook が その服に合わせる
+    pick('aitop', function (L, v) { L.top = v; });
+    pick('aicol2', function (L, v) { L.col2 = v; });
+    pick('airib', function (L, v) { L.rib = v; if (v && L.acc === 'flower') L.acc = ''; });
+    pick('airibc', function (L, v) { L.ribC = v; });
+    pick('aineck', function (L, v) { L.neck = v; });
+    pick('aiacc', function (L, v) { L.acc = v; if (v === 'flower') L.rib = ''; });
+    body.querySelectorAll('[data-aikeep]').forEach(function (b) { b.onclick = function () {
+      if (b.getAttribute('data-aikeep') === '1') { if (!regLook()) { aiDress(aiCur(), true); toast('今の服を「' + REG.NAME + 'の服」にしました。毎回 この服で来ます', 2400); } }
+      else if (regLook()) { net.update('state', { aiLook: null }); toast('服は おまかせ にしました(次に来るときから 毎回変わります)', 2400); }
+      redo();
+    }; });
+    var mo = body.querySelector('.ai-more'); if (mo) mo.addEventListener('toggle', function () { aiMoreOpen = mo.open; });
+    var sh = body.querySelector('#aiShuffle'); if (sh) sh.onclick = function () { var L = fixLook(lookOf(regAvatar(true))); aiDress(L, !!regLook()); toast('👗 ' + ((REG.FIT_NAMES || {})[L.fit] || [L.fit])[0].replace(/\|/g, '') + ' に着がえました', 1800); redo(); };
   }
   /* 今日のゲーム(ノブさん 2026-11-22)。state.todayGame = ゲームの id(なければ 日がわり) */
   function gameSheetHTML() {
@@ -2580,6 +2718,7 @@
   applyPerf();
   $('bOrders').onclick = function () { openSheet('orders'); };
   $('bOwner').onclick = function () { openSheet('owner'); };
+  $('bAi').onclick = function () { openSheet('aichan'); };
   $('bBot').onclick = function () { openSheet('bot'); };
   /* 大将の接客画面の「☰」: 右のボタンを出す・しまう。ほかのボタンを押したら しまう */
   $('bMore').onclick = function () { var o = document.body.classList.toggle('side-open'); $('bMoreLbl').textContent = o ? 'しまう' : 'メニュー'; fitSide(); };
@@ -2612,7 +2751,7 @@
   /* 顔・髪型・髪の色・前髪のヘアピンは いつも同じ(覚えてもらえるように。ふつうの可愛い女の子で、ロボットっぽくしない。ノブさん 2026-11-21)。
      服は お客さんと同じ服から毎回1つ(おそろいになることもある)+ ときどき アイちゃんだけの服。小物も毎回ちがう */
   function pickOne(L) { return L[Math.floor(Math.random() * L.length)]; }
-  function regAvatar() {
+  function regAvatar(noLook) {   // noLook: 大将が選んだ服を使わず、おまかせで組み合わせる
     var base = Object.assign(JSON.parse(JSON.stringify((AVATAR.PRESETS.f || [])[1] || AVATAR.random('f'))), REG.FACE || {});   // 顔・髪型は REG.FACE(ノブさんが選んだ)
     base.sex = 'f'; base.owner = false; base.special = 'ai'; base.acc = 'none';
     var a = AVATAR.fix(base); a.special = 'ai'; a.aiHair = REG.HAIR; if (REG.FACE && REG.FACE.aiEyes) a.aiEyes = 1;
@@ -2628,6 +2767,7 @@
     var mo = new Date(now() + JST).getUTCMonth() + 1, winter = mo === 12 || mo <= 2;
     var accs = (REG.ACCS || []).filter(function (x) { return (x !== 'muffler' || winter) && (x !== 'flower' || !a.aiRibbon); });
     if (accs.length && Math.random() < 0.3) a.aiAcc = pickOne(accs);   // そのほかの小物は ときどき
+    var Lk = !noLook && regLook(); if (Lk) a = wearLook(a, fixLook(Lk));   // 大将が選んだ服(👧 パネル)で来る
     if (REG.VOICE) a.voice = REG.VOICE;
     return a;
   }
@@ -2637,7 +2777,7 @@
   function regLine(kind, to, filter) { var L = (REG.TALK || {})[kind] || []; if (filter) L = L.filter(filter); if (L.length > 1) L = L.filter(function (x) { return x[0] !== regLast; }); if (!L.length) return false; var x = L[Math.floor(Math.random() * L.length)]; regLast = x[0]; regSay(x[1], to, x[0]); return true; }   // 同じ言葉を続けて言わない
   /* 自分から話す(ノブさん 2026-11-21「2分に1回くらい。1・5・10分も選べるように。お客さんに話しかけたり 大将に話したり を多めに」) */
   var regOnce = {};   // 来ている間に 1回だけ言う言葉(金曜・夜おそく・ラストオーダー前・年末)
-  function regEvery() { var v = +((tree.state || {}).aiTalk) || (LOCAL ? 0.5 : REG.TALK_EVERY || 2); return (LOCAL ? [0.5, 1, 2, 5, 10] : [1, 2, 5, 10]).indexOf(v) >= 0 ? v : 2; }   // おためし版は はじめ30秒に1回(ノブさん 2026-11-21「お試し版では30秒に1回」)
+  function regEvery() { var raw = (tree.state || {}).aiTalk, v = raw === 0 ? 0 : (+raw || (LOCAL ? 0.5 : REG.TALK_EVERY || 2)); return aiEveryList().indexOf(v) >= 0 ? v : 2; }   // 0 = 自分からは話さない(返事・あいさつは する)   // おためし版は はじめ30秒に1回(ノブさん 2026-11-21「お試し版では30秒に1回」)
   function regGap() { return regEvery() * MIN * rnd(0.75, 1.25); }   // きっちり同じ間にしない
   function lastHumanTalk() { var c = tree.chat || {}, t = 0; Object.keys(c).forEach(function (k) { var m = c[k]; if (m && !m.sys && m.uid !== REG_UID && (m.at || 0) > t) t = m.at; }); return t; }
   function regTalk(n) {
@@ -2701,6 +2841,7 @@
     if (!regNext) regNext = n + rnd(REG.FIRST_ORDER_SEC[0], REG.FIRST_ORDER_SEC[1]) * 1000;   // まとめ役が代わったとき
     if (!regTalkAt) regTalkAt = n + regGap();
     if (m.name !== REG.NAME) net.update('members/' + REG_UID, { name: REG.NAME });
+    var Lw = regLook(); if (Lw && m.avatar) { Lw = fixLook(Lw); if (lookKey(fixLook(lookOf(m.avatar))) !== lookKey(Lw)) net.update('members/' + REG_UID, { avatar: wearLook(m.avatar, Lw) }); }   // 大将が選んだ服(👧 パネル)に 着がえる
     // ミニゲーム: いる間に 1回だけ遊ぶ(30秒「ゲーム中」→ ほどほどの点数)。お客さんがゲーム中のときは待つ
     if (!regGameAt) regGameAt = n + rnd(REG.GAME_MIN[0], REG.GAME_MIN[1]) * MIN;
     if (regGameAt > 0 && n >= regGameAt && !regGaming && guests <= REG.MAX_GUESTS && !phOn && window.IZGAME && todayGame()) { regGaming = n; regGame = [gameId(), gameKey()]; IZGAME.load(gameId()).catch(function () {}); net.update('members/' + REG_UID, { game: TS }); if (ownerPresent()) regLine('game', 'owner'); }   // 大将がいたら「大将、ゲームやってもいいですか？」
@@ -2735,7 +2876,7 @@
       if (pick && !whyNot(k, pick.id)) { net.push('orders', { uid: REG_UID, name: m.name, seat: k, item: pick.id, at: TS }); net.push('events', { type: 'order', seat: k, item: pick.id, at: TS, by: REG_UID }); }
     }
     // たまに ひとこと(少なめ)
-    if (n >= regTalkAt) regTalk(n);   // 自分から話す(間かくは 大将が選べる。お客さんが話している間は 少し待つ)
+    if (n >= regTalkAt) { if (regEvery() === 0) regTalkAt = n + 30000; else regTalk(n); }   // 自分から話す(間かくは 大将が選べる。お客さんが話している間は 少し待つ)
     // お祝いの日は 仮装(かわいく。なければ その日の帽子)
     var ck = celebKind(); if (ck && !cosOf(REG_UID, m)) { var d0 = SHOP.CELEBRATE[ck]; net.update('members/' + REG_UID, { costume: ck + '/' + d0.hats[0][0] + '||' }); }
   }

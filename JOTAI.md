@@ -305,3 +305,11 @@
 - アイちゃん: まとめ役がかわっても 3分は残す(消えて 20秒後に また来店していた)・最後の人が帰ったら そっと帰る。
 - 本番のしくみ(FireNet)を tools/fake-firebase.py(にせの Firebase・わざと遅れ)で試した: 二度押し・会話・出す・アイちゃん・まとめ役の交代・帰る、全部 合格。試しの台本は scratchpad の t169.py(config.js を書きかえて読ませる)。
 - 本番の前に まだ必要: Firebase を作る(ノブさんの Google)・書きこみの決まり(rules)と匿名ログイン・合言葉の確かめを見えない所へ・本物の Firebase で もう一度 試す。
+
+## 11-23 大将の「👧 アイちゃん」パネル(枝 worktree-agent-a7d2c31aa4d35ee8d・まだ main に入れていない)
+- 大将の右のボタン列に「👧 アイちゃん」(☰ をたたんだままでも出る。いる間は 緑の点)。押すと アイちゃん専用のパネル(sheetKind 'aichan'・js/app.js の aiSheetHTML / wireAi)。
+- 中身: 今の様子(全身の絵=IZ3D.portrait(…, {full:true})・いる/いない・何番の席・おまかせ/呼んだ/帰した・話す間かく・服の名前) → 来る・帰る(🎲おまかせ / 👋呼ぶ / 🌙帰す の3つ並び。今の状態が光る)→ 💬 今すぐ ひとこと言わせる(お客さんへ・大将へ・ひとりごと・リアクション。二度押しは1回)→ ⏱ 話す間かく(🤐話さない を足した = state.aiTalk 0。あいさつ・返事・お礼は する)→ 👗 服(おまかせ / 大将が選ぶ。服21種を4つの種類に分けて名前のボタン、服の色・スカート/パンツの色・リボン(形と色)・ネックレス・小物)→ 🎲 ほかの服に おまかせで着がえる。
+- 大将が選んだ服は state.aiLook {fit,top,col2,col3,neck,rib,ribC,acc}。押すと すぐ着がえ(members/reg-ai の avatar)、次に来るときも その服(regAvatar)。まとめ役の regTick も 合わせる。服の決まり(胸元が開いた服はネックレス・パーカー等はなし・花とリボンは重ねない)は fixLook。閉店しても覚えている(「おまかせ」で戻す)。
+- 服の名前などは config.js の REGULAR.FIT_NAMES / FIT_GROUPS / NECK_NAMES / RIBBON_NAMES / ACC_NAMES。
+- 「店主の操作」の中のアイちゃんは「👧 アイちゃんの操作を開く」の案内だけにした。
+- 試し: scratchpad の aipanel/t_ai.py(縦 390x844・横 844x390)。写真は shots/aichan-panel/。

@@ -310,7 +310,7 @@ button.mini { background: rgba(0,0,0,.1); border-radius: 999px; width: 30px; hei
 /* 大将の接客画面: 会話の欄を大きく、右のボタンは「☰」にたたむ */
 #bMore { display: none; }
 body.owner-view #bMore { display: flex; }
-body.owner-view:not(.side-open) .side > .sbtn:not(#bMore):not(#bOrders):not(#bView) { display: none; }
+body.owner-view:not(.side-open) .side > .sbtn:not(#bMore):not(#bOrders):not(#bView):not(#bAi) { display: none; }   /* 👧 アイちゃんも たたんだ時に出す 11-23 */
 body.owner-view .side > #bView { order: -1; }   /* 大将も 👁 は いつも いちばん上(右上)。おしゃべり画面と 同じ所で 続けて押せる 11-22 ノブさん */
 body.owner-view .log { max-height: 27vh; font-size: 14.5px; background: rgba(20,12,8,.55); border-radius: 12px; padding: 14px 6px 6px; }
 body.owner-view .log .ln { background: rgba(255,255,255,.07); }
@@ -571,3 +571,45 @@ body.owner-view .log .ln.owner.me { background: rgba(140,29,22,.95); }
 .log .ln.owner.me .me-tag { background: #ffd36a; color: #5a1a10; }
 .bubble.me { border: 3px solid #e8463d; }
 .bubble.me .bt::before { content: 'あなた'; display: inline-block; font-size: 10.5px; font-weight: 800; line-height: 1; color: #fff; background: #e8463d; border-radius: 999px; padding: 3px 6px 2px; margin-right: 5px; vertical-align: 2px; }
+
+/* ---------- 大将の「👧 アイちゃん」ボタンとパネル(2026-11-23) ---------- */
+#bAi small { white-space: nowrap; letter-spacing: -.06em; }
+.ai-dot { position: absolute; top: 4px; right: 5px; width: 10px; height: 10px; border-radius: 50%; background: #5ad16a; box-shadow: 0 0 0 2px rgba(20,12,8,.85); }
+.ai-top { display: flex; gap: 12px; align-items: center; background: #fff8e8; border-radius: 14px; padding: 8px 10px; border: 1px solid #e3cfa4; }
+.ai-pic { width: 84px; height: 112px; flex: none; border-radius: 12px; background: radial-gradient(circle at 50% 35%, #fff3dc, #e8d3a6); object-fit: contain; }
+.ai-pic-wait { display: flex; align-items: center; justify-content: center; font-size: 40px; opacity: .55; }
+.ai-st { display: flex; flex-direction: column; gap: 3px; font-size: 12.5px; line-height: 1.4; color: #5a3a22; min-width: 0; }
+.ai-here { font-size: 15px; color: #8a7a6a; }
+.ai-here.on { color: #2a8a3a; }
+.ai-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.ai-seg.two { grid-template-columns: repeat(2, 1fr); }
+.ai-seg button { min-height: 58px; border-radius: 14px; background: #f3e6cc; color: var(--ink); font-weight: 900; font-size: 15px; border: 2px solid #d9c39a; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.2; padding: 6px 2px; }
+.ai-seg button i { font-style: normal; font-size: 18px; }
+.ai-seg button small { font-size: 10.5px; font-weight: 700; color: #8a6a3a; }
+.ai-seg button.on { background: #ffd27a; border-color: #c8261c; box-shadow: 0 0 0 1px #c8261c inset; }
+.ai-seg button.bye.on { background: #4a3a5a; color: #fff; border-color: #2a1a3a; }
+.ai-seg button.bye.on small { color: #e0d6ee; }
+.ai-say { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+.ai-say-h { flex: none; width: 5.2em; font-size: 10.5px; font-weight: 800; color: #8a6a3a; line-height: 1.2; display: flex; flex-direction: column; align-items: center; white-space: nowrap; letter-spacing: -.04em; }
+.ai-say-h i { font-style: normal; font-size: 17px; }
+.ai-say .ph-chips { flex: 1; min-width: 0; }
+.ai-say .ph-chips button { background: #fff; border: 2px solid #e3cfa4; font-size: 13px; padding: 8px 11px; }
+.ai-say .ph-chips button.said { background: #ffd27a; border-color: #c8261c; }
+.sheet button:disabled { opacity: .38; }
+.ai-g { font-size: 12px; font-weight: 800; color: #8a6a3a; margin: 10px 0 5px; }
+.ai-fits { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+.ai-fits button { min-height: 42px; border-radius: 12px; background: #fff; border: 2px solid #e3cfa4; color: var(--ink); font-weight: 800; font-size: 12.5px; line-height: 1.25; padding: 4px 6px; }
+.ai-fits button.on { background: #ffd27a; border-color: #c8261c; }
+.ai-chips button { background: #fff; border-color: #e3cfa4; }
+.ai-chips button.on { background: #ffd27a; border-color: #c8261c; }
+.ai-sw { display: flex; flex-wrap: wrap; gap: 8px; }
+.ai-sw button { width: 38px; height: 38px; border-radius: 50%; border: 2px solid rgba(0,0,0,.18); }
+.ai-sw button.on { box-shadow: 0 0 0 3px #fff, 0 0 0 6px #c8261c; }
+.ai-more { margin-top: 12px; background: #fff8e8; border-radius: 12px; padding: 8px 10px; border: 1px solid #e3cfa4; }
+.ai-more summary { font-weight: 800; font-size: 13.5px; color: #5a3a22; cursor: pointer; padding: 4px 0; }
+.ai-shuffle { margin-top: 12px; }
+.ai-shuffle button { width: 100%; }
+@media (orientation: landscape) and (max-height: 520px) {
+  .ai-pic { width: 66px; height: 88px; }
+  .ai-seg button { min-height: 50px; }
+}

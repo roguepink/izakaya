@@ -3100,8 +3100,8 @@ function createPreview(canvas) {
    小さな絵の板を1枚だけ使い回す(スマホの負担を ふやさない)
    ===================================================================== */
 let ptR = null, ptS = null, ptC = null;
-function portrait(raw, size) {
-  size = size || 256;
+function portrait(raw, size, opt) {   // opt.full: 全身(大将の「👧 アイちゃん」パネルで 今の服を見せる 2026-11-23)。縦長 3:4
+  size = size || 256; opt = opt || {};
   if (!ptR) {
     ptR = new THREE.WebGLRenderer({ canvas: document.createElement('canvas'), antialias: true, alpha: true, preserveDrawingBuffer: true });
     ptR.outputColorSpace = THREE.SRGBColorSpace; ptR.setPixelRatio(1);
@@ -3110,12 +3110,14 @@ function portrait(raw, size) {
     const d = new THREE.DirectionalLight('#ffe0b0', 1.7); d.position.set(1, 2, 2.5); ptS.add(d);
     ptC = new THREE.PerspectiveCamera(14, 1, 0.05, 20);
   }
-  ptR.setSize(size, size, false);
+  const pw = opt.full ? Math.round(size * 0.75) : size;
+  ptR.setSize(pw, size, false); ptC.aspect = pw / size; ptC.updateProjectionMatrix();
   try { if (ptR.getContext().isContextLost()) return ''; } catch (e) {}   // 3D の係が 落ちているときは 透明の絵を 返さない(11-22)
   const av = buildAvatar(raw, { standing: true }); av.rotation.y = -0.18; ptS.add(av);
   const hat = !!(raw && raw.costume && String(raw.costume).split('|')[0]);   // かぶりものが あるときは 少し引いて 上まで入れる
   const ly = hat ? 0.8 : 0.72, dist = hat ? 3.1 : 2.55;
-  ptC.position.set(0, ly + 0.12, dist); ptC.lookAt(0, ly, 0);
+  if (opt.full) { av.rotation.y = -0.38; ptC.position.set(0, 0.5, 4.6); ptC.lookAt(0, 0.42, 0); }   // 全身(少し横を向けて 服の形が分かるように)
+  else { ptC.position.set(0, ly + 0.12, dist); ptC.lookAt(0, ly, 0); }
   let url = '';
   try { ptR.render(ptS, ptC); url = ptR.domElement.toDataURL('image/png'); } catch (e) {}
   ptS.remove(av); disposeAvatar(av);
