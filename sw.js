@@ -1,7 +1,7 @@
 'use strict';
 /* ホーム画面に入れたあと、すぐ開けるようにする(お店の中身は毎回ネットで最新を取りにいく)。
    FILES(覚えるファイル)を変えたときだけ VERSION を 1つ上げる。 */
-const VERSION = 'izakaya-v89';
+const VERSION = 'izakaya-v90';
 const FILES = ['./', 'index.html', 'install.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png',
   'css/style.css', 'js/config.js', 'js/avatar-data.js', 'js/net.js', 'js/scene3d.js', 'js/game-kit.js', 'js/app.js',
   'vendor/three/build/three.module.js', 'vendor/three/build/three.core.js', 'owner.html', 'owner/', 'owner/index.html', 'owner/rec.html', 'owner/manifest.webmanifest', 'owner/icon-192.png', 'owner/apple-touch-icon.png', 'shots/1.jpg', 'shots/2.jpg', 'shots/3.jpg'];

@@ -829,7 +829,8 @@
       if (mySeat >= 0) { event({ type: 'phrase', id: 'mataokoshi', seat: mySeat }); net.remove('seats/' + mySeat); net.remove('tables/' + mySeat); }
       sys(OWNER_MODE ? (/^大将/.test(currentName()) ? '' : '大将の') + currentName() + 'が奥に下がりました' : honor(currentName()) + 'がお帰りになりました');
       net.remove('members/' + ME.uid);
-      botsLeave();
+      var others = Object.keys(members()).some(function (u) { var m = members()[u]; return u !== ME.uid && m.name && !m.bot && fresh(m); });
+      if (OWNER_MODE || !others) botsLeave(); else bots = {};   // おためし客は 大将が帰るか、だれもいなくなったら 帰る(ほかの人が いれば その人の画面が 引きつぐ)
     }
     var bL = (tree.state || {}).baton; if (OWNER_MODE && bL && bL.from === ME.uid && !bL.ans) net.update('state', { baton: null });   // 頼んだまま帰った → 取り消す(「やる」のあとは 新しい大将が片づける)
     inside = false; mySeat = -1; clearInterval(hbTimer);
@@ -1692,6 +1693,8 @@
     if (!amLeader()) return;
     var n = now(), ms = members(), st = tree.state || {};
     autoCountdown(n);
+    // おためし客は いま お店を回している画面(まとめ役)が 引きつぐ(作った画面が 裏に回って止まっても 消えないように 11-22)
+    Object.keys(ms).forEach(function (uid) { var m = ms[uid]; if (m.bot && m.name && uid !== REG_UID && !bots[uid] && m.seat >= 0) bots[uid] = { seat: m.seat, name: m.name, next: n + 2000 + Math.random() * 6000 }; });
     // いなくなった人の片づけ
     Object.keys(ms).forEach(function (uid) {
       if (ms[uid].name && (fresh(ms[uid]) || away(ms[uid]) || (ms[uid].bot && bots[uid]))) return;   // 名前のない記録(消されたあとの「いるよ」だけ)も片づける
@@ -2759,14 +2762,14 @@
     net.push('events', { type: 'phrase', id: 'irasshai', seat: seat, at: TS, by: uid });
   }
   function botTick() {
-    Object.keys(bots).forEach(function (uid) { if (members()[uid]) net.update('members/' + uid, { seen: TS }); else delete bots[uid]; });
+    Object.keys(bots).forEach(function (uid) { if (!members()[uid]) delete bots[uid]; else if (amLeader()) net.update('members/' + uid, { seen: TS }); });   // 「いるよ」は まとめ役だけが 出す
     var ck = celebKind();   // おためし客も お祝いの日は 仮装する
     if (ck) Object.keys(bots).forEach(function (uid) { var m = members()[uid], d = SHOP.CELEBRATE[ck]; if (!m || cosOf(uid, m) || Math.random() < 0.3) return;
       var h = d.hats[Math.floor(Math.random() * d.hats.length)][0], fc = Math.random() < 0.4 ? SHOP.FACES[Math.floor(Math.random() * SHOP.FACES.length)][0] : '';
       net.update('members/' + uid, { costume: ck + '/' + h + '|' + fc + '|' }); });
   }
   setInterval(function () {
-    if (!inside) return;
+    if (!inside || !amLeader()) return;   // おためし客を 動かすのは まとめ役の画面だけ(2つの画面で 同じ客が 2回 しゃべらないように)
     var t = Date.now();
     Object.keys(bots).forEach(function (uid) {
       var b = bots[uid]; if (t < b.next) return;
