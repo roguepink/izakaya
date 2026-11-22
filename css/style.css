@@ -129,6 +129,13 @@ body.tv-land #tvBack { background: #000; }
 body.tv-land #tvClose { left: auto; right: calc(env(safe-area-inset-right, 0px) + 10px); top: calc(var(--sat) + 10px); bottom: auto; transform: none; padding: 8px 14px; font-size: 14px; opacity: .85; }
 .side { position: absolute; right: 8px; top: calc(var(--sat) + 52px); display: flex; flex-direction: column; gap: 7px; z-index: 6; flex-wrap: wrap-reverse; align-content: flex-start; }   /* 下の会話に もぐらないよう、入りきらない分は 左に もう1列(高さは js の fitSide。11-21 ノブさん「帰りたいのに帰れない」) */
 .sbtn { position: relative; width: 58px; padding: 7px 0 5px; border-radius: 14px; background: var(--glass); display: flex; flex-direction: column; align-items: center; gap: 1px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+/* 👁(目線)は どの画面でも ぴったり同じ所・同じ大きさ(右のボタン列の 右上の角に 固定。11-22 ノブさん「あちこちに飛ぶ。ずらさないで」)
+   ボタン列の中には 同じ大きさの「あき」(::before)を入れて、ほかのボタンが 👁 の下(おしゃべり画面では 左)に並ぶようにする */
+.side::before { content: ''; flex: none; width: 58px; height: 52px; order: -2; }
+.side > #bView { position: absolute; top: 0; right: 0; width: 58px; height: 52px; margin: 0; padding: 7px 0 5px; z-index: 1; }
+.side > #bView span { font-size: 22px; }
+.side > #bView small { font-size: 11px; white-space: nowrap; letter-spacing: -.03em; }
+body.talk-on .side::before { order: -2; }
 .sbtn span { font-size: 22px; line-height: 1.1; }
 .sbtn small { font-size: 10.5px; font-weight: 700; color: var(--paper2); }
 .badge { position: absolute; top: -4px; right: -4px; background: var(--red); color: #fff; font-style: normal; font-size: 12px; font-weight: 800; border-radius: 999px; min-width: 20px; padding: 1px 5px; }
@@ -318,6 +325,9 @@ body.owner-view .log .ln.new { background: rgba(255,232,170,.2); }
   .np-skip { font-size: 12px; padding: 5px 10px; }
   .side { top: calc(var(--sat) + 6px); right: calc(env(safe-area-inset-right, 0px) + 8px); flex-direction: row; gap: 5px; }
   .sbtn { width: 50px; padding: 5px 0 3px; border-radius: 12px; }
+  .side::before { width: 50px; height: 46px; order: 99; }
+  .side > #bView { width: 50px; height: 46px; padding: 5px 0 3px; }
+  .side > #bView span { font-size: 19px; } .side > #bView small { font-size: 9.5px; }
   .sbtn span { font-size: 19px; }
   .sbtn small { font-size: 9.5px; }
   .bottom { right: auto; width: min(60vw, 560px); padding-left: calc(env(safe-area-inset-left, 0px) + 8px); }
