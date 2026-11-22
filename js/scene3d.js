@@ -1114,23 +1114,32 @@ function buildAvatar(raw, opt = {}) {
     [-1, 1].forEach((s) => {
       const x = (f ? 0.062 : 0.072) * s;
       if (!skirt) { const th = tm(new THREE.CapsuleGeometry(def.wide ? 0.064 : (f ? 0.055 : 0.06), 0.2, 6, 12), def.shorts ? pantsC : legC, x, 0.04, 0.13, LN); th.rotation.x = Math.PI / 2; legs.add(th); }
-      legs.add(tm(new THREE.SphereGeometry(f ? 0.048 : 0.054, 12, 10), skirt ? skc : legC, x, 0.035, 0.27, LN));   // ひざ(スカートのときは スカートの色で ぬって、布から肌が出ないように)
+      if (!skirt) legs.add(tm(new THREE.SphereGeometry(f ? 0.048 : 0.054, 12, 10), legC, x, 0.035, 0.27, LN));   // ひざ(スカートのときは 布が おおうので 作らない。玉が 布から つき出ていた 11-22)
       legs.add(tm(new THREE.CapsuleGeometry(def.wide ? 0.058 : (f ? 0.04 : 0.046), 0.24, 6, 12), legC, x, -0.13, 0.285, LN));
-      if (skirt && !def.tights) legs.add(tm(new THREE.CylinderGeometry(0.035, 0.035, 0.07, 10), def.socks || (f ? '#f2ece4' : legC), x, -0.24, 0.285, 0));   // くつした
-      // くつ(丸い つま先+底)
-      const shoeC = f ? (skirt ? '#6a2a2a' : '#3a2a22') : '#1d1a18';
-      const toe = tm(new THREE.SphereGeometry(0.045, 14, 10), shoeC, x, -0.345, 0.32, LN); toe.scale.set(0.85, 0.6, 1.35); legs.add(toe);
-      legs.add(tm(new THREE.BoxGeometry(0.072, 0.012, 0.13), '#f2ece4', x, -0.372, 0.325, 0));
+      const lr = def.wide ? 0.058 : (f ? 0.04 : 0.046);
+      if (skirt && !def.tights) legs.add(tm(new THREE.CylinderGeometry(lr + 0.003, lr + 0.002, 0.08, 16), def.socks || (f ? '#f2ece4' : legC), x, -0.265, 0.285, LN));   // くつした(脚より 少し太く。前は 細くて 脚に うまり、足首が ぎざぎざに見えた 11-22)
+      // くつ: 底 + つま先の丸い甲 + かかと(足首まで つながる)。前の「平たい玉 + 白い板」は 粗く見えた(11-22 ノブさん)
+      const shoeC = f ? (skirt ? '#6a2a2a' : '#3a2a22') : '#1d1a18', soleC = shade(shoeC, 0.55);
+      const sole = tm(new THREE.CylinderGeometry(1, 1, 1, 24), soleC, x, -0.368, 0.318, LN); sole.scale.set(0.043, 0.014, 0.082); legs.add(sole);
+      const up = tm(new THREE.SphereGeometry(1, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), shoeC, x, -0.361, 0.33, LN); up.scale.set(0.04, 0.042, 0.07); legs.add(up);
+      legs.add(tm(new THREE.CylinderGeometry(0.035, 0.037, 0.06, 16), shoeC, x, -0.335, 0.29, LN));   // かかと〜足首(上は くつした・脚の中に かくれる)
+      if (f && skirt) { const st = tm(new THREE.TorusGeometry(0.043, 0.0055, 6, 20, Math.PI), soleC, x, -0.362, 0.332, 0); st.scale.y = 1.02; legs.add(st); }   // ストラップ(甲の上の細いベルト)
     });
     if (skirt) {   // ひざの上にかかる布 + 前に垂れる すそ
       const skMap = def.skirtTex ? { map: fabricTex(def.skirtTex) } : {};
       /* 座ったときのスカート: ももと ひざを すっぽり おおう つまった形(足が布から出ないように)+ ひざの前に少しだけ たれる 短い すそ(ノブさん 2026-11-21) */
       const mat = () => toon(skc, skMap);
-      const lapG = new THREE.SphereGeometry(1, 28, 16).scale(0.148, 0.062, 0.2); const lap = new THREE.Mesh(lapG, mat()); lap.position.set(0, 0.06, 0.15); lap.add(outlineOf(lapG, LN)); body.add(lap);
+      /* 11-22 作り直し(ノブさん「スカートのところに服が出てたり 透けてる」): 前は 腰の輪が 胴と同じ太さで 服が横から つき出ていた・ひざの上が 大きな玉で すき間から ももが見えた。
+         いまは ① 腰の輪を 胴より太く(服が出ない)② もも2本ぶんの 布(つつ)を 腰から ひざまで つなげる ③ ひざの前に 短い すそ */
+      { const W2 = 0.106, z0 = -0.02, z1 = 0.27, rr = 0.07, sh = new THREE.Shape();   // ひざの上の布: 角の丸い 1枚の板(上から見た形)を 少し厚くして ふちを丸める
+        sh.moveTo(-W2 + rr, -z0); sh.lineTo(W2 - rr, -z0); sh.quadraticCurveTo(W2, -z0, W2, -z0 - rr); sh.lineTo(W2, -z1 + rr); sh.quadraticCurveTo(W2, -z1, W2 - rr, -z1);
+        sh.lineTo(-W2 + rr, -z1); sh.quadraticCurveTo(-W2, -z1, -W2, -z1 + rr); sh.lineTo(-W2, -z0 - rr); sh.quadraticCurveTo(-W2, -z0, -W2 + rr, -z0);
+        const lg = new THREE.ExtrudeGeometry(sh, { depth: 0.03, bevelEnabled: true, bevelThickness: 0.042, bevelSize: 0.042, bevelSegments: 6, curveSegments: 10 }); lg.rotateX(-Math.PI / 2);
+        const lap = new THREE.Mesh(lg, mat()); lap.position.set(0, 0.012, 0); lap.add(outlineOf(lg, LN)); body.add(lap); }
+      const hip = tm(new THREE.CylinderGeometry(0.152, 0.158, 0.095, 28), skc, 0, 0.03, 0, LN); hip.scale.z = 0.8; body.add(hip);   // 腰(胴の いちばん太い所 0.14 より 太く)
       const dh = def.long ? 0.1 : 0.05;
-      const hemG = new THREE.CylinderGeometry(0.146, 0.156, dh, 24, 1, false, -Math.PI / 2, Math.PI);
-      const hemM = new THREE.Mesh(hemG, toon(skc, Object.assign({ side: THREE.DoubleSide }, skMap))); hemM.position.set(0, 0.035 - dh / 2, 0.19); hemM.scale.z = 1.05; hemM.add(outlineOf(hemG, LN)); body.add(hemM);
-      body.add(tm(new THREE.CylinderGeometry(0.135, 0.14, 0.08, 24), skc, 0, 0.035, 0, LN));
+      const hemG = new THREE.CylinderGeometry(0.148, 0.158, dh, 28, 1, false, -Math.PI / 2, Math.PI);
+      const hemM = new THREE.Mesh(hemG, toon(skc, Object.assign({ side: THREE.DoubleSide }, skMap))); hemM.position.set(0, 0.0 - dh / 2, 0.195); hemM.scale.z = 1.0;   // すそは ひざより 前に(脚が すそを つきぬけないように) hemM.add(outlineOf(hemG, LN)); body.add(hemM);
     }
   }
 
