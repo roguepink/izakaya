@@ -241,7 +241,7 @@ function shade(hex, f) { const c = new THREE.Color(hex); c.multiplyScalar(f); re
 function lighten(hex, f) { const c = new THREE.Color(hex); c.lerp(new THREE.Color('#ffffff'), f); return '#' + c.getHexString(); }
 
 /* ---------- 顔(キャンバス 512×512 に描く) ---------- */
-const FACE_CACHE = {}, FACE_ORDER = [], FACE_MAX = 48;   // 顔の絵は 新しい順に 48枚まで とっておく(ずっと ためると スマホの絵の入れ物が いっぱいになって 3D が落ちる 11-22)
+const FACE_CACHE = {}, FACE_ORDER = [], FACE_MAX = 64;   // 顔の絵は 新しい順に 64枚まで とっておく(ずっと ためると スマホの絵の入れ物が いっぱいになって 3D が落ちる 11-22)
 function faceTexture(a) {
   const key = JSON.stringify([a.sex, a.eyes, a.eyeColor, a.brows, a.mouth, a.beard, a.lip, a.cheek, a.hairColor, a.skin, a.nBeard || '', a.nBeardC || '', a.blink ? 1 : 0]);
   if (FACE_CACHE[key]) { const i = FACE_ORDER.indexOf(key); if (i >= 0 && i < FACE_ORDER.length - 1) { FACE_ORDER.splice(i, 1); FACE_ORDER.push(key); } return FACE_CACHE[key]; }
