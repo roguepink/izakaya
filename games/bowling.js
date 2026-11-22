@@ -178,16 +178,19 @@
         g.stroke(); g.setLineDash([]);
         var ax = bx + Math.sin(st.ang) * br * 3.2, ay = by - Math.cos(st.ang) * br * 3.2;   // 向きの矢印
         g.save(); g.translate(ax, ay); g.rotate(st.ang); g.fillStyle = '#ffd23f'; g.strokeStyle = '#3a2210'; g.lineWidth = 3; g.beginPath(); g.moveTo(0, -br * 1.1); g.lineTo(-br * 0.8, br * 0.3); g.lineTo(-br * 0.3, br * 0.3); g.lineTo(-br * 0.3, br * 1.2); g.lineTo(br * 0.3, br * 1.2); g.lineTo(br * 0.3, br * 0.3); g.lineTo(br * 0.8, br * 0.3); g.closePath(); g.stroke(); g.fill(); g.restore();
-        if (!st.aiming) { g.fillStyle = 'rgba(20,12,8,.78)'; g.fillRect(W / 2 - 150, H * 0.36, 300, 76); g.fillStyle = '#ffd23f'; g.font = 'bold 21px sans-serif'; g.textAlign = 'center'; g.fillText('👆 指で 向きを決めて', W / 2, H * 0.36 + 32); g.fillText('はなすと 投げる!', W / 2, H * 0.36 + 62); }
+        if (!st.aiming) { var hy = Math.max(8, Math.min(H * 0.36, by - br * 4.6 - 76));   // 説明の箱は ボールと矢印より上に(横向きで ボールに重なっていた 11-23)
+          g.fillStyle = 'rgba(20,12,8,.78)'; g.fillRect(W / 2 - 150, hy, 300, 76); g.fillStyle = '#ffd23f'; g.font = 'bold 21px sans-serif'; g.textAlign = 'center'; g.fillText('👆 指で 向きを決めて', W / 2, hy + 32); g.fillText('はなすと 投げる!', W / 2, hy + 62); }
       }
       if (st.phase === 'look') { g.fillStyle = 'rgba(20,12,8,.7)'; g.fillRect(W / 2 - 110, 14, 220, 40); g.fillStyle = '#fbf3e4'; g.font = 'bold 18px sans-serif'; g.textAlign = 'center'; g.fillText('ピンの並びを 見てね…', W / 2, 41); }
       if (st.msgT > 0) { g.fillStyle = '#fbf3e4'; g.font = 'bold 30px sans-serif'; g.textAlign = 'center'; g.fillText(st.msg, W / 2, H * 0.4); }
     },
-    pointer: function (k, p, type) {
+    pointer: function (k, p, type, e) {
       if (k.phase !== 'play') return;
       if (st.phase === 'look') { if (type === 'down') st.lookT = 99; return; }   // 見るのを とばす
       if (st.phase === 'aim') {   // 指を おいた方へ 投げる(ななめもOK)。はなすと 投げる
-        if (type === 'down') { st.aiming = true; aimAt(p); }
+        var id = e && e.pointerId != null ? e.pointerId : 0;
+        if (type === 'down') { if (st.aiming && st.pid !== id) return; st.pid = id; st.aiming = true; aimAt(p); return; }   // 2本目の指は 無視(先に離した指で 投げていた 11-23)
+        if (st.aiming && st.pid !== id) return;
         else if (type === 'move' && st.aiming) aimAt(p);
         else if (type === 'cancel') st.aiming = false;   // 指が とりけされた(通知など)→ ねらい直し
         else if (type === 'up' && st.aiming) { st.aiming = false; var b = st.ball; b.vx = Math.sin(st.ang) * st.speed; b.vy = Math.cos(st.ang) * st.speed; st.phase = 'roll'; }

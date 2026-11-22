@@ -147,7 +147,8 @@
     var msg = ''; try { msg = opts.onEnd ? opts.onEnd(score, !!aborted) || '' : ''; } catch (e) {}
     if (aborted) { close(); return; }
     var extra = ''; try { extra = G.result ? G.result(kit) || '' : ''; } catch (e) {}
-    panel('<h2>おしまい!</h2><div class="izg-big">' + score + '<small style="font-size:20px">' + (D.unit || '点') + '</small></div>' +
+    var neg = Math.round(kit.score) < 0 ? '<p style="opacity:.8;font-size:14px">(マイナスは 0' + (D.unit || '点') + 'になります)</p>' : '';   // 上の帯は −949点、おしまいは 0点 で 食いちがって見えた(11-23)
+    panel('<h2>おしまい!</h2><div class="izg-big">' + score + '<small style="font-size:20px">' + (D.unit || '点') + '</small></div>' + neg +
       (extra ? '<p>' + extra + '</p>' : '') + (msg ? '<p class="izg-res">' + msg + '</p>' : ''),
       [['もう一回', function () { opts.best = Math.max(opts.best || 0, score); begin(); }], ['お店にもどる', close, 'izg-no']]);
   }
@@ -172,7 +173,7 @@
     g.textAlign = 'center'; g.textBaseline = 'alphabetic';
     kit._fx.forEach(function (f) {
       g.globalAlpha = Math.max(0, Math.min(1, f.a)); g.font = 'bold ' + (f.big === 2 ? 42 : f.big ? 30 : 22) + 'px sans-serif';
-      var x = Math.max(70, Math.min(W - 70, f.x * W));
+      var hw = g.measureText(f.s).width / 2 + 8, x = Math.max(hw, Math.min(W - hw, f.x * W));   // 文字の はばを測って 内側に(右はしで 切れていた 11-23)
       if (f.big) { g.lineWidth = 4; g.strokeStyle = 'rgba(0,0,0,.6)'; g.strokeText(f.s, x, f.y * H); }
       g.fillStyle = f.c; g.fillText(f.s, x, f.y * H); g.globalAlpha = 1;
     });

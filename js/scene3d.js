@@ -2184,7 +2184,8 @@ function createShop(canvas, opts) {
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#140c08');
-  scene.fog = new THREE.Fog('#140c08', 7, 14);
+  const FOG0 = [7 + Math.max(0, N - 9) * 1.2, 14 + Math.max(0, N - 9) * 2];   // 席が多いときは 霧を遠く(はしの席が 暗くならないように)
+  scene.fog = new THREE.Fog('#140c08', FOG0[0], FOG0[1]);
   const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 40);
 
   // 明かり
@@ -2449,7 +2450,8 @@ function createShop(canvas, opts) {
       case 'ownerAll': viewShift = portrait ? 0 : 0.69;   // 大将の「全体」: お客さんの全体と同じ映し方。横向きは左の会話の欄の分 右へずらす
       // fall through
       default:
-        if (portrait) { const ex = Math.max(0, N - 7) * 0.32; wantPos.set(L / 2 + 0.75 + ex * 0.4, 2.55 + ex * 0.35, 2.75 + ex); wantLook.set(-L * 0.12, 1.0, -0.35); wantFov = 64 + Math.max(0, N - 7) * 1.5; }
+        if (portrait) { const ex = Math.max(0, N - 7) * 0.32; wantPos.set(L / 2 + 0.75 + ex * 0.4, 2.55 + ex * 0.35, 2.75 + ex); wantLook.set(-L * 0.12, 1.0, -0.35); wantFov = 64 + Math.max(0, N - 7) * 1.5;
+          if (N >= 10) { wantPos.set(Math.min(wantPos.x, L / 2 + 0.9), Math.min(wantPos.y, 2.85), Math.min(wantPos.z, 3.4)); wantLook.set(-L * 0.09, 1.0 - 0.17 * (N - 9), -0.3); wantFov = 64 + (N - 7) * 2.8; } }   // 10席より多いと カメラが かべ・天井の外に出て 9〜12番が映らず 暗かった(11-23)。部屋の中で 広く映す
         else { wantPos.set(0, 2.6, 3.25); wantLook.set(0, 1.0, -0.8); wantFov = fitFov(3.25, view.mode === 'ownerAll' ? 0.62 : 1); }
     }
     // 指でぐるっと見回す分
@@ -2555,7 +2557,7 @@ function createShop(canvas, opts) {
     if (!photo) { const sh = (view.mode === 'owner' || view.mode === 'ownerAll') ? viewShift : 0;   // 絵の中心を 画面の横 sh の位置へ(ゆがまないように、広い絵の左側を切りとる)
       if (sh !== viewApplied) { viewApplied = sh; const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
         if (sh) { camera.aspect = baseAspect * sh * 2; camera.setViewOffset(w * sh * 2, h, 0, 0, w, h); } else { camera.aspect = baseAspect; camera.clearViewOffset(); } } }
-    { const hb = camPos.z < -1.8; if (hb !== backHidden) { backHidden = hb; backList().forEach((o) => { o.visible = !hb; }); scene.fog.near = hb ? 9 : 7; scene.fog.far = hb ? 18 : 14; } }
+    { const hb = camPos.z < -1.8; if (hb !== backHidden) { backHidden = hb; backList().forEach((o) => { o.visible = !hb; }); scene.fog.near = hb ? Math.max(9, FOG0[0]) : FOG0[0]; scene.fog.far = hb ? Math.max(18, FOG0[1]) : FOG0[1]; } }
     seatAvatars.forEach((a) => { if (a) { animateAvatar(a, dt); lookNext(a); } });
     tagList.forEach((tg) => { const f = tg.userData.flash; if (!f) return; const e = (performance.now() - f) / 500; if (e >= 1) { tg.rotation.z = 0; tg.userData.flash = 0; return; } tg.rotation.z = Math.sin(e * Math.PI * 4) * 0.12 * (1 - e); });
     // 押した料理が「ぽよん」とはねる
@@ -2932,7 +2934,7 @@ function createShop(canvas, opts) {
       window.__photoDbg = E.map((e) => ({ k: e.isOwner ? 'owner' : e.p.key, x: +e.x.toFixed(2), z: e.z, y: +e.y.toFixed(2), y0: e.y0, top: +e.hm.top.toFixed(2), chin: +e.hm.chin.toFixed(2), hw: +e.hm.hw.toFixed(2) }));   // 確認用
       const gs = E.filter((e) => !e.isOwner);
       photo.half = Math.max(0.45, ...E.map((e) => Math.abs(e.x) + LY.edge));   // 横のはしの人は 少し切れてもよい(自撮りらしく)
-      photo.top = Math.max(...E.map((e) => e.y + e.hm.top)) + 0.12;
+      photo.top = E.length ? Math.max(...E.map((e) => e.y + e.hm.top)) + 0.12 : 2.1;   // だれも写らないとき(-Infinity になって 真っ黒だった 11-23)
       photo.bot = (gs.length ? Math.min(...gs.map((e) => e.y)) : 1.3) - (duo ? LY.duo.under : gs.length >= 8 && LY.underMany ? LY.underMany : (LY.under || 0.45));   // 前の列は胸から上(人数が多いときは顔と首くらい)
       photo.look.y = (photo.top + photo.bot) / 2;
     },

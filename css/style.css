@@ -159,7 +159,7 @@ body:not(.is-owner) .owner-only { display: none; }
 .phrases button { flex: none; background: rgba(243,230,204,.92); color: var(--ink); border-radius: 999px; padding: 7px 12px; font-weight: 800; font-size: 14px; }
 .log-wrap { position: relative; }
 .log { max-height: 16vh; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; line-height: 1.45;
-  mask-image: linear-gradient(180deg, transparent, #000 30%); -webkit-mask-image: linear-gradient(180deg, transparent, #000 30%); padding-top: 14px; }
+  mask-image: linear-gradient(180deg, transparent 0, transparent 20px, #000 56px); -webkit-mask-image: linear-gradient(180deg, transparent 0, transparent 20px, #000 56px); padding-top: 20px; }   /* 上の「全部見る」の下は 文字を見せない(長い文が ボタンに かぶっていた 11-23) */
 .log .ln { background: rgba(0,0,0,.35); align-self: flex-start; border-radius: 10px; padding: 3px 9px; max-width: 92%; word-break: break-word; white-space: pre-wrap; }
 .log .ln b { color: var(--gold); margin-right: 5px; }
 .log .ln.owner b { color: #ff8a6a; }
@@ -187,6 +187,9 @@ body:not(.is-owner) .owner-only { display: none; }
 .tag.free { pointer-events: auto; background: rgba(243,230,204,.95); color: var(--ink); font-size: 13px; padding: 7px 12px; border: 2px solid var(--wood); cursor: pointer; }
 .tag.away { background: rgba(60,60,70,.85); color: #ddd; font-size: 11px; }
 .tag.reserved { background: rgba(80,60,40,.92); color: #ffe7b8; font-size: 12px; padding: 4px 10px; border: 1px solid rgba(232,163,61,.6); }
+.tag.moved { font-size: 10px; padding: 1px 6px; opacity: .93; }   /* ほかの名札と重なるので 小さくして上へ(11-23) */
+.tag.free.moved { font-size: 11px; padding: 3px 8px; border-width: 1.5px; }
+.tag.reserved.moved { font-size: 10px; padding: 2px 7px; }
 .bubble { position: absolute; transform: translate(-50%, calc(-100% - 22px)); width: max-content; max-width: min(62vw, 260px); white-space: pre-wrap; box-sizing: border-box; background: #fffaf0; color: var(--ink);
   border-radius: 14px; padding: 7px 11px; font-size: 14px; line-height: 1.4; box-shadow: 0 3px 10px rgba(0,0,0,.4); word-break: break-word; transition: opacity .4s; }
 .bubble::after { content: ''; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #fffaf0; border-bottom: 0; }
@@ -310,7 +313,8 @@ button.mini { background: rgba(0,0,0,.1); border-radius: 999px; width: 30px; hei
 /* 大将の接客画面: 会話の欄を大きく、右のボタンは「☰」にたたむ */
 #bMore { display: none; }
 body.owner-view #bMore { display: flex; }
-body.owner-view:not(.side-open) .side > .sbtn:not(#bMore):not(#bOrders):not(#bView):not(#bAi) { display: none; }   /* 👧 アイちゃんも たたんだ時に出す 11-23 */
+body.owner-view:not(.side-open) .side > .sbtn:not(#bMore):not(#bOrders):not(#bView):not(#bAi) { display: none; }
+@media (orientation: portrait) { body.side-open .np-row { max-width: calc(100% - 150px); } }   /* ☰ を開くと ボタンが2列になるので、曲名の帯と「次へ」を短く(👧 が「次へ」に重なっていた 11-23) */   /* 👧 アイちゃんも たたんだ時に出す 11-23 */
 body.owner-view .side > #bView { order: -1; }   /* 大将も 👁 は いつも いちばん上(右上)。おしゃべり画面と 同じ所で 続けて押せる 11-22 ノブさん */
 body.owner-view .log { max-height: 27vh; font-size: 14.5px; background: rgba(20,12,8,.55); border-radius: 12px; padding: 14px 6px 6px; }
 body.owner-view .log .ln { background: rgba(255,255,255,.07); }
@@ -364,7 +368,7 @@ body.owner-view .log .ln.new { background: rgba(255,232,170,.2); }
 }
 
 /* ---------- 記念撮影 ---------- */
-body.photo-mode .bottom, body.photo-mode .side, body.photo-mode #tags, body.photo-mode #bubbles, body.photo-mode #tv, body.photo-mode .topbar { visibility: hidden !important; }
+body.photo-mode .bottom, body.photo-mode .side, body.photo-mode #tags, body.photo-mode #bubbles, body.photo-mode #tv, body.photo-mode .topbar, body.photo-mode .np-row { visibility: hidden !important; }
 .photo-ui { position: fixed; inset: 0; z-index: 60; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
 .ph-top { pointer-events: none; text-align: center; padding: calc(10px + env(safe-area-inset-top)) 16px 0; background: linear-gradient(rgba(20,12,8,.85), rgba(20,12,8,0)); }
 .ph-title { color: #fff; font-weight: 800; font-size: 15px; text-shadow: 0 1px 4px #000; line-height: 1.4; }
@@ -539,6 +543,7 @@ body.demo .side > #bGame { display: none !important; }   /* 着がえ中は 💬
 body.talk-on .side { flex-direction: row-reverse; flex-wrap: wrap; left: 8px; right: 8px; max-height: none !important; gap: 5px; justify-content: flex-start; align-content: flex-start; }
 body.talk-on .side > #bView { order: -1; }   /* 👁 は いちばん右上(ふつうの画面の 👁 と だいたい同じ所。続けて押せるように 11-22 ノブさん) */   /* ボタンは 全部見えるように(入りきらなければ 2段に) */
 body.talk-on .side::-webkit-scrollbar { display: none; }
+@media (orientation: landscape) and (max-height: 520px) { body.talk-on .side { flex-direction: row; justify-content: flex-end; } body.talk-on .side::before { order: 99; } }   /* 横向きの おしゃべり画面: ふつうの画面と同じ並び(左右逆になっていた 11-23) */
 body.talk-on .sbtn { flex: none; width: 49px; padding: 5px 0 4px; }
 body.talk-on .sbtn span { font-size: 19px; }
 body.talk-on .sbtn small { font-size: 9.5px; white-space: nowrap; letter-spacing: -.03em; }
