@@ -830,7 +830,8 @@
       sys(OWNER_MODE ? (/^大将/.test(currentName()) ? '' : '大将の') + currentName() + 'が奥に下がりました' : honor(currentName()) + 'がお帰りになりました');
       net.remove('members/' + ME.uid);
       var others = Object.keys(members()).some(function (u) { var m = members()[u]; return u !== ME.uid && m.name && !m.bot && fresh(m); });
-      if (OWNER_MODE || !others) botsLeave(); else bots = {};   // おためし客は 大将が帰るか、だれもいなくなったら 帰る(ほかの人が いれば その人の画面が 引きつぐ)
+      if (OWNER_MODE || !others) botsLeave(); else bots = {};
+      if (!others && regMember()) regLeave(true);   // だれもいなくなったら アイちゃんも そっと帰る(次に来た人の 画面に 残らないように)   // おためし客は 大将が帰るか、だれもいなくなったら 帰る(ほかの人が いれば その人の画面が 引きつぐ)
     }
     var bL = (tree.state || {}).baton; if (OWNER_MODE && bL && bL.from === ME.uid && !bL.ans) net.update('state', { baton: null });   // 頼んだまま帰った → 取り消す(「やる」のあとは 新しい大将が片づける)
     inside = false; mySeat = -1; clearInterval(hbTimer);
@@ -1697,7 +1698,7 @@
     Object.keys(ms).forEach(function (uid) { var m = ms[uid]; if (m.bot && m.name && uid !== REG_UID && !bots[uid] && m.seat >= 0) bots[uid] = { seat: m.seat, name: m.name, next: n + 2000 + Math.random() * 6000 }; });
     // いなくなった人の片づけ
     Object.keys(ms).forEach(function (uid) {
-      if (ms[uid].name && (fresh(ms[uid]) || away(ms[uid]) || (ms[uid].bot && bots[uid]))) return;   // 名前のない記録(消されたあとの「いるよ」だけ)も片づける
+      if (ms[uid].name && (fresh(ms[uid]) || away(ms[uid]) || (ms[uid].bot && bots[uid]) || (uid === REG_UID && n - (ms[uid].seen || 0) < AWAY_MS))) return;   // アイちゃんは まとめ役が かわっても 3分は そのまま(消えて 20秒後に また「おじゃまします」と 来ていた 11-22)   // 名前のない記録(消されたあとの「いるよ」だけ)も片づける
       net.remove('members/' + uid);
       for (var i = 0; i < N; i++) if (seatUid(i) === uid) { net.remove('seats/' + i); net.remove('tables/' + i); }
     });
