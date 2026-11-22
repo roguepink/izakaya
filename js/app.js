@@ -1300,6 +1300,7 @@
   }, true);
   var SEAT_COLORS = ['#7ec8ff', '#ff9ec4', '#8fe39a', '#ffd36a', '#c9a8ff', '#7fe0d8', '#ffb07a', '#b8d86a', '#f0a0a0', '#a0c0f0'];
   var lastOwnerAt = 0;
+  var ME_TAG = '<i class="me-tag">あなた</i>';
   function renderLog() {
     var c = tree.chat || {}, keys = Object.keys(c).sort(); lastOwnerAt = 0;
     var shown = keys.filter(function (k) { return (c[k].at || 0) >= joinAt - 10 * MIN; }).slice(-120);
@@ -1308,17 +1309,18 @@
     var html = shown.map(function (k) {
       var m = c[k];
       if (m.sys) return '<div class="ln sys">' + esc(m.text) + '</div>';
-      if (m.owner) { return '<div class="ln owner" data-seat="owner"><b>🏮 ' + esc(m.name || '') + '</b>' + esc(m.text) + '</div>'; }
+      if (m.owner) { return '<div class="ln owner' + (OWNER_MODE ? ' me' : '') + '" data-seat="owner">' + (OWNER_MODE ? ME_TAG : '') + '<b>🏮 ' + esc(m.name || '') + '</b>' + esc(m.text) + '</div>'; }   // 大将の画面では 大将の言葉が「自分の言葉」
       var col = typeof m.seat === 'number' ? SEAT_COLORS[m.seat % SEAT_COLORS.length] : '';
       var fresh2 = OWNER_MODE && (m.at || 0) > lastOwnerAt && m.uid !== ME.uid;   // 大将が まだ返事していない新しいコメント
-      return '<div class="ln' + (fresh2 ? ' new' : '') + '" data-uid="' + esc(m.uid || '') + '" data-seat="' + (okSeat(m.seat) ? m.seat : '') + '"' + (m.uid === ME.uid ? ' data-me="1"' : '') + '><b' + (col ? ' style="color:' + col + '"' : '') + '>' + esc(m.name || '') + '</b>' + esc(m.text) + '</div>';
+      var mine = m.uid === ME.uid;   // 自分の言葉は 右に寄せて 色を変える(埋もれないように。ノブさん 11-22)
+      return '<div class="ln' + (fresh2 ? ' new' : '') + (mine ? ' me' : '') + '" data-uid="' + esc(m.uid || '') + '" data-seat="' + (okSeat(m.seat) ? m.seat : '') + '"' + (mine ? ' data-me="1"' : '') + '>' + (mine ? ME_TAG : '') + '<b' + (mine || !col ? '' : ' style="color:' + col + '"') + '>' + esc(m.name || '') + '</b>' + esc(m.text) + '</div>';
     }).join('');
     if (log._h !== html) { log.innerHTML = html; log._h = html; if (atBottom) log.scrollTop = log.scrollHeight; }
     keys.forEach(function (k) {
       if (seenChat[k]) return; seenChat[k] = 1;
       var m = c[k]; if (m.sys || (m.at || 0) < joinAt - 5000) return;
       if ((m.at || 0) > now() - 15000) regHear(m);
-      bubble(m.seat, m.text, false);
+      bubble(m.seat, m.text, false, m.uid === ME.uid && !m.owner);
       if (m.ai && m.uid === REG_UID && /^[a-z]{1,2}\d{1,2}$/.test(m.ai)) playAi(m.ai, m.seat);   // アイちゃんの声(2026-11-21 録音)
       withScene(function (s) {
         s.talk(m.seat);
@@ -1334,7 +1336,7 @@
   /* 頭の上の吹き出し */
   var bubbles = {};   // seat → {el, until}
   function okSeat(v) { return typeof v === 'number' && v >= 0 && v < N && Math.floor(v) === v; }   // 席番号として正しいか(おかしな値で画面がこわれないように)
-  function bubble(seat, text, phrase) {
+  function bubble(seat, text, phrase, mine) {
     if (seat !== 'owner' && !okSeat(seat)) return;
     talkHear(seat, text, phrase);
     var key = String(seat);
@@ -1342,7 +1344,7 @@
     if (!b) { b = bubbles[key] = { el: document.createElement('div'), bn: document.createElement('div'), bt: document.createElement('div') }; b.bn.className = 'bn'; b.bt.className = 'bt'; b.el.appendChild(b.bn); b.el.appendChild(b.bt); }
     b.el.style.display = 'none';   // 中身が変わったら、次に置き場所が決まるまで隠す(古い場所で一瞬重ならないように)
     $('bubbles').appendChild(b.el);   // いちばん新しい吹き出しを、いちばん手前に
-    b.el.className = 'bubble' + (phrase ? ' phrase' : '') + (key === 'owner' ? ' owner' : '') + (text.length > 50 ? ' long' : '');
+    b.el.className = 'bubble' + (phrase ? ' phrase' : '') + (key === 'owner' ? ' owner' : '') + (mine ? ' me' : '') + (text.length > 50 ? ' long' : '');
     b.bt.textContent = text; b.bt.scrollTop = 0;
     b.start = Date.now();
     b.until = b.start + Math.min(20000, 3500 + text.length * 90);

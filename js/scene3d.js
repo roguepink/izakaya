@@ -379,7 +379,7 @@ function drawEye(g, cx, cy, s, a, eyeC, ink) {
     case 'cool': w *= 1.15; h *= 0.6; tilt = -0.08; break;
     case 'narrow': h *= 0.32; break;
     case 'smile': closed = true; break;
-    case 'wink': if (s === 1) closed = true; break;
+    case 'wink': if (s === 1) closed = true; break;   // 記念撮影の「ウインク」のときだけ(ふだんの顔では選べない。ノブさん 11-22)
     case 'ai': h *= 1.16; w *= 1.08; tilt = 0.08; break;   // アイちゃん: 大きく まるい目(少したれ目)
     case 'ne1': w *= 1.12; h *= 1.12; tilt = 0.1; break;   // 大将ノブ: やさしい大きめの目(少したれ目)
     case 'ne2': w *= 1.18; h *= 1.0; tilt = 0.14; break;   // 大将ノブ: やさしい横長の大きめの目
@@ -392,7 +392,7 @@ function drawEye(g, cx, cy, s, a, eyeC, ink) {
     if (F) { g.lineWidth = 4; g.beginPath(); g.moveTo(w * 0.92 * s, -2); g.lineTo(w * 1.18 * s, -8); g.stroke(); }
     g.restore(); return;
   }
-  if (closed) {   // にこにこ・ウインクは 弧を描く
+  if (closed) {   // にこにこ・(撮影の)ウインクは 弧を描く
     g.strokeStyle = ink; g.lineWidth = F ? 8 : 7;
     g.beginPath(); g.arc(0, 10, w * 0.95, Math.PI * 1.15, Math.PI * 1.85); g.stroke();
     if (F) { g.lineWidth = 4; g.beginPath(); g.moveTo(w * 0.85 * s, -6); g.lineTo(w * 1.15 * s, -14); g.stroke(); }
