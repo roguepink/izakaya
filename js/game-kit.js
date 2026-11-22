@@ -60,14 +60,16 @@
     '#izg .izg-panel p{margin:6px 0;font-size:15px;line-height:1.7}',
     '#izg .izg-today{display:inline-block;background:#d9442e;color:#fff;font-size:12px;font-weight:700;border-radius:99px;padding:2px 10px;margin-bottom:6px}',
     '#izg .izg-leg{margin:8px 0 4px;text-align:left}',
-    '#izg .izg-leg div{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:10px;margin:5px 0;font-size:15px;line-height:1.4}',
+    '#izg .izg-leg div{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:5px 8px;border-radius:10px;margin:5px 0;font-size:15px;line-height:1.4}',
+    '#izg .izg-leg span{flex:1 1 9em;min-width:0}',   /* 絵が多いときは 説明を 下の行へ(小さいスマホで 文字が 縦に細長く くずれていた 11-22) */
     '#izg .izg-leg img{width:40px;height:40px;flex:none}',
+    '@media (max-width:360px){#izg .izg-leg img{width:34px;height:34px}}',
     '#izg .izg-leg .g{background:rgba(255,240,210,.08)}',
     '#izg .izg-leg .b{background:rgba(255,60,40,.14)}',
     '#izg .izg-leg .o{background:rgba(255,210,60,.14)}',
     '#izg .izg-leg b{font-size:17px}',
     '#izg .izg-big{font-size:44px;font-weight:700;color:#fff;font-variant-numeric:tabular-nums}',
-    '#izg .izg-btns{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap}',
+    '#izg .izg-btns{display:flex;gap:10px;justify-content:center;margin-top:14px;flex-wrap:wrap;position:sticky;bottom:-18px;background:#2a1d14;padding:8px 0 10px;margin-bottom:-10px}',   /* 説明が長くても「スタート」は いつも見える(小さいスマホで 下に かくれていた 11-22) */
     '#izg button{font:inherit;font-size:17px;font-weight:700;border:0;border-radius:99px;padding:12px 22px;cursor:pointer}',
     '#izg .izg-go{background:#d9442e;color:#fff}',
     '#izg .izg-no{background:#4a3a2c;color:#f2e6d4}',
@@ -90,7 +92,7 @@
     var k = {
       W: 1, H: 1, t: 0, score: 0, phase: 'ready', seed: '', g: null,
       rng: rng, hash: hash, EMOJI_FONT: EMOJI_FONT,
-      add: function (n) { k.score = Math.max(0, k.score + n); },                   // 点数を足す(マイナスもOK。0より下にはならない)
+      add: function (n) { k.score += n; },   // 点数を足す(マイナスもOK)。途中は 0より下にもなる(0点のときに −10 を取っても 減らないのは 不公平だった 11-22)。おしまいの点は 0より下にはしない
       combo: function (s) { var c = root && root.querySelector('.izg-combo'); if (c) c.textContent = s || ''; },   // 上のまん中の文字(「🔥 5れんぞく」など)
       fx: function (x, y, s, color, big) { k._fx.push({ x: x, y: y, s: s, c: color || '#ffe08a', a: big ? 1.6 : 1.1, big: big || 0 }); },   // 点数の文字が ふわっと出る(x,y は 0〜1)
       flash: function (color, power) { k._flash = { c: color || '220,40,30', a: power || 1 }; },   // 画面が光る(色は 'r,g,b')
@@ -111,7 +113,7 @@
     if (!cv) return;
     var dpr = Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth, h = cv.clientHeight;
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (kit) { kit.W = w; kit.H = h; if (G && G.resize) G.resize(kit); }
+    if (kit) { kit.W = w; kit.H = h; if (G && G.resize) G.resize(kit); if (kit.phase !== 'play') { try { draw(); } catch (e) {} } }   // 向きを変えたとき、スタート画面・おしまい画面の うしろも 描き直す
   }
   function panel(html, btns) {
     var old = root.querySelector('.izg-panel'); if (old) old.remove();
@@ -194,9 +196,10 @@
       G = game; kit = makeKit(); kit.g = g;
       var w = root.querySelector('.izg-wait'); if (w) w.remove();
       resize(); window.addEventListener('resize', resize);
-      cv.addEventListener('pointerdown', function (e) { if (G.pointer) G.pointer(kit, pos(e), 'down', e); });
+      cv.addEventListener('pointerdown', function (e) { try { cv.setPointerCapture(e.pointerId); } catch (e2) {} if (G.pointer) G.pointer(kit, pos(e), 'down', e); });   // 指が 画面の外に出ても はなした所まで 受け取る
       cv.addEventListener('pointermove', function (e) { if (G.pointer && (e.buttons || e.pointerType === 'touch')) G.pointer(kit, pos(e), 'move', e); });
       cv.addEventListener('pointerup', function (e) { if (G.pointer) G.pointer(kit, pos(e), 'up', e); });
+      cv.addEventListener('pointercancel', function (e) { if (G.pointer) G.pointer(kit, pos(e), 'cancel', e); });   // スマホの 通知・ホームのスワイプで 指が とりけされたとき(11-22 ボウリングが「はなすと投げる」のまま止まっていた)
       window.addEventListener('keydown', onKey);
       if (G.init) G.init(kit);
       draw(); startScreen();

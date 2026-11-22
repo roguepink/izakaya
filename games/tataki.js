@@ -77,7 +77,7 @@
         var key = x.ch + (x.state === 'hit' ? 'h' : 'n'), sp = st.faces[key] || (st.faces[key] = face(x.ch, x.state === 'hit'));
         g.save(); g.beginPath(); g.rect(hl.cx - sz, hl.cy - sz * 1.3, sz * 2, sz * 1.3); g.clip();   // 穴より下は 見せない
         g.drawImage(sp, hl.cx - sz / 2, top, sz, sz); g.restore();
-        x.box = [hl.cx, top + sz * 0.45, sz * 0.42, sz * 0.5];
+        var bt = top + sz * 0.05, bb = Math.min(hl.cy, top + sz * 0.95); x.box = bb > bt + 4 ? [hl.cx, (bt + bb) / 2, sz * 0.42, (bb - bt) / 2] : null;   // 当たる所は 見えている顔だけ(穴より下は 当たらない。下の段の顔と 重なって 見えない大将に 当たっていた 11-22)
       });
       st.holes.forEach(function (hl) {   // 穴の手前のふち
         g.strokeStyle = '#7a4a24'; g.lineWidth = 6; g.beginPath(); g.ellipse(hl.cx, hl.cy, hl.rw, hl.rw * 0.33, 0, 0, Math.PI); g.stroke();
@@ -85,14 +85,14 @@
     },
     pointer: function (k, p, type) {
       if (type !== 'down' || k.phase !== 'play') return;
-      var px = p.x * k.W, py = p.y * k.H, best = null;
-      st.list.forEach(function (x) {
+      var px = p.x * k.W, py = p.y * k.H, best = null, bd = 1e9;
+      st.list.forEach(function (x) {   // 重なったときは 指に いちばん近い顔
         if (x.state !== 'up' || !x.box) return;
-        if (Math.abs(px - x.box[0]) < x.box[2] && Math.abs(py - x.box[1]) < x.box[3]) best = x;
+        if (Math.abs(px - x.box[0]) < x.box[2] && Math.abs(py - x.box[1]) < x.box[3]) { var d = Math.hypot(px - x.box[0], py - x.box[1]); if (d < bd) { bd = d; best = x; } }
       });
       if (!best) return;
       best.state = 'hit'; best.hitAt = k.t;
-      var fx = best.box[0] / k.W, fy = (best.box[1] - best.box[3]) / k.H;
+      var fx = best.box[0] / k.W, fy = Math.max(0.08, (best.box[1] - best.box[3]) / k.H);
       if (best.ch === 0) { k.add(-10); st.ouch++; st.streak = 0; k.flash('220,40,30', 2); k.shake(2.2); k.fx(fx, fy, '−10 いてっ!', '#ff5a4a', 2); }
       else { k.add(1); st.hit++; st.streak++; k.fx(fx, fy, '+1', '#ffe08a'); }
     },

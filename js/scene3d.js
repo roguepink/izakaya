@@ -241,10 +241,10 @@ function shade(hex, f) { const c = new THREE.Color(hex); c.multiplyScalar(f); re
 function lighten(hex, f) { const c = new THREE.Color(hex); c.lerp(new THREE.Color('#ffffff'), f); return '#' + c.getHexString(); }
 
 /* ---------- 顔(キャンバス 512×512 に描く) ---------- */
-const FACE_CACHE = {};
+const FACE_CACHE = {}, FACE_ORDER = [], FACE_MAX = 48;   // 顔の絵は 新しい順に 48枚まで とっておく(ずっと ためると スマホの絵の入れ物が いっぱいになって 3D が落ちる 11-22)
 function faceTexture(a) {
   const key = JSON.stringify([a.sex, a.eyes, a.eyeColor, a.brows, a.mouth, a.beard, a.lip, a.cheek, a.hairColor, a.skin, a.nBeard || '', a.nBeardC || '', a.blink ? 1 : 0]);
-  if (FACE_CACHE[key]) return FACE_CACHE[key];
+  if (FACE_CACHE[key]) { const i = FACE_ORDER.indexOf(key); if (i >= 0 && i < FACE_ORDER.length - 1) { FACE_ORDER.splice(i, 1); FACE_ORDER.push(key); } return FACE_CACHE[key]; }
   const t = canvasTex(512, 512, (g) => {
     const F = a.sex === 'f';
     const ink = '#2a1a14', EY = 272, LX = 174, RX = 338;
@@ -364,7 +364,9 @@ function faceTexture(a) {
     }
     if (F && a.mouth !== 'grin' && a.mouth !== 'open') { g.strokeStyle = lip; g.globalAlpha = 0.75; g.lineWidth = 7; g.beginPath(); g.moveTo(240, MY + 6); g.quadraticCurveTo(256, MY + 14, 272, MY + 6); g.stroke(); g.globalAlpha = 1; }
   });
-  FACE_CACHE[key] = t; return t;
+  FACE_CACHE[key] = t; FACE_ORDER.push(key);
+  while (FACE_ORDER.length > FACE_MAX) { const old = FACE_ORDER.shift(), ot = FACE_CACHE[old]; delete FACE_CACHE[old]; if (ot) ot.dispose(); }   // まだ使っている人がいても、次に描くとき 自動で 読みこみ直される
+  return t;
 }
 function drawEye(g, cx, cy, s, a, eyeC, ink) {
   const F = a.sex === 'f';
@@ -1063,14 +1065,14 @@ function buildAvatar(raw, opt = {}) {
   const torso = new THREE.Mesh(torsoGeo(f), torsoMat); torso.add(outlineOf(torso.geometry, LN)); body.add(torso);
   const lower = buildTop(body, a, f, cc);
   if (a.backText && a.owner && ['happi', 'samue', 'jinbei'].includes(a.top)) {   // 大将の 法被の背中の大きな文字(11-22 ノブさん 大将だけの目印)。縦書き。背中の丸みに そわせる
-    const tx = canvasTex(256, 384, (g) => {
+    const tx = canvasTex(256, 384, (g) => {   // (この人だけの絵 → own 印。作り直すとき 捨てる)
       g.fillStyle = a.backTextColor || '#f6f2e8'; g.textAlign = 'center'; g.textBaseline = 'middle';
       const ch = Array.from(String(a.backText)).slice(0, 3), fs = ch.length > 2 ? 118 : 172;
       g.font = '900 ' + fs + 'px "Hiragino Sans","Hiragino Kaku Gothic StdN","Noto Sans JP",sans-serif';
       g.lineJoin = 'round'; g.lineWidth = fs * 0.08; g.strokeStyle = 'rgba(0,0,0,.35)';
       ch.forEach((c, i) => { const y = 192 + (i - (ch.length - 1) / 2) * fs * 0.98; g.strokeText(c, 128, y); g.fillText(c, 128, y); });
     });
-    const bk = new THREE.Mesh(new THREE.CylinderGeometry(0.152, 0.152, 0.27, 16, 1, true, Math.PI - 0.6, 1.2), new THREE.MeshBasicMaterial({ map: tx, transparent: true, depthWrite: false, side: THREE.FrontSide }));
+    tx.userData.own = 1; const bk = new THREE.Mesh(new THREE.CylinderGeometry(0.152, 0.152, 0.27, 16, 1, true, Math.PI - 0.6, 1.2), new THREE.MeshBasicMaterial({ map: tx, transparent: true, depthWrite: false, side: THREE.FrontSide }));
     bk.position.y = 0.25; body.add(bk);
   }
   // 首・肩
@@ -1291,12 +1293,12 @@ function buildCostume(head, body, a, R, f, cos, skinC, D) {
       const Rb = f ? R * 0.98 : R;
       const b = tm(new THREE.TorusGeometry(Rb * 1.04, 0.018, 8, 36), '#fbfaf4', 0, Rb * 0.3, 0, LN); b.rotation.x = Math.PI / 2 + 0.15; head.add(b);
       const b2 = tm(new THREE.TorusGeometry(Rb * 1.045, 0.007, 6, 36), '#d01e28', 0, Rb * 0.3, 0); b2.rotation.x = Math.PI / 2 + 0.15; head.add(b2);
-      const t = canvasTex(128, 128, (g) => { g.fillStyle = '#fbfaf4'; g.fillRect(0, 0, 128, 128); g.fillStyle = '#d01e28'; g.font = 'bold 100px ' + FONT_JP; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('祝', 64, 70); });
+      const t = canvasTex(128, 128, (g) => { g.fillStyle = '#fbfaf4'; g.fillRect(0, 0, 128, 128); g.fillStyle = '#d01e28'; g.font = 'bold 100px ' + FONT_JP; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('祝', 64, 70); }); t.userData.own = 1;
       const lab = mesh(new THREE.PlaneGeometry(0.075, 0.075), new THREE.MeshBasicMaterial({ map: t }), 0, Rb * 0.42, Rb * 1.03); lab.rotation.x = -0.18; head.add(lab);
       [-1, 1].forEach((s) => { const tl = tm(new THREE.BoxGeometry(0.03, 0.1, 0.006), s > 0 ? '#d01e28' : '#fbfaf4', s * 0.03, Rb * 0.12, -Rb * 1.05); tl.rotation.z = s * 0.4; head.add(tl); });
       break; }
     case 'party': {   // とんがり帽子: しま模様 + ぼんぼり(少しななめ)
-      const t = canvasTex(128, 128, (g) => { const C = ['#ff4a8a', '#ffd23b', '#4ac8ff', '#8ae04a']; for (let k = 0; k < 8; k++) { g.fillStyle = C[k % 4]; g.fillRect(0, k * 16, 128, 16); } });
+      const t = canvasTex(128, 128, (g) => { const C = ['#ff4a8a', '#ffd23b', '#4ac8ff', '#8ae04a']; for (let k = 0; k < 8; k++) { g.fillStyle = C[k % 4]; g.fillRect(0, k * 16, 128, 16); } }); t.userData.own = 1;
       const g = new THREE.Group(); g.position.set(R * 0.15, top - 0.02, 0); g.rotation.z = -0.3; head.add(g);
       g.add(mesh(new THREE.ConeGeometry(0.075, 0.2, 18), toon('#ffffff', { map: t }), 0, 0.1, 0));
       g.add(tm(new THREE.SphereGeometry(0.025, 10, 8), '#ffd23b', 0, 0.21, 0, LN));
@@ -1328,7 +1330,7 @@ function buildCostume(head, body, a, R, f, cos, skinC, D) {
       break; }
   }
   if (c.body === 'sash') {   // たすき「本日の主役」: 右肩から左の腰へ
-    const t = canvasTex(64, 512, (g) => { g.fillStyle = '#d01e28'; g.fillRect(0, 0, 64, 512); g.fillStyle = '#ffe9a8'; g.fillRect(4, 0, 4, 512); g.fillRect(56, 0, 4, 512); g.fillStyle = '#ffffff'; g.font = 'bold 50px ' + FONT_JP; g.textAlign = 'center'; g.textBaseline = 'middle'; Array.from('本日の主役').forEach((ch, k) => g.fillText(ch, 32, 70 + k * 80)); });
+    const t = canvasTex(64, 512, (g) => { g.fillStyle = '#d01e28'; g.fillRect(0, 0, 64, 512); g.fillStyle = '#ffe9a8'; g.fillRect(4, 0, 4, 512); g.fillRect(56, 0, 4, 512); g.fillStyle = '#ffffff'; g.font = 'bold 50px ' + FONT_JP; g.textAlign = 'center'; g.textBaseline = 'middle'; Array.from('本日の主役').forEach((ch, k) => g.fillText(ch, 32, 70 + k * 80)); }); t.userData.own = 1;
     const sw = mesh(new THREE.PlaneGeometry(0.055, 0.42), new THREE.MeshBasicMaterial({ map: t, side: THREE.DoubleSide }), 0, 0.2, f ? 0.125 : 0.14); sw.rotation.z = 0.62; sw.rotation.x = -0.12; body.add(sw);
     const bk = mesh(new THREE.PlaneGeometry(0.055, 0.42), new THREE.MeshBasicMaterial({ color: '#d01e28', side: THREE.DoubleSide }), 0, 0.2, -(f ? 0.12 : 0.135)); bk.rotation.z = -0.62; body.add(bk);
   }
@@ -1580,7 +1582,13 @@ function cullBelow(root, yCut) {
   });
   window.__cullStats = stats;
 }
-function disposeAvatar(o) { if (!o) return; o.traverse((m) => { if (m.isMesh && m.geometry) m.geometry.dispose(); }); }
+function disposeAvatar(o) {   // 形と、その人だけの絵(背中の文字・仮装の絵)を 捨てる。みんなで使う材料・絵は 捨てない(11-22 作り直すたびに たまっていた)
+  if (!o) return;
+  o.traverse((m) => {
+    if (m.isMesh && m.geometry) m.geometry.dispose();
+    if (m.material) [].concat(m.material).forEach((mt) => { if (mt && mt.map && mt.map.userData && mt.map.userData.own) { mt.map.dispose(); mt.dispose(); } });
+  });
+}
 /* ---------- 記念撮影のポーズと表情 ----------
    腕の形 [肩の前後, 肩の外むき, ひじ]。外むきは 左右で向きを合わせて使う。指をさすポーズは入れない(ノブさん) */
 const ARM = { down: [-0.12, 0.1, -0.2], cheek: [-0.95, 0.22, -2.25], high: [-2.85, 0.28, -0.15], cheer: [-1.85, 0.6, -0.7], guts: [-0.3, 0.42, -2.35],
@@ -2169,6 +2177,8 @@ function createShop(canvas, opts) {
   const N = opts.seats;
   let SHOPNAME = opts.name || SHOP.NAME;   // バトンタッチで その場で変わる(setName)   // 回ごとの店の名前(ちょうちん・のれんの文字)
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); window.__iz3dLost = 1; window.dispatchEvent(new Event('iz3d-lost')); });
+  canvas.addEventListener('webglcontextrestored', () => { window.__iz3dLost = 0; });   // もどったら そのまま(three.js が 描き直す)   // スマホの都合で 3D が落ちた(絵の入れ物が いっぱい・長く裏にいた)→ app.js が 読みこみ直す(11-22 まっ黒のまま もどらなかった)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15;
@@ -3101,6 +3111,7 @@ function portrait(raw, size) {
     ptC = new THREE.PerspectiveCamera(14, 1, 0.05, 20);
   }
   ptR.setSize(size, size, false);
+  try { if (ptR.getContext().isContextLost()) return ''; } catch (e) {}   // 3D の係が 落ちているときは 透明の絵を 返さない(11-22)
   const av = buildAvatar(raw, { standing: true }); av.rotation.y = -0.18; ptS.add(av);
   const hat = !!(raw && raw.costume && String(raw.costume).split('|')[0]);   // かぶりものが あるときは 少し引いて 上まで入れる
   const ly = hat ? 0.8 : 0.72, dist = hat ? 3.1 : 2.55;

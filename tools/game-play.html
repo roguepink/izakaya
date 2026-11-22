@@ -20,6 +20,6 @@
     b.onclick = function () { play(g.id); }; box.appendChild(b);
   });
   function play(id) { IZGAME.open({ game: id, any: true, seed: 'try-' + new Date().toDateString(), onEnd: function () { return 'ためしなので 記録はされません'; } }); }
-  var q = new URLSearchParams(location.search).get('g'); if (q) play(q);
+  var q = new URLSearchParams(location.search).get('g'); if (q) { if (L.some(function (g) { return g.id === q; })) play(q); else alert('「' + q + '」という ゲームは ありません。下の一覧から えらんでください'); }   // 名前のまちがいで 別のゲームが開かないように
 </script>
 </body></html>

@@ -204,7 +204,7 @@
       k.combo(st.streak >= 3 ? '🔥 ' + st.streak + 'れんぞく' : '');
     },
     draw: function (k, g, W, H) {
-      var size = st.size = Math.max(40, Math.min(W * 0.13, H * 0.1, 80));
+      var size = st.size = Math.round(Math.max(40, Math.min(W * 0.13, H * 0.1, 80)) / 2) * 2;   // 2ずつに まるめる(画面の大きさが少し変わるたびに 絵を作り直して たまっていた 11-22)
       g.fillStyle = '#2a1c12'; g.fillRect(-10, 0, W + 20, H);
       g.fillStyle = '#3a2618'; g.fillRect(-10, 0, W + 20, H * 0.06);   // のれんの帯とカウンター(雰囲気だけ。軽く)
       g.fillStyle = '#7a4a24'; g.fillRect(-10, H * (TRAY_Y + 0.06), W + 20, H);

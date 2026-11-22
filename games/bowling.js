@@ -57,25 +57,7 @@
   }
   function hit(p, k) { if (p.st !== 'stand') return; p.st = 'fly'; st.down++; k.add(1); st.chain.push(k.t); }
 
-  window.IZGAME.register({
-    id: 'bowling', title: '🎳 ハンドレッド ボウリング', ver: 'ver.2', sec: SEC,
-    maxScore: function () { return N_PIN; },
-    intro: function () {
-      return '<p>1回 投げるだけ。レーンに でたらめに ならんだ <b>100本</b>の ピンを、何本 倒せるか!<br>倒れたピンが ほかのピンも たおします。ガーターは なし(かべで 跳ね返る)。<br><b>ななめに投げる</b>と かべで 何回も 跳ね返って、たくさん 倒せるかも!</p>' +
-        chips('c', COLORS) + chips('w', WEIGHT) + chips('s', SPIN) + chips('d', DIR) + chips('p', POS) +
-        '<p style="font-size:13px;opacity:.8">右回転は 左へ、左回転は 右へ 曲がります。<br>左から 右回転で投げると、はじめは 右へ転がって あとで 左へ曲がります。<br>スタートすると ピンの並びを 上から見せます。<br>見たら <b>指で 投げる向きを決めて、はなすと 投げます</b>。</p>';
-    },
-    init: function () { st = {}; },
-    start: function (k, seed) {
-      tries++;
-      st.pins = layout(seed + ':' + Date.now() + ':' + tries);
-      var W = WEIGHT[opt.w], sp = SPIN[opt.s][1], dir = DIR[opt.d][1], x0 = POS[opt.p][1];
-      st.speed = 2.6 + (W[2] - 1) * 0.15; st.ang = 0; st.aiming = false;
-      st.ball = { x: x0, y: 0.35, vx: 0, vy: st.speed, r: W[1], m: W[2], rot: 0 };
-      st.spin = sp; st.dir = dir; st.color = COLORS[opt.c][1];
-      st.phase = 'look'; st.lookT = 0; st.cam = TOP; st.down = 0; st.chain = []; st.slow = 0; st.endT = 0; st.msg = ''; st.msgT = 0; st.bigAt = 0;
-    },
-    update: function (k, dt) {
+  function step(k, dt) {   // 1コマぶんの動き(update が 1/120秒ずつに 区切って 呼ぶ)
       var b = st.ball;
       if (st.phase === 'look') {   // 上から下へ なぞって見せる
         st.lookT += dt; var q = Math.min(1, st.lookT / 2.8), e = q < 0.5 ? 2 * q * q : 1 - Math.pow(-2 * q + 2, 2) / 2;
@@ -130,6 +112,28 @@
       if (st.chain.length >= 8 && k.t - st.bigAt > 0.6) { st.bigAt = k.t; k.shake(1.2); k.fx(0.5, 0.3, 'れんさ!' , '#ffd23f', 1); }
       if (st.msgT > 0) st.msgT -= dt;
       k.combo(st.phase === 'roll' || st.phase === 'settle' ? '🎳 ' + st.down + '本' : '');
+    }
+
+  window.IZGAME.register({
+    id: 'bowling', title: '🎳 ハンドレッド ボウリング', ver: 'ver.2', sec: SEC,
+    maxScore: function () { return N_PIN; },
+    intro: function () {
+      return '<p>1回 投げるだけ。レーンに でたらめに ならんだ <b>100本</b>の ピンを、何本 倒せるか!<br>倒れたピンが ほかのピンも たおします。ガーターは なし(かべで 跳ね返る)。<br><b>ななめに投げる</b>と かべで 何回も 跳ね返って、たくさん 倒せるかも!</p>' +
+        chips('c', COLORS) + chips('w', WEIGHT) + chips('s', SPIN) + chips('d', DIR) + chips('p', POS) +
+        '<p style="font-size:13px;opacity:.8">右回転は 左へ、左回転は 右へ 曲がります。<br>左から 右回転で投げると、はじめは 右へ転がって あとで 左へ曲がります。<br>スタートすると ピンの並びを 上から見せます。<br>見たら <b>指で 投げる向きを決めて、はなすと 投げます</b>。</p>';
+    },
+    init: function () { st = {}; },
+    start: function (k, seed) {
+      tries++;
+      st.pins = layout(seed + ':' + Date.now() + ':' + tries);
+      var W = WEIGHT[opt.w], sp = SPIN[opt.s][1], dir = DIR[opt.d][1], x0 = POS[opt.p][1];
+      st.speed = 2.6 + (W[2] - 1) * 0.15; st.ang = 0; st.aiming = false;
+      st.ball = { x: x0, y: 0.35, vx: 0, vy: st.speed, r: W[1], m: W[2], rot: 0 };
+      st.spin = sp; st.dir = dir; st.color = COLORS[opt.c][1];
+      st.bumpAt = 0; st.phase = 'look'; st.lookT = 0; st.cam = TOP; st.down = 0; st.chain = []; st.slow = 0; st.endT = 0; st.msg = ''; st.msgT = 0; st.bigAt = 0;
+    },
+    update: function (k, dt) {   // 動きは 1/120秒ずつに 区切って計算(スマホの速さで れんさの数・すりぬけが 変わらないように 11-22)
+      var n = Math.min(40, Math.max(1, Math.ceil(dt * 120))); for (var i = 0; i < n; i++) step(k, dt / n);
     },
     draw: function (k, g, W, H) {
       if (!st.pins) { st.pins = layout('intro'); st.cam = 3.2; st.phase = 'intro'; st.ball = { x: 0.5, y: 0.35, r: 0.05, vx: 0, vy: 0, rot: 0 }; }   // スタート前は 見本の並び
@@ -185,6 +189,7 @@
       if (st.phase === 'aim') {   // 指を おいた方へ 投げる(ななめもOK)。はなすと 投げる
         if (type === 'down') { st.aiming = true; aimAt(p); }
         else if (type === 'move' && st.aiming) aimAt(p);
+        else if (type === 'cancel') st.aiming = false;   // 指が とりけされた(通知など)→ ねらい直し
         else if (type === 'up' && st.aiming) { st.aiming = false; var b = st.ball; b.vx = Math.sin(st.ang) * st.speed; b.vy = Math.cos(st.ang) * st.speed; st.phase = 'roll'; }
       }
     },
