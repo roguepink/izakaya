@@ -169,12 +169,15 @@ var Net = (function () {
     var k = this.newKey(); return this._req('PUT', path + '/' + k, value).then(function () { return k; });
   };
   FireNet.prototype.remove = function (path) { return this._req('DELETE', path); };
-  FireNet.prototype.leaveBeacon = function (path) {   // 画面を閉じるときでも届くように
-    try { fetch(this._url(path), { method: 'DELETE', keepalive: true }); } catch (e) {}
+  /* 画面を閉じるときの書きこみ。DELETE・PATCH の fetch は 送る前の確認(preflight)が要るので、閉じる途中だと 送られないことがあった(11-23)。
+     sendBeacon(POST・text/plain = 確認がいらない)に Firebase の「x-http-method-override」を付けて送る。使えないときは 前の送り方 */
+  FireNet.prototype._beacon = function (path, method, obj) {
+    var u = this._url(path); u += (u.indexOf('?') < 0 ? '?' : '&') + 'x-http-method-override=' + method;
+    try { if (navigator.sendBeacon && navigator.sendBeacon(u, new Blob([obj == null ? '' : JSON.stringify(obj)], { type: 'text/plain' }))) return; } catch (e) {}
+    try { fetch(this._url(path), { method: method, body: obj == null ? undefined : JSON.stringify(obj), keepalive: true }); } catch (e) {}
   };
-  FireNet.prototype.patchBeacon = function (path, obj) {   // 画面を閉じるときでも届く「書きかえ」
-    try { fetch(this._url(path), { method: 'PATCH', body: JSON.stringify(obj), keepalive: true }); } catch (e) {}
-  };
+  FireNet.prototype.leaveBeacon = function (path) { this._beacon(path, 'DELETE'); };
+  FireNet.prototype.patchBeacon = function (path, obj) { this._beacon(path, 'PATCH', obj); };
 
   /* ---------- 合言葉 → 指紋 ---------- */
   function sha256(text) {

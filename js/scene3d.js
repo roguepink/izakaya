@@ -2177,7 +2177,8 @@ function createShop(canvas, opts) {
   const N = opts.seats;
   let SHOPNAME = opts.name || SHOP.NAME;   // バトンタッチで その場で変わる(setName)   // 回ごとの店の名前(ちょうちん・のれんの文字)
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); window.__iz3dLost = 1; window.dispatchEvent(new Event('iz3d-lost')); });
+  let stopped = false;
+  canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); if (stopped) return; window.__iz3dLost = 1; window.dispatchEvent(new Event('iz3d-lost')); });
   canvas.addEventListener('webglcontextrestored', () => { window.__iz3dLost = 0; });   // もどったら そのまま(three.js が 描き直す)   // スマホの都合で 3D が落ちた(絵の入れ物が いっぱい・長く裏にいた)→ app.js が 読みこみ直す(11-22 まっ黒のまま もどらなかった)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -2466,7 +2467,8 @@ function createShop(canvas, opts) {
     }
     // 縦向きで人数が多い・はなれているとき: はしから斜めに見る(前からの形)
     const ex = Math.max(0, N - 7) * 0.22;
-    wantPos.set(-L / 2 - 0.1 - ex * 0.5, 2.1 + ex * 0.4 + ARC_D * 0.6, -1.25 - ex * 0.3 - ARC_D * 1.3); wantLook.set(L * 0.12, 0.95, 1.45 - ARC_D * 0.5);   // 弓のはしは 大将の側へ回りこむので、その分 うしろ・上から wantFov = 64 + Math.max(0, N - 7) * 1.5;
+    wantPos.set(-L / 2 - 0.1 - ex * 0.5, 2.1 + ex * 0.4 + ARC_D * 0.6, -1.25 - ex * 0.3 - ARC_D * 1.3); wantLook.set(L * 0.12, 0.95, 1.45 - ARC_D * 0.5);   // 弓のはしは 大将の側へ回りこむので、その分 うしろ・上から
+    wantFov = 64 + Math.max(0, N - 7) * 1.5;
   }
   /* 奥の壁ぎわの物(棚・木札・モニター・のれん)。大将の画面で 壁の向こうから映すときは隠す */
   let backStuff = null;
@@ -3089,7 +3091,7 @@ function createShop(canvas, opts) {
       up.pop(); lo.pop();
       return lo.concat(up).map((p) => ({ x: p[0], y: p[1] }));
     },
-    stop() { running = false; api.onAvatarTap = api.onTableTap = api.onMonitorTap = api.onTap = api.onItemTap = api.onTagTap = api.onFrame = null; window.removeEventListener('resize', resize); renderer.dispose(); }
+    stop() { running = false; api.onAvatarTap = api.onTableTap = api.onMonitorTap = api.onTap = api.onItemTap = api.onTagTap = api.onFrame = null; window.removeEventListener('resize', resize); stopped = true; renderer.dispose(); try { renderer.forceContextLoss(); } catch (e) {} }   // 席の数を何度も変えると 古い入れ物がたまって 読みなおしになっていた 11-23
   };
   return api;
 }

@@ -94,6 +94,13 @@ class H(BaseHTTPRequestHandler):
             v = resolve(v, int(time.time() * 1000))
             for k, x in v.items(): set_at(p + '/' + k, json.loads(json.dumps(x)))
         broadcast('patch', '/' + p, v); self.reply(v)
+    def do_POST(self):   # 本物の Firebase と同じく ?x-http-method-override=DELETE|PATCH|PUT を受ける(sendBeacon 用)
+        q = self.path.split('?', 1)[1] if '?' in self.path else ''
+        m = dict(x.split('=', 1) for x in q.split('&') if '=' in x).get('x-http-method-override', '').upper()
+        if m == 'DELETE': return self.do_DELETE()
+        if m == 'PATCH': return self.do_PATCH()
+        if m == 'PUT': return self.do_PUT()
+        self.send_response(400); self.cors(); self.end_headers()
     def do_DELETE(self):
         p = self.path_of(); time.sleep(LAT)
         with lock: set_at(p, None)

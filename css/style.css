@@ -384,6 +384,10 @@ body.photo-mode .bottom, body.photo-mode .side, body.photo-mode #tags, body.phot
 .ph-chips::-webkit-scrollbar { display: none; }
 .ph-chips button { flex: none; background: #f3e6cc; color: var(--ink); border-radius: 999px; padding: 7px 11px; font-weight: 800; font-size: 13.5px; border: 2px solid transparent; }
 .ph-chips button.on { background: #ffd27a; border-color: #c8261c; }
+/* 小窓(大将の操作など)の中の 選ぶボタン: 地の色と同じで ただの字に見えていた 11-23 → 白地に茶色のふち */
+#shBody .ph-chips button { background: #fff; border-color: #e3cfa4; }
+#shBody .ph-chips button.on { background: #ffd27a; border-color: #c8261c; }
+#shBody .ph-chips button:disabled { opacity: .45; }
 #phChoose.off { opacity: .35; pointer-events: none; }
 .ph-pick.locked .ph-hide { opacity: .5; }
 .ph-note { color: #f3e6cc; font-size: 12.5px; margin: 8px 0 0; line-height: 1.45; }
@@ -661,3 +665,20 @@ body.owner-view .log .ln.wh.me { background: rgba(74,53,102,.88); color: #fff; }
 .mood-name input { flex: 1; min-width: 0; font-size: 16px; padding: 8px 10px; border-radius: 10px; border: 1.5px solid #c9a46a; background: #fff8ec; color: #2a1a10; }
 .mood-name button { flex: none; border-radius: 10px; padding: 8px 12px; font-weight: 800; background: #8c1d16; color: #fff; }
 .mood-name button#moodNameBack { background: #efe2cb; color: #6b4a2a; }
+
+/* こそっと中は 決まり文句を隠す(押すと みんなに聞こえるので) 11-23 */
+body.wh-mode #phrases, body.wh-mode .ph-more { display: none !important; }
+/* 大将: 頼まれている品 */
+.mn-card.ordered { outline: 3px solid #c8261c; }
+.mn-badge.ord { background: #c8261c; color: #fff; left: auto; right: 6px; }
+/* 上の帯: せまい画面で こわれないように(「・大将あり」を隠し、店名を省く) 11-23 */
+.topbar .tb-left { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.topbar .tb-right { flex: none; display: flex; align-items: center; white-space: nowrap; }
+@media (max-width: 360px) { .tb-own { display: none; } .topbar { padding: 7px 10px; font-size: 13px; } }
+/* 座る前(縦向き): 案内を上に出し、決まり文句を隠して 下の席の名札を押せるように 11-23 */
+@media (orientation: portrait) {
+  body.picking #phrases { display: none !important; }
+  body.picking #pickHint { position: fixed; top: calc(96px + env(safe-area-inset-top)); left: 0; right: 0; margin: 0 auto; width: max-content; max-width: calc(100% - 24px); z-index: 20; }
+}
+/* 座る前の案内は 押せる物ではないので、上からでも 下の名札を押せるように 11-23 */
+#pickHint { pointer-events: none; }
