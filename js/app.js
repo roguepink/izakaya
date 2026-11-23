@@ -1384,7 +1384,7 @@
   }, true);
   var SEAT_COLORS = ['#7ec8ff', '#ff9ec4', '#8fe39a', '#ffd36a', '#c9a8ff', '#7fe0d8', '#ffb07a', '#b8d86a', '#f0a0a0', '#a0c0f0'];
   var lastOwnerAt = 0;
-  var ME_TAG = '<i class="me-tag">あなた</i>';
+  var ME_TAG = '';   // 「あなた」の札は出さない(ノブさん 11-23「名前が入っているので いらない。少しでも少なく」)。右寄せ+色だけで自分の言葉と分かる
   function renderLog() {
     var c = tree.chat || {}, keys = Object.keys(c).sort(); lastOwnerAt = 0;
     var shown = keys.filter(function (k) { return (c[k].at || 0) >= joinAt - 10 * MIN && canSee(c[k]); }).slice(-120);

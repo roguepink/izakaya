@@ -575,7 +575,7 @@ body.owner-view .log .ln.owner.me { background: rgba(140,29,22,.95); }
 .log .me-tag { display: inline-block; font-style: normal; font-size: 10.5px; font-weight: 800; line-height: 1; color: #fff; background: #e8463d; border-radius: 999px; padding: 3px 6px 2px; margin-right: 5px; vertical-align: 1px; }
 .log .ln.owner.me .me-tag { background: #ffd36a; color: #5a1a10; }
 .bubble.me { border: 3px solid #e8463d; }
-.bubble.me .bt::before { content: 'あなた'; display: inline-block; font-size: 10.5px; font-weight: 800; line-height: 1; color: #fff; background: #e8463d; border-radius: 999px; padding: 3px 6px 2px; margin-right: 5px; vertical-align: 2px; }
+/* 「あなた」の札は 11-23 にやめた(名前が入っているので) */
 
 /* ---------- 大将の「👧 アイちゃん」ボタンとパネル(2026-11-23) ---------- */
 #bAi small { white-space: nowrap; letter-spacing: -.06em; }
