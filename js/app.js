@@ -873,7 +873,9 @@
     talkSay = {};   // 吹き出しも 消す(入り直したとき 前の言葉が 別の人に出ないように)
     talkAuto = false;
     if (!kicked) {
-      if (mySeat >= 0) { event({ type: 'phrase', id: 'mataokoshi', seat: mySeat }); net.remove('seats/' + mySeat); net.remove('tables/' + mySeat); }
+      var byeNow = !OWNER_MODE && mySeat >= 0 && byeOn();
+      if (byeNow) { net.push('chat', { uid: ME.uid, name: currentName(), seat: mySeat, text: 'ごちそうさまでした', at: TS, bye: 1 }); byeOwner = ownerPresent(); }   // 帰る人の「ごちそうさま」(残った人に 帰ったと伝わる)。みんなの画面で 大将が お辞儀
+      if (mySeat >= 0) { event({ type: 'phrase', id: byeNow ? 'o_matakite' : 'mataokoshi', seat: mySeat }); net.remove('seats/' + mySeat); net.remove('tables/' + mySeat); }
       if (!OWNER_MODE) dropOrders(ME.uid, mySeat);
       sys(OWNER_MODE ? (/^大将/.test(currentName()) ? '' : '大将の') + currentName() + 'が奥に下がりました' : honor(currentName()) + 'がお帰りになりました');
       net.remove('members/' + ME.uid);
@@ -892,6 +894,21 @@
     $('shop').classList.add('hidden'); $('entrance').classList.remove('hidden'); $('emptyNote').classList.add('hidden'); $('bCos').classList.add('hidden'); $('bGame').classList.add('hidden');
     setView('overview'); restSync();
     $('leaveAsk').classList.add('hidden'); backUsed();
+    if (!kicked && byeOwner) { byeOwner = false; byeShow(); }
+  }
+  /* 帰るときの形(ノブさん 11-23): 大将のお辞儀の姿+「また来てくださいね」+ 下に 次に開く日。3秒で消える・押すと すぐ閉じる */
+  var byeOwner = false, BYE_WORDS = ['また来てくださいね', 'また来てくださいね', '気をつけて帰ってね', 'おやすみなさい'];
+  function byeOn() { return !!SHOP.BYE_V2 || /[#&]byetest\b/.test(location.hash); }
+  function byeShow() {
+    var st = tree.state || {}, av = (st.ownerAvatar && AVATAR.fix(st.ownerAvatar)) || AVATAR.fix(AVATAR.OWNER), img = '';
+    try { if (window.IZ3D && IZ3D.portrait) img = IZ3D.portrait(av, 440, { full: true, bow: true }); } catch (e) {}
+    var n = now(), nx = upcoming(n, 21).filter(function (x) { return x.start > n + 30 * MIN; })[0];
+    var el = $('byeCard'); if (!el) { el = document.createElement('div'); el.id = 'byeCard'; el.className = 'bye-card'; document.body.appendChild(el); el.onclick = function () { el.classList.add('hidden'); }; }
+    el.innerHTML = '<div class="bye-in"><div class="bye-bub">' + esc(BYE_WORDS[Math.floor(Math.random() * BYE_WORDS.length)]) + '</div>' +
+      '<div class="bye-fig">' + (img ? '<img class="bye-img" alt="" src="' + img + '">' : '<div class="bye-img bye-emo">🙇</div>') + '<div class="bye-counter"></div></div>' +   // 下は カウンターで かくす(大将は カウンターの中)
+      '<div class="bye-name">' + esc(st.ownerName || SHOP.OWNER_NAME) + '</div>' +
+      (nx ? '<div class="bye-next">次は <b>' + fmtDay(nx.start) + ' ' + fmtTime(nx.start) + '〜</b></div>' : '') + '</div>';
+    el.classList.remove('hidden'); clearTimeout(byeShow._t); byeShow._t = setTimeout(function () { el.classList.add('hidden'); }, 3200);
   }
   /* 「帰る」を押さずに画面を閉じた: すぐには帰さず「席を外しています」にする(3分は席と料理が残る。戻ればそのまま座れる) */
   var hereNow = function () { var mm = members()[ME.uid]; if (inside && net && document.visibilityState !== 'hidden' && mm && mm.name) net.update('members/' + ME.uid, { seen: TS }); };   // 画面にもどったら すぐ「いるよ」(席を外している扱いから もどす)
@@ -1550,6 +1567,7 @@
       }
       if ((m.at || 0) > now() - 15000) regHear(m);
       bubble(m.seat, m.text, false, m.uid === ME.uid && !m.owner);
+      if (m.bye) withScene(function (s) { if (s.bow) s.bow('owner'); });   // 帰る人に 大将が お辞儀
       if (m.ai && m.uid === REG_UID && /^[a-z]{1,2}\d{1,2}$/.test(m.ai)) playAi(m.ai, m.seat);   // アイちゃんの声(2026-11-21 録音)
       withScene(function (s) {
         s.talk(m.seat);

@@ -230,6 +230,7 @@ var SHOP = {
     { id: 'lastcall',   cat: 'おくる',   say: 'そろそろ閉店です。ラストオーダー、どうぞ！' },
     { id: 'mataokoshi', cat: 'おくる',   say: 'またお越しください！',        main: true },
     { id: 'o_kiwotsukete', cat: 'おくる', say: '気をつけて帰ってね！' },
+    { id: 'o_matakite',  cat: 'おくる',   say: 'また来てくださいね！' },   // 帰るときの形(11-23 ノブさん。声は ノブさんが あとで録る)
     { id: 'oyasumi',    cat: 'おくる',   say: 'おやすみなさい！' },
     { id: 'o_photo',    cat: 'さつえい', say: '記念撮影しまーす！' },
     { id: 'o_cheese',   cat: 'さつえい', say: 'はい、チーズ！' }
@@ -309,6 +310,8 @@ var SHOP = {
       org: [['org1', 'こんばんは、大将！'], ['org2', '大将も おつかれさまです'], ['org3', 'こちらこそ、ありがとうございます']],   // あいさつ・お礼
       oro: [['oro1', 'はーい、大将！'], ['oro2', 'ふふ、そうですね'], ['oro3', '大将の話、いつも楽しいです']]   // そのほか
     } },
+  BYE_V2: false, BYE_BOW: 0.62,   // BYE_BOW: お辞儀の深さ(0.45 軽め 〜 0.65 深め)
+    // 帰るときの形(大将のお辞儀・「また来てくださいね」・次に開く日・自動の「ごちそうさま」)。ノブさんが お辞儀の姿を見て OK したら true に(11-23)。ためしは アドレスに #byetest
   PHOTO: { SEC: 20, PICK_FROM: 15, PICK_TO: 3, KEEP_DAYS: 30, LAYOUT: 'N4' },   // LAYOUT: 並び方(js/scene3d.js の PHOTO_LAYOUTS。N1〜N4。ノブさんが N4 すき間に顔 に決めた 2026-11-20)
 
   /* お祝いモード(大将が ☰ → 🏮店主 で切りかえる)。飾り・限定メニュー(MENU の only)・限定の決まり文句(PHRASES の only)・仮装。

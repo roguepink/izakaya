@@ -751,3 +751,19 @@ body.demo .chat .wh-btn { display: none; }
 .osu-pick > summary { font-weight: 800; display: flex; flex-direction: column; gap: 2px; }
 .osu-pick > summary small { font-weight: 600; color: #8a6a3a; font-size: 12px; }
 .mine button.itsumo { background: #fff3d6; border: 2px solid var(--gold); }
+
+/* 帰るときの形(11-23。ノブさんの OK まで BYE_V2 は false) */
+.bye-card { position: fixed; inset: 0; z-index: 300; display: flex; align-items: center; justify-content: center; background: rgba(20,12,8,.55); animation: byein .35s ease-out; }
+.bye-card.hidden { display: none; }
+.bye-in { position: relative; width: min(78vw, 300px); padding: 18px 16px 14px; border-radius: 22px; background: linear-gradient(180deg, #3a2414, #24160c); box-shadow: 0 10px 30px rgba(0,0,0,.5), inset 0 0 0 2px #6b4524; text-align: center; color: #fbf3e4; }
+.bye-bub { position: relative; display: inline-block; background: #fffaf0; color: #2a1a10; font-weight: 900; font-size: 18px; padding: 9px 16px; border-radius: 16px; margin-bottom: 4px; }
+.bye-bub::after { content: ''; position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); border: 9px solid transparent; border-top-color: #fffaf0; border-bottom: 0; }
+.bye-fig { position: relative; width: 92%; margin: 6px auto 0; aspect-ratio: 3 / 3.3; overflow: hidden; border-radius: 12px 12px 4px 4px; }
+.bye-img { display: block; width: 100%; }
+.bye-counter { position: absolute; left: -4%; right: -4%; bottom: 0; height: 15%; background: linear-gradient(180deg, #d9a46a, #b67c45 30%, #8a5a2e); border-top: 3px solid #f0c890; box-shadow: 0 -3px 8px rgba(0,0,0,.35); }
+.bye-emo { font-size: 90px; line-height: 1.2; }
+.bye-name { font-size: 13px; font-weight: 800; color: #ffd98a; margin-top: -2px; }
+.bye-next { margin-top: 12px; padding-top: 10px; border-top: 1px dashed rgba(255,217,138,.35); font-size: 13px; color: #e8dcc6; }
+.bye-next b { color: #fff; }
+@keyframes byein { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .bye-card { animation: none; } }

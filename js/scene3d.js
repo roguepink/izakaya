@@ -1669,6 +1669,7 @@ function photoClear(av) {   // 撮影が終わったら もとの形へ
   if (u.face) { u.face.material.map = faceTexture(u.faceA); u.face.material.needsUpdate = true; }
   [0, 1].forEach((i) => { u.arms[i].rotation.set(-0.45, 0, 0.06 * (i ? 1 : -1)); if (u.fores) u.fores[i].rotation.x = -0.55; });
 }
+const BOW_T = 1.8;
 function animateAvatar(av, dt) {
   if (av.userData.photo) { photoPose(av, dt); return; }
   const u = av.userData; u.t += dt;
@@ -1700,6 +1701,11 @@ function animateAvatar(av, dt) {
   if (u.fores) u.fores[1].rotation.x = P[2];
   u.head.rotation.x += P[4];
   u.body.rotation.x = P[5];
+  if (u.bow > 0) {   // お辞儀(お客さんが帰るとき。ノブさん 11-23)
+    u.bow = Math.max(0, u.bow - dt); const t = BOW_T - u.bow, ss = (x) => x * x * (3 - 2 * x);
+    const b = t < 0.45 ? ss(t / 0.45) : t < 1.05 ? 1 : ss(Math.max(0, 1 - (t - 1.05) / 0.75));
+    u.body.rotation.x += 0.52 * b; u.head.rotation.x += 0.22 * b;
+  }
   if (e >= 0) {   // ジョッキは いつも まっすぐ(飲むときだけ 口のほうへ かたむける)
     u.cheerMug.rotation.set(-(P[0] + P[2]) + P[3], 0, -P[1]);
   }
@@ -2940,6 +2946,7 @@ function createShop(canvas, opts) {
     },
     _hideMine() { if (photo) return; seatAvatars.forEach((a, i) => { if (a) a.visible = !(view.mode === 'first' && i === view.seat); }); if (owner) owner.visible = view.mode !== 'owner'; },
     cheer(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.cheer = 2.2; },
+    bow(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.bow = BOW_T; },
     cheerAt(seat, e) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.cheer = Math.max(0.001, CHEER_T - e); },   // 確認用: 乾杯の途中の形
     cheerAll() { seatAvatars.forEach((a) => a && (a.userData.cheer = 2.2)); if (owner) owner.userData.cheer = 2.2; },
     talk(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.talk = 1.6; },
@@ -3190,7 +3197,15 @@ function portrait(raw, size, opt) {   // opt.full: 全身(大将の「👧 ア�
   const av = buildAvatar(raw, { standing: true }); av.rotation.y = -0.18; ptS.add(av);
   const hat = !!(raw && raw.costume && String(raw.costume).split('|')[0]);   // かぶりものが あるときは 少し引いて 上まで入れる
   const ly = hat ? 0.8 : 0.72, dist = hat ? 3.1 : 2.55;
-  if (opt.full) { av.rotation.y = -0.38; ptC.position.set(0, 0.5, 4.6); ptC.lookAt(0, 0.42, 0); }   // 全身(少し横を向けて 服の形が分かるように)
+  if (opt.full) { av.rotation.y = -0.38; ptC.position.set(0, 0.5, 4.6); ptC.lookAt(0, 0.42, 0); }
+  if (opt.bow) {   // お辞儀の姿(帰るときの画面 11-23): 腰から前へ・あごを引く・手は ももの前でそろえる。少し斜めから写して 角度が分かるように
+    const u = av.userData, A = opt.bowA != null ? opt.bowA : (SHOP.BYE_BOW || 0.62), az = opt.armZ != null ? opt.armZ : 0.32;
+    av.rotation.y = opt.side != null ? opt.side : -0.8; u.body.rotation.x = A; u.head.rotation.x = opt.headA != null ? opt.headA : 0.3;
+    [0, 1].forEach((i) => { u.arms[i].rotation.set(opt.armX != null ? opt.armX : -0.25, 0, az * (i ? -1 : 1)); if (u.fores) u.fores[i].rotation.x = -0.25; });
+    av.updateMatrixWorld(true); const hp = new THREE.Vector3(); u.head.getWorldPosition(hp);   // 前へ出た頭を まん中に(頭が はしで切れていた)
+    const lx = hp.x * 0.7, ly2 = hp.y - (opt.lookDown != null ? opt.lookDown : 0.22), lz = hp.z * 0.7;
+    ptC.position.set(lx, ly2 + (opt.camUp != null ? opt.camUp : 0.35), lz + (opt.camZ != null ? opt.camZ : 4.3)); ptC.lookAt(lx, ly2, lz);
+  }   // 全身(少し横を向けて 服の形が分かるように)
   else { ptC.position.set(0, ly + 0.12, dist); ptC.lookAt(0, ly, 0); }
   let url = '';
   try { ptR.render(ptS, ptC); url = ptR.domElement.toDataURL('image/png'); } catch (e) {}
