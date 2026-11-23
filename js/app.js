@@ -904,16 +904,24 @@
   function byeShow(who) {   // who: 'owner' 大将 / 'ai' 大将がいない時は アイちゃん / 'shop' だれもいない時は 文字だけ
     var st = tree.state || {}, rm = who === 'ai' ? regMember() : null, img = '';
     if (who === 'ai' && !rm) who = 'shop';
-    var av = rm ? AVATAR.fix(rm.avatar || {}) : (st.ownerAvatar && AVATAR.fix(st.ownerAvatar)) || AVATAR.fix(AVATAR.OWNER);
+    var av = rm ? (rm.avatar || AVATAR.fix({ sex: 'f' })) : (st.ownerAvatar && AVATAR.fix(st.ownerAvatar)) || AVATAR.fix(AVATAR.OWNER);
     var words = who === 'ai' ? BYE_AI : who === 'shop' ? ['ありがとうございました'] : BYE_WORDS;
-    try { if (who !== 'shop' && window.IZ3D && IZ3D.portrait) img = IZ3D.portrait(av, 440, { full: true, bow: true, bowA: who === 'ai' ? 0.3 : undefined }); } catch (e) {}
+    /* アイちゃんは お辞儀より「またね〜」と手をふる形(ノブさん 11-24「お辞儀のアイちゃんが全然可愛くない。作り込んで」):
+       目を細めた笑顔・ほっぺ・首をかしげる・こちらを見る。絵を2枚 交互に出して 手をふって見せる */
+    var img2 = '', AIB = { bowA: 0.08, side: -0.3, headA: -0.02, headZ: 0.17, bodyZ: -0.04, face: { eyes: 'smile', mouth: 'grin', cheek: 2 }, lookDown: 0.15, camUp: -0.02, camZ: 3.55 }, AIL = [-0.3, -0.14, -0.55];
+    try {
+      if (who === 'owner' && window.IZ3D && IZ3D.portrait) img = IZ3D.portrait(av, 440, { full: true, bow: true });
+      if (who === 'ai' && window.IZ3D && IZ3D.portrait) { img = IZ3D.portrait(av, 440, Object.assign({ full: true, bow: true, arm: [AIL, [-2.15, 0.5, -1.05]] }, AIB)); img2 = IZ3D.portrait(av, 440, Object.assign({ full: true, bow: true, arm: [AIL, [-2.15, 0.8, -1.05]] }, AIB)); }
+    } catch (e) {}
     var n = now(), nx = upcoming(n, 21).filter(function (x) { return x.start > n + 30 * MIN; })[0];
     var el = $('byeCard'); if (!el) { el = document.createElement('div'); el.id = 'byeCard'; el.className = 'bye-card'; document.body.appendChild(el); el.onclick = function () { el.classList.add('hidden'); }; }
     el.innerHTML = '<div class="bye-in"><div class="bye-bub">' + esc(words[Math.floor(Math.random() * words.length)]) + '</div>' +
       '<div class="bye-fig">' + (img ? '<img class="bye-img" alt="" src="' + img + '">' : '<div class="bye-img bye-emo">' + (who === 'shop' ? '🏮' : '🙇') + '</div>') + '<div class="bye-counter"></div></div>' +   // 下は カウンターで かくす(大将は カウンターの中)
       '<div class="bye-name">' + esc(who === 'ai' ? REG.NAME : who === 'shop' ? shopName() : (st.ownerName || SHOP.OWNER_NAME)) + '</div>' +
       (nx ? '<div class="bye-next">次は <b>' + fmtDay(nx.start) + ' ' + fmtTime(nx.start) + '〜</b></div>' : '') + '</div>';
-    el.classList.remove('hidden'); clearTimeout(byeShow._t); byeShow._t = setTimeout(function () { el.classList.add('hidden'); }, 3200);
+    el.classList.remove('hidden'); clearTimeout(byeShow._t); clearInterval(byeShow._w);
+    if (img && img2) { var im = el.querySelector('.bye-img'), fr = 0; byeShow._w = setInterval(function () { fr = 1 - fr; if (im) im.src = fr ? img2 : img; if (el.classList.contains('hidden')) clearInterval(byeShow._w); }, 300); }   // 手をふる
+    byeShow._t = setTimeout(function () { el.classList.add('hidden'); clearInterval(byeShow._w); }, 3200);
   }
   /* 「帰る」を押さずに画面を閉じた: すぐには帰さず「席を外しています」にする(3分は席と料理が残る。戻ればそのまま座れる) */
   var hereNow = function () { var mm = members()[ME.uid]; if (inside && net && document.visibilityState !== 'hidden' && mm && mm.name) net.update('members/' + ME.uid, { seen: TS }); };   // 画面にもどったら すぐ「いるよ」(席を外している扱いから もどす)

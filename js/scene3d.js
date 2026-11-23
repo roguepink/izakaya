@@ -3207,6 +3207,7 @@ function portrait(raw, size, opt) {   // opt.full: 全身(大将の「👧 ア�
   const pw = opt.full ? Math.round(size * 0.75) : size;
   ptR.setSize(pw, size, false); ptC.aspect = pw / size; ptC.updateProjectionMatrix();
   try { if (ptR.getContext().isContextLost()) return ''; } catch (e) {}   // 3D の係が 落ちているときは 透明の絵を 返さない(11-22)
+  if (opt.face) raw = Object.assign({}, raw, { _face: opt.face });   // 表情(帰るときの アイちゃんの笑顔 11-24)
   const av = buildAvatar(raw, { standing: true }); av.rotation.y = -0.18; ptS.add(av);
   const hat = !!(raw && raw.costume && String(raw.costume).split('|')[0]);   // かぶりものが あるときは 少し引いて 上まで入れる
   const ly = hat ? 0.8 : 0.72, dist = hat ? 3.1 : 2.55;
@@ -3215,6 +3216,8 @@ function portrait(raw, size, opt) {   // opt.full: 全身(大将の「👧 ア�
     const u = av.userData, A = opt.bowA != null ? opt.bowA : (SHOP.BYE_BOW || 0.62), az = opt.armZ != null ? opt.armZ : 0.32;
     av.rotation.y = opt.side != null ? opt.side : -0.8; u.body.rotation.x = A; u.head.rotation.x = opt.headA != null ? opt.headA : 0.3;
     [0, 1].forEach((i) => { u.arms[i].rotation.set(opt.armX != null ? opt.armX : -0.25, 0, az * (i ? -1 : 1)); if (u.fores) u.fores[i].rotation.x = -0.25; });
+    if (opt.headZ != null) u.head.rotation.z = opt.headZ; if (opt.headY != null) u.head.rotation.y = opt.headY; if (opt.bodyZ != null) u.body.rotation.z = opt.bodyZ;   // 首をかしげる など
+    if (opt.arm) opt.arm.forEach((A, i) => { if (!A) return; u.arms[i].rotation.set(A[0], A[3] || 0, (i === 1 ? 1 : -1) * A[1]); if (u.fores) u.fores[i].rotation.x = A[2]; });   // 腕: [前後, 開き, ひじ, ひねり](撮影のポーズと同じ向き)
     av.updateMatrixWorld(true); const hp = new THREE.Vector3(); u.head.getWorldPosition(hp);   // 前へ出た頭を まん中に(頭が はしで切れていた)
     const lx = hp.x * 0.7, ly2 = hp.y - (opt.lookDown != null ? opt.lookDown : 0.22), lz = hp.z * 0.7;
     ptC.position.set(lx, ly2 + (opt.camUp != null ? opt.camUp : 0.35), lz + (opt.camZ != null ? opt.camZ : 4.3)); ptC.lookAt(lx, ly2, lz);
