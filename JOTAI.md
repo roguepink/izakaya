@@ -369,3 +369,9 @@
 
 ## これからの方針(11-23)
 - 総点検の指摘の直し方と進める順番は **docs/kongo-houshin.md**。答えるページ https://claude.ai/artifact/NywkhcWtbW77PCzTj7EwP1 (答えは answers/izakaya-1123)。次に直すときは、まずそれを読む(A 小さい直し → B 大将の画面の整理 → C 楽しさ)。
+
+## 11-23 夜: ノブさんの答え → A・言葉・B を本番へ(sw v110)+ゲーム2本
+- 答えの まとめ: docs/kongo-houshin.md の「ノブさんの答え」。考え方(機能は多く・表は少なく・説明しすぎない・採点は忖度なく)もそこ。
+- 本番に出した: ☰ほか・🏮大将の操作・大将がいます・👁見え方・お品書き説明短く / 🤫ボタン(入力欄の左) / 字の大きさ(全部見るの Aa。body.fz-s / fz-l・CSS の var(--fz)) / 横向きの会話(上ほど薄く・おしゃべりは顔の下の右 placeTalkLog) / 大将の操作を3見出し(osec・iz-osec に開け閉め) / 5秒の「元に戻す」(undoable) / 交代のまかせ方(state.boss {uid, full, home}・fullOwner()・batonHome()) / アイちゃんのパネルをたたむ(ai-fuku) / 縦の接客カメラ(fitOwnerDiag) / ゲーム shirahadori・darts(音なし・seed で同じ並び)。
+- 枝: kongo-a(worktree agent-a7d2c31aa4d35ee8d)。ゲームを移した作業場所は worktree games(枝 games-add・コミットなし)。
+- 次: C(c1 雰囲気と看板の保存・c2 今日のおすすめ木札+アイちゃん10種+大将への返し3種・c3 帰るとき(お辞儀の姿は先に見せる)・c5 いつもの・c6 使い方に写真)。その2 の答え待ち: 右のボタン A/B・おしゃべりの見え方 E・帰るときの形 F。

@@ -4,6 +4,7 @@
 次にこのアプリを直すときは、まずこれを読む。
 
 > 答えるページ(11-23): https://claude.ai/artifact/NywkhcWtbW77PCzTj7EwP1 (元のファイル `docs/kongo-page.html`。答えは ArtifactData の collection `answers`・doc `izakaya-1123`)。クラッシュの直し工房の確認ページと同じ作り。
+> その2(11-23 夜): https://claude.ai/artifact/2grrxGb31hQAoksoUApTGy (元 `docs/kongo-page2.html`・作り直しは scratchpad の build.py ではなく、このファイルを直して同じパスで出す。答えは collection `answers`・doc `izakaya-1123b`)。右のボタン A/B 案・おしゃべりの見え方の案・帰るときの形。
 
 ## いちばん大事な考え(ノブさんの言葉)
 
