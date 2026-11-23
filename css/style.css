@@ -682,3 +682,14 @@ body.wh-mode #phrases, body.wh-mode .ph-more { display: none !important; }
 }
 /* 座る前の案内は 押せる物ではないので、上からでも 下の名札を押せるように 11-23 */
 #pickHint { pointer-events: none; }
+
+/* 「お店を出ますか?」の確認(スマホの「戻る」・帰るボタン。11-23) */
+.leave-ask { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(20,10,4,.58); }
+.leave-ask.hidden { display: none; }
+.la-box { width: min(330px, 100%); background: #fff8ec; border: 3px solid #5a3a1e; border-radius: 18px; padding: 24px 18px 18px; text-align: center; color: #3a2412; box-shadow: 0 12px 32px rgba(0,0,0,.45); }
+.la-ttl { font-size: 23px; font-weight: 900; }
+.la-sub { font-size: 15px; margin-top: 8px; color: #6b4a2a; line-height: 1.5; }
+.la-btns { display: flex; gap: 10px; margin-top: 20px; }
+.la-btns button { flex: 1; min-height: 54px; font: inherit; font-size: 18px; font-weight: 900; border-radius: 14px; border: 2px solid #5a3a1e; cursor: pointer; }
+#laStay { background: #fff; color: #3a2412; }
+#laGo { background: #c0392b; color: #fff; border-color: #7a1c12; }

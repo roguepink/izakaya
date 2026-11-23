@@ -829,6 +829,7 @@
   function enter(name) {
     if (inside) return;   // 二度押し・二重の呼び出しで 2回入らない(「店に立ちました」が2回出ていた 11-22)
     inside = true; seenMine = false; mySeat = -1; joinAt = now();
+    armBack();   // スマホの「戻る」で すぐ外に出ないように(11-23)
     seenChat = {}; seenEvt = {};
     Object.keys(tree.chat || {}).forEach(function (k) { seenChat[k] = 1; });
     Object.keys(tree.events || {}).forEach(function (k) { seenEvt[k] = 1; });
@@ -884,6 +885,7 @@
     $('bubbles').innerHTML = ''; bubbles = {}; $('log').innerHTML = ''; $('log')._h = ''; toggleLog(false);
     $('shop').classList.add('hidden'); $('entrance').classList.remove('hidden'); $('emptyNote').classList.add('hidden'); $('bCos').classList.add('hidden'); $('bGame').classList.add('hidden');
     setView('overview'); restSync();
+    $('leaveAsk').classList.add('hidden'); backUsed();
   }
   /* 「帰る」を押さずに画面を閉じた: すぐには帰さず「席を外しています」にする(3分は席と料理が残る。戻ればそのまま座れる) */
   var hereNow = function () { var mm = members()[ME.uid]; if (inside && net && document.visibilityState !== 'hidden' && mm && mm.name) net.update('members/' + ME.uid, { seen: TS }); };   // 画面にもどったら すぐ「いるよ」(席を外している扱いから もどす)
@@ -894,10 +896,55 @@
     if (net.patchBeacon) net.patchBeacon('members/' + ME.uid, { seen: now() - 51000 });
   });
   function currentName() { var m = members()[ME.uid]; return (m && m.name) || ME.name; }
-  $('bLeave').onclick = function () {
-    if (!confirm(OWNER_MODE ? '奥に下がりますか?' : 'お店を出ますか?')) return;
-    leave(false);
-  };
+  $('bLeave').onclick = function () { askLeave(); };
+
+  /* ---------------- スマホの「戻る」(ノブさん 11-23) ----------------
+     押してもすぐ外に出ない。開いている小窓・画面があれば それを1つ閉じる(ひとつ前の画面へ)。
+     何も開いていなければ「お店を出ますか?」の確認を出す。確認はスマホの決まった形(上にアドレスが出る)ではなく お店の画面で。
+     しくみ: お店に入ったら 履歴に「しおり」を1枚はさむ。「戻る」はそのしおりを使うだけなので、ページは出ない。
+     Chrome は 指でさわらずに はさんだしおりを飛ばすことがあるので、お店の中で さわったときにも はさみなおす。 */
+  var backArmed = false, backIgnore = 0;
+  function armBack() {
+    if (backArmed || DEMO) return;
+    try { history.pushState({ izBack: 1 }, '', location.href); backArmed = true; } catch (e) {}
+  }
+  function backUsed() {   // お店を出たら しおりを片づける(入口で「戻る」を2回押さないと出られない、をなくす)
+    if (!backArmed) return;
+    backArmed = false; backIgnore++;
+    try { history.back(); } catch (e) { backIgnore--; }
+  }
+  function leaveAskOpen() { return !$('leaveAsk').classList.contains('hidden'); }
+  function askLeave() {
+    $('laTtl').textContent = OWNER_MODE ? '奥に下がりますか?' : 'お店を出ますか?';
+    $('laSub').textContent = OWNER_MODE ? 'お客さんは、そのまま お店にいられます' : (mySeat >= 0 ? '席と料理は 片づけられます' : '入口にもどります');
+    $('laGo').textContent = OWNER_MODE ? '奥に下がる' : '出る';
+    $('leaveAsk').classList.remove('hidden');
+  }
+  function closeTop() {   // 開いている画面を 上から1つ閉じる。閉じたら true
+    if (leaveAskOpen()) { $('leaveAsk').classList.add('hidden'); return true; }
+    if (!$('helpBox').classList.contains('hidden')) { $('helpClose').click(); return true; }
+    if (!$('firstGuide').classList.contains('hidden')) { $('firstGuide').classList.add('hidden'); return true; }
+    if (!$('photoBox').classList.contains('hidden')) { $('photoBox').classList.add('hidden'); return true; }
+    if (!$('maker').classList.contains('hidden')) { $('mkBack').click(); return true; }
+    if (!$('sheet').classList.contains('hidden')) { closeSheet(); return true; }
+    if (!$('whoPick').classList.contains('hidden')) { closeWho(); return true; }
+    if (window.IZGAME && IZGAME.isOpen()) { IZGAME.abort(); return true; }
+    if (tvMode === 'big') { tvBig(false); return true; }
+    var lw = document.querySelector('.log-wrap'); if (lw && lw.classList.contains('big')) { toggleLog(false); return true; }
+    if (whMode) { setWhisper(null); return true; }
+    return false;
+  }
+  window.addEventListener('popstate', function () {
+    backArmed = false;
+    if (backIgnore > 0) { backIgnore--; return; }
+    if (!inside) { closeTop(); return; }   // 入口: 開いている画面を閉じるだけ(もう一度「戻る」で 外へ)
+    if (!closeTop()) askLeave();
+    armBack();   // 次の「戻る」にも そなえる
+  });
+  document.addEventListener('pointerdown', function () { if (inside && !backArmed) armBack(); }, true);
+  $('laStay').onclick = function () { $('leaveAsk').classList.add('hidden'); armBack(); };
+  $('laGo').onclick = function () { $('leaveAsk').classList.add('hidden'); leave(false); };
+  $('leaveAsk').onclick = function (e) { if (e.target === $('leaveAsk')) { $('leaveAsk').classList.add('hidden'); armBack(); } };   // まわりの暗い所を押しても もどる
 
   /* ---------------- 席 ---------------- */
   /* 予約の回: 次の(または いまの)営業。予約は 開店の3時間前から、開店して15分まで 席を取っておく */
