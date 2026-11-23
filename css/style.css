@@ -737,3 +737,17 @@ body.demo .chat .wh-btn { display: none; }
 .osec-end > summary b { color: #a0281c; }
 .bt-how button small { white-space: normal; }
 .ai-fuku > summary { font-weight: 800; }
+
+/* ===== C: 今日のおすすめの木札・いつもの(11-23 夜) ===== */
+.osu-board { margin: 2px 0 12px; padding: 10px 10px 12px; border-radius: 14px; background: linear-gradient(180deg, #3a2414, #2a190d); box-shadow: inset 0 0 0 2px #6b4524; }
+.osu-ttl { color: #ffd98a; font-weight: 900; font-size: 15px; letter-spacing: .2em; text-align: center; margin-bottom: 8px; }
+.osu-tags { display: flex; justify-content: center; gap: 12px; }
+.osu-tag { width: 64px; min-height: 150px; padding: 8px 4px 10px; border-radius: 6px 6px 10px 10px; background: linear-gradient(90deg, #e9cf9f, #f6e3bd 45%, #dcbd86); color: #2a1a10; border: 1.5px solid #9a6a36;
+  box-shadow: 0 4px 0 #5a3a1c, 0 6px 10px rgba(0,0,0,.35); display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.osu-tag i { font-style: normal; font-size: 24px; line-height: 1; }
+.osu-tag span { writing-mode: vertical-rl; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; font-weight: 800; font-size: 16px; line-height: 1.15; letter-spacing: .05em; }
+.osu-tag:active { transform: translateY(3px); box-shadow: 0 1px 0 #5a3a1c; }
+.osu-tag.off { opacity: .45; }
+.osu-pick > summary { font-weight: 800; display: flex; flex-direction: column; gap: 2px; }
+.osu-pick > summary small { font-weight: 600; color: #8a6a3a; font-size: 12px; }
+.mine button.itsumo { background: #fff3d6; border: 2px solid var(--gold); }
