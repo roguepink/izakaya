@@ -2469,6 +2469,30 @@ function createShop(canvas, opts) {
     const ex = Math.max(0, N - 7) * 0.22;
     wantPos.set(-L / 2 - 0.1 - ex * 0.5, 2.1 + ex * 0.4 + ARC_D * 0.6, -1.25 - ex * 0.3 - ARC_D * 1.3); wantLook.set(L * 0.12, 0.95, 1.45 - ARC_D * 0.5);   // 弓のはしは 大将の側へ回りこむので、その分 うしろ・上から
     wantFov = 64 + Math.max(0, N - 7) * 1.5;
+    fitOwnerDiag();
+  }
+  /* 縦の接客(はしから斜め): 座っている人が みんな 画面の見える所(右のボタン列・下の会話の欄の外)に入るように、向きを合わせ、入らなければ 広く・うしろへ。
+     手前の人が 右のはしで半分切れていた(11-23 総点検)。切れた人の吹き出しが となりの人の頭の上に よけていたのも これで直る */
+  let fitCam = null;
+  function fitOwnerDiag() {
+    const pts = []; seatAvatars.forEach((a, i) => { if (a) { const p = seatP(i); pts.push(new THREE.Vector3(p[0], HEAD_Y + 0.16, p[1]), new THREE.Vector3(p[0], 1.0, p[1])); } });
+    if (!pts.length) return;
+    const cam = fitCam || (fitCam = new THREE.PerspectiveCamera(60, 1, 0.05, 100)), q = new THREE.Vector3(), right = new THREE.Vector3();
+    const X0 = -0.78, X1 = 0.56, Y0 = -0.3, Y1 = 0.6;   // 右は ボタン列、上は 帯、下は 決まり文句と会話の欄
+    const back = wantLook.clone().sub(wantPos).setY(0).normalize().multiplyScalar(-0.14);
+    for (let it = 0; it < 60; it++) {
+      cam.fov = wantFov; cam.aspect = baseAspect; cam.updateProjectionMatrix(); cam.position.copy(wantPos); cam.lookAt(wantLook); cam.updateMatrixWorld();
+      let mnx = 9, mxx = -9, mny = 9, mxy = -9, behind = false;
+      pts.forEach((v) => { q.copy(v).project(cam); if (q.z > 1 || q.z < -1) behind = true; mnx = Math.min(mnx, q.x); mxx = Math.max(mxx, q.x); mny = Math.min(mny, q.y); mxy = Math.max(mxy, q.y); });
+      if (!behind && mnx >= X0 && mxx <= X1 && mny >= Y0 && mxy <= Y1) return;
+      const D = wantPos.distanceTo(wantLook), t = Math.tan(THREE.MathUtils.degToRad(wantFov / 2));
+      right.setFromMatrixColumn(cam.matrixWorld, 0);
+      if (!behind) {   // まず 真ん中に来るように 向きを変える
+        wantLook.addScaledVector(right, ((mnx + mxx) / 2 - (X0 + X1) / 2) * t * baseAspect * D * 0.5);
+        wantLook.y += ((mny + mxy) / 2 - (Y0 + Y1) / 2) * t * D * 0.5;
+      }
+      if (behind || mxx - mnx > (X1 - X0) * 0.98 || mxy - mny > (Y1 - Y0) * 0.98) { if (wantFov < 76 && !behind) wantFov += 1.5; else wantPos.add(back); }
+    }
   }
   /* 奥の壁ぎわの物(棚・木札・モニター・のれん)。大将の画面で 壁の向こうから映すときは隠す */
   let backStuff = null;

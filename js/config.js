@@ -324,6 +324,8 @@ var SHOP = {
     { id: 'tataki', name: '大将をたたくな!', icon: '🔨', sec: 30, file: 'games/tataki.js', note: '大将そっくりの にせものを たたく。本物の大将は たたかない' },
     { id: 'bowling', name: 'ハンドレッド ボウリング', icon: '🎳', sec: 60, file: 'games/bowling.js', note: 'でたらめに ならんだ 100本のピンを、1投で 何本 倒せるか' },
     { id: 'golf', name: 'ナイスショット ゴルフ', icon: '⛳', sec: 150, unit: 'ヤード', noTimer: true, file: 'games/golf.js', note: '動く目もりの まん中で 打つ!を10回。飛んだヤードが点数(最高390)' },
+    { id: 'shirahadori', name: '真剣白刃取り', icon: '🗡️', sec: 120, unit: '本', noTimer: true, file: 'games/shirahadori.js', note: '刀が手にとどく瞬間にタップ。20本で 何本 受け止められるか' },   // 11-23 単独のゲームから移した(roguepink/shirahadori)
+    { id: 'darts', name: 'ダーツ 10投勝負', icon: '🎯', sec: 120, noTimer: true, file: 'games/darts.js', note: '左右に動く的に、押した瞬間ダーツが飛ぶ。10投の合計点(最後は2倍)' },   // 11-23 単独のゲームから移した(roguepink/darts)
     { id: '_template', name: '焼き鳥タップ(お手本)', icon: '🍢', sec: 20, file: 'games/_template.js', note: '新しいゲームの お手本', off: true }
   ],
   NOBU_FACE: { hair: 'n2', brow: 'k4', eye: 'e2', nose: 2, beard: 'b1', beardColor: '#4a4542', face: 'tall', skin: 2, mouth: 'nsmile', headColor: '#2a3a6a', backText: 'のぶ' },   // 11-22 ノブさんが決めた: 顔は 髪を横に流す(8番)で統一。服の基本は 紺の法被+藍のはちまき+背中「のぶ」(6番)。はちまきの色・背中の文字は 着がえで 変えられる
