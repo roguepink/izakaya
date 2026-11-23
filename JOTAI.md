@@ -375,3 +375,6 @@
 - 本番に出した: ☰ほか・🏮大将の操作・大将がいます・👁見え方・お品書き説明短く / 🤫ボタン(入力欄の左) / 字の大きさ(全部見るの Aa。body.fz-s / fz-l・CSS の var(--fz)) / 横向きの会話(上ほど薄く・おしゃべりは顔の下の右 placeTalkLog) / 大将の操作を3見出し(osec・iz-osec に開け閉め) / 5秒の「元に戻す」(undoable) / 交代のまかせ方(state.boss {uid, full, home}・fullOwner()・batonHome()) / アイちゃんのパネルをたたむ(ai-fuku) / 縦の接客カメラ(fitOwnerDiag) / ゲーム shirahadori・darts(音なし・seed で同じ並び)。
 - 枝: kongo-a(worktree agent-a7d2c31aa4d35ee8d)。ゲームを移した作業場所は worktree games(枝 games-add・コミットなし)。
 - 次: C(c1 雰囲気と看板の保存・c2 今日のおすすめ木札+アイちゃん10種+大将への返し3種・c3 帰るとき(お辞儀の姿は先に見せる)・c5 いつもの・c6 使い方に写真)。その2 の答え待ち: 右のボタン A/B・おしゃべりの見え方 E・帰るときの形 F。
+- 11-23 夜おそく: C を本番へ(sw v111)。今日のおすすめ(state.osusume・お品書きの上の木札 osuBoardHTML・頼まれると REG.TALK.osusume)/ 大将→アイちゃんの返し(REG.TALK.orq/orp/orf/org/oro)/ いつもの(iz-itsumo・iz-itsumo-now)/ わたしの店(iz-myshop)/ 料理の出し方は 何も選んでいなければ「自動 おすすめ」(curAuto・手で出すは 'hand')。
+- 帰るときの形(byeShow・3D の bow)は作ったが SHOP.BYE_V2=false。ノブさんが お辞儀の絵を見て OK したら true(深さは BYE_BOW)。#byetest で ためせる。大将の声「また来てくださいね」(o_matakite)は ノブさんが録る。
+- 使い方ページの写真(c6)は、右のボタン(その2 の D-1)が決まってから撮る。
