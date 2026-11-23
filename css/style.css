@@ -311,10 +311,19 @@ button.mini { background: rgba(0,0,0,.1); border-radius: 999px; width: 30px; hei
 @keyframes toFlash { 0% { box-shadow: 0 0 0 3px var(--gold); } 100% { box-shadow: 0 0 0 0 rgba(232,163,61,0); } }
 .chat textarea.to-flash { animation: toFlash 1.2s ease-out; }
 /* 大将の接客画面: 会話の欄を大きく、右のボタンは「☰」にたたむ */
-#bMore { display: none; }
-body.owner-view #bMore { display: flex; }
-body.owner-view:not(.side-open) .side > .sbtn:not(#bMore):not(#bOrders):not(#bView):not(#bAi) { display: none; }
-@media (orientation: portrait) { body.side-open .np-row { max-width: calc(100% - 150px); } }   /* ☰ を開くと ボタンが2列になるので、曲名の帯と「次へ」を短く(👧 が「次へ」に重なっていた 11-23) */   /* 👧 アイちゃんも たたんだ時に出す 11-23 */
+/* 右のボタン(11-23 ノブさん A案): 表は いつも同じ4つ+「☰ ほか」。残りは「ほか」の小窓の中 */
+.side > .sbtn.in-more { display: none !important; }
+#bMore { order: 50; }
+#bMore.on { background: rgba(232,163,61,.92); }
+#bMore.on span, #bMore.on small { color: #2a1a10; }
+.more-menu { position: fixed; z-index: 30; background: rgba(255,248,232,.97); border-radius: 18px; padding: 10px; box-shadow: 0 8px 28px rgba(0,0,0,.45); }
+.mm-grid { display: grid; grid-template-columns: repeat(3, 78px); gap: 8px; }
+.mm-b { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 66px; border-radius: 14px; background: #f1e3c4; color: #3a2414; padding: 6px 2px; }
+.mm-b span { font-size: 24px; line-height: 1.1; font-weight: 900; }
+.mm-b small { font-size: 12px; font-weight: 800; line-height: 1.2; text-align: center; }
+.mm-b small b { display: block; font-size: 11px; color: #b5121b; }
+.mm-b:active { transform: scale(.96); }
+@media (orientation: landscape) and (max-height: 520px) { .mm-grid { grid-template-columns: repeat(5, 70px); } .mm-b { min-height: 58px; } .mm-b span { font-size: 21px; } }
 body.owner-view .side > #bView { order: -1; }   /* 大将も 👁 は いつも いちばん上(右上)。おしゃべり画面と 同じ所で 続けて押せる 11-22 ノブさん */
 body.owner-view .log { max-height: 27vh; font-size: calc(14.5px * var(--fz, 1)); background: rgba(20,12,8,.55); border-radius: 12px; padding: 14px 6px 6px; }
 body.owner-view .log .ln { background: rgba(255,255,255,.07); }
@@ -573,7 +582,6 @@ body.talk-on .log { max-height: 22vh; }
 .tk-serve { position: absolute; right: 6px; bottom: 30px; font-size: 13px; font-weight: 900; background: #c8402c; color: #fff; border-radius: 99px; padding: 6px 10px; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
 .tk-grid.small .tk-serve { font-size: 11.5px; padding: 4px 8px; right: 4px; bottom: 24px; }
 .tk-grid.small .tk-ord { font-size: 10.5px; left: 4px; bottom: 50px; }   /* 小さいカードでは「出す」の上の段に(重なって 見えなかった 11-22) */
-body.talk-on.owner-view:not(.side-open) .side > #bView { display: flex !important; }   /* 大将の おしゃべり画面: 👁(もどる)は いつも見える */
 body.talk-on.owner-view .log { max-height: 22vh; }
 body.talk-on .log-wrap.big .log, body.talk-on.owner-view .log-wrap.big .log { max-height: 100%; }   /* 「全部見る」は おしゃべりの見え方でも 画面いっぱいに(大将の画面で 上の3分の1しか出ていなかった 11-23) */
 /* 自分の言葉(ノブさん 11-22「埋もれないように、自分が話した言葉はすぐわかるように」): 右に寄せて、明るい色+「あなた」の札 */
@@ -767,3 +775,32 @@ body.demo .chat .wh-btn { display: none; }
 .bye-next b { color: #fff; }
 @keyframes byein { from { opacity: 0; } to { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .bye-card { animation: none; } }
+
+/* ===== おしゃべりの見え方(11-23 夜 ノブさんの答え E・言葉を残す) ===== */
+/* 新しい言葉は 顔の上に大きく → 数秒後 顔の下に小さく残す(次に話すまで・2分まで)。顔は 下の帯の分しか かくれない */
+.tk-bub.keep { top: auto; bottom: 32px; background: rgba(20,12,8,.8); color: #fff6e6; font-weight: 700; font-size: calc(12px * var(--fz, 1)); padding: 3px 8px; -webkit-line-clamp: 2; box-shadow: none; border: 1px solid rgba(255,240,210,.25); }
+.tk-bub.keep.old { opacity: .6; }
+.tk-grid.small .tk-bub.keep { top: auto; bottom: 25px; font-size: calc(10.5px * var(--fz, 1)); padding: 2px 6px; -webkit-line-clamp: 2; }
+body.is-owner .tk-bub.keep { bottom: 62px; }
+body.is-owner .tk-grid.small .tk-bub.keep { bottom: 50px; }
+.tk-card.tk-big .tk-bub { -webkit-line-clamp: 5; font-size: calc(15px * var(--fz, 1)); }
+.tk-card.tk-big .tk-bub.keep { -webkit-line-clamp: 3; font-size: calc(13.5px * var(--fz, 1)); }
+/* だれに話したか(E-3) */
+.tk-to { display: block; font-style: normal; font-size: .82em; font-weight: 800; color: #b5121b; line-height: 1.2; }
+.tk-bub.keep .tk-to { color: #ffd36a; display: inline; margin-right: 5px; }
+.tk-to.me { color: #fff; background: #e8463d; border-radius: 99px; padding: 0 6px; display: inline-block; }
+.tk-card.called { border-color: #8fd0ff; box-shadow: 0 0 0 2px rgba(143,208,255,.45), 0 0 14px rgba(143,208,255,.5); }
+/* ✍️ 書いています(E-1) */
+.tk-typing { position: absolute; top: 6px; left: 6px; background: #fffdf6; color: #2a1a10; border-radius: 99px; padding: 2px 9px 2px 7px; font-size: 13px; display: flex; align-items: center; gap: 3px; box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.tk-typing.low { top: auto; bottom: 32px; }
+.tk-grid.small .tk-typing.low { bottom: 25px; } body.is-owner .tk-typing.low { bottom: 62px; }
+.tk-typing i { width: 5px; height: 5px; border-radius: 50%; background: #8a6a3a; animation: tkDot 1.1s infinite ease-in-out; }
+.tk-typing i:nth-child(2) { animation-delay: .18s; } .tk-typing i:nth-child(3) { animation-delay: .36s; }
+@keyframes tkDot { 0%, 70%, 100% { transform: translateY(0); opacity: .45; } 35% { transform: translateY(-3px); opacity: 1; } }
+/* 長く押した人を大きく(E-4) */
+.tk-focus { display: flex; flex-direction: column; gap: 8px; align-items: center; height: 100%; justify-content: center; }
+.tk-focus.land { flex-direction: row; }
+.tk-focus .tk-grid { flex: none; }
+.tk-card.tk-big { border-color: #f5c04a; }
+/* 横向き: 顔は左の6割、会話は右の列(E-2) */
+@media (orientation: landscape) and (max-height: 520px) { body.talk-on #talk { right: auto; width: min(60vw, 560px); } }

@@ -2342,7 +2342,7 @@ function createShop(canvas, opts) {
     const gr = g.createLinearGradient(0, 0, 0, 360); gr.addColorStop(0, '#1c2a3a'); gr.addColorStop(1, '#0b0f16');
     g.fillStyle = gr; g.fillRect(0, 0, 640, 360);
     g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillStyle = '#ffcf8a'; g.font = 'bold 64px ' + FONT_JP; g.fillText(SHOPNAME.slice(0, 8), 320, 120);
+    g.fillStyle = '#ffcf8a'; g.font = 'bold 64px ' + FONT_JP; { const w = g.measureText(SHOPNAME).width || 1; g.font = 'bold ' + Math.min(64, Math.floor(64 * 600 / w)) + 'px ' + FONT_JP; } g.fillText(SHOPNAME, 320, 120);   // 長い名前も 全部(字を小さく)
     g.fillStyle = '#f3efe6'; g.font = '30px ' + FONT_JP;
     const t = tvInfo.title ? '♪ ' + tvInfo.title : '';
     g.fillText(Array.from(t).slice(0, 18).join(''), 320, 215);
@@ -2369,17 +2369,26 @@ function createShop(canvas, opts) {
   }
 
   // ちょうちん
+  /* 提灯の字(ノブさん 11-23「3文字しか入らない。細かくなっても 全部入れて。2行でもいい」):
+     縦書きで、4文字までは1列、5〜8文字は2列、それより長いと3列…(右の列から読む)。字の大きさは 入る大きさに自動で */
   const drawLantern = (g) => {
+    const sc = g.canvas.width / 256; g.setTransform(sc, 0, 0, sc, 0, 0);
     g.fillStyle = moodLan[0]; g.fillRect(0, 0, 256, 256);
     g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 3;
     for (let y = 16; y < 256; y += 22) { g.beginPath(); g.moveTo(0, y); g.lineTo(256, y); g.stroke(); }
     g.fillStyle = moodLan[2]; g.textAlign = 'center'; g.textBaseline = 'middle';
-    const chars = Array.from(SHOPNAME.replace(/^居酒屋\s*/, '') || '酒').slice(0, 3);
-    const sz = chars.length === 1 ? 120 : chars.length === 2 ? 78 : 58;
+    const chars = Array.from(SHOPNAME.replace(/^居酒屋\s*/, '') || '酒'), n = chars.length;
+    const cols = Math.ceil(n / 4), rows = Math.ceil(n / cols), BW = 88, BH = 170;   // 1面の字の場所(球なので はしは見えにくい)
+    const sz = Math.floor(Math.min(120, BH / rows / 1.04, BW / cols / 1.06)), lh = sz * 1.04, cw = sz * 1.06;
     g.font = 'bold ' + sz + 'px ' + FONT_JP;
-    [64, 192].forEach((cx) => chars.forEach((ch, k) => g.fillText(ch, cx, 128 + (k - (chars.length - 1) / 2) * sz * 1.02)));
+    [64, 192].forEach((cx) => chars.forEach((ch, i) => {
+      const c = Math.floor(i / rows), r = i % rows, x = cx + ((cols - 1) / 2 - c) * cw, y = 128 + (r - (rows - 1) / 2) * lh;
+      if (/[ー〜～\-－―]/.test(ch)) { g.save(); g.translate(x, y); g.rotate(Math.PI / 2); g.fillText(ch, 0, 0); g.restore(); }   // 縦書きの「ー」は 縦に
+      else g.fillText(ch, x, y);
+    }));
+    g.setTransform(1, 0, 0, 1, 0, 0);
   };
-  const lanternTex = canvasTex(256, 256, drawLantern);
+  const lanternTex = canvasTex(512, 512, drawLantern);   // 字が細かくなっても読めるように 細かい絵に
   const lanterns = [];
   // 真ん中(モニターと お祝いの垂れ幕)の前には 提灯を下げない。左右に同じ数ずつ、等しい間で(ノブさん 2026-11-21「真ん中の提灯が じゃまで 映像が見づらい」)
   const LGAP = 1.0, nside = Math.max(1, Math.round((L / 2 - LGAP) / 1.5)), nl = nside * 2;
@@ -2398,8 +2407,11 @@ function createShop(canvas, opts) {
   const drawNoren = (g) => {
     g.fillStyle = moodNoren[0]; g.fillRect(0, 0, 512, 256);
     g.fillStyle = moodNoren[1]; g.font = 'bold 120px ' + FONT_JP; g.textAlign = 'center'; g.textBaseline = 'middle';
-    const nm = SHOPNAME.replace(/^居酒屋\s*/, '') || SHOPNAME;
-    g.fillText(nm.slice(0, 4), 256, 140);
+    const nm = SHOPNAME.replace(/^居酒屋\s*/, '') || SHOPNAME, a = Array.from(nm);
+    const fit = (t, mx) => { g.font = 'bold 100px ' + FONT_JP; return Math.min(mx, Math.floor(100 * 470 / (g.measureText(t).width || 1))); };
+    const s1 = fit(nm, 120);
+    if (s1 >= 64 || a.length < 5) { g.font = 'bold ' + s1 + 'px ' + FONT_JP; g.fillText(nm, 256, 140); }   // 長い名前も 全部(入らなければ 2行に)
+    else { const h = Math.ceil(a.length / 2), l1 = a.slice(0, h).join(''), l2 = a.slice(h).join(''), s2 = Math.min(fit(l1, 100), fit(l2, 100), 100); g.font = 'bold ' + s2 + 'px ' + FONT_JP; g.fillText(l1, 256, 140 - s2 * 0.56); g.fillText(l2, 256, 140 + s2 * 0.56); }
   };
   const norenT = canvasTex(512, 256, drawNoren), norenTexs = [norenT];
   for (let k = 0; k < 3; k++) {
@@ -3063,6 +3075,7 @@ function createShop(canvas, opts) {
       return { tables: seatAvatars.map((a, i) => { if (!a) return null; const tp = seatP(i, -0.3); return proj(tp[0], COUNTER_Y + 0.01, tp[1]); }),   // その人のテーブルの手前のふち(大将の「出す」ボタンの高さ。料理にかからない。横は その人の頭に合わせる)
         seats: seatAvatars.map((a, i) => (a && a.visible ? headPos(a) : null)), owner: headPos(owner), empty: stools.map((s, i) => { const sp = seatP(i); tmp.set(sp[0], STOOL_Y + 0.25, sp[1]); const v = tmp.clone().project(camera); if (v.z > 1) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }) }; },
     get name() { return SHOPNAME; },
+    _signs() { return [lanternTex.image.toDataURL(), norenT.image.toDataURL(), tvCanvas.toDataURL()]; },   // 確かめる用(提灯・のれん・モニターの字)
     /* 店の名前を その場で変える(ちょうちん・のれん・モニター)。バトンタッチのとき */
     setScores(list, title, unit) { boardList = (list || []).slice(0, 3); boardTitle = title || ''; boardUnit = unit || '点'; drawBoard(); },   // unit: 点数の単位(ゴルフは ヤード)   // 本日の最高得点(上位3人)と 今日のゲームの名前
     setName(nm) {

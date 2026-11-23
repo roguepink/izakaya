@@ -51,11 +51,11 @@ def load():
     return js_list(c, "GUEST_PHRASES"), js_list(c, "OWNER_PHRASES"), js_list(a, "GUEST_VOICES"), js_list(a, "OWNER_VOICES")
 
 
-READ = {"大将、がんばってね": "たいしょー、がんばってね", "ウケる！": "うけるー！", "はいよ！": "はいよー！", "はい、お待ち！": "はいっ、おまち！"}   # Google の声が読みまちがえる言葉の読み方(2026-11-19「ウケる」が「来る」、威勢のいい声の「はいよ」が「あや」に聞こえた)
+READ = {"大将、がんばってね": "たいしょー、がんばってね", "ウケる！": "うけるー！", "はいよ！": "はいよー！", "はい、お待ち！": "はいっ、おまち！", "うーん、どうだろう…大将は どう思います？": "うーん、どうだろう。大将は、どう思います？"}   # Google の声が読みまちがえる言葉の読み方(2026-11-19「ウケる」が「来る」、威勢のいい声の「はいよ」が「あや」に聞こえた)
 
 
-def spoken(t):
-    return READ.get(t, t).replace("〜", "ー")
+def spoken(t):   # 「大将」を「たいちょう」と読むことがあった(11-23 アイちゃんの声 4つ)→ ひらがなで渡す
+    return READ.get(t, t).replace("〜", "ー").replace("大将", "たいしょう")
 
 
 def request(text, voice, style, model=None):
@@ -154,7 +154,15 @@ def split_points(pcm, texts, wav_path):
     starts = [0.0]
     for i in range(1, len(texts)):
         starts.append(max(first.get(i, total * i / len(texts)) - 0.05, starts[-1] + 0.3))
-    return starts, total, "聞き起こし"
+    # 「えへへ」「うーん」のような 字にならない声は 聞き起こしに出ないので、切れ目が その声のあとになり 前の言葉にくっつく(11-23)。
+    # → 前の言葉の始まり〜この言葉の最初の字 の間で いちばん長い無音を 切れ目にする(行の間は 1秒ほど あけて読ませている)
+    gaps = silences(pcm, min_len=0.2)
+    out = [0.0]
+    for i in range(1, len(texts)):
+        lo, hi = starts[i - 1] + 0.4, starts[i] + 0.15
+        cand = [g for g in gaps if g[0] >= lo and g[1] <= hi]
+        out.append((lambda g: (g[0] + g[1]) / 2)(max(cand, key=lambda g: g[1] - g[0])) if cand else starts[i])
+    return out, total, "聞き起こし+無音"
 
 
 def encode(pcm, a, b, out):
