@@ -2455,6 +2455,30 @@ function createShop(canvas, opts) {
   const tableHits = [];
   for (let i = 0; i < N; i++) { const h = new THREE.Mesh(new THREE.BoxGeometry(SEAT_GAP * 0.96, 0.16, 0.76), new THREE.MeshBasicMaterial({ visible: false })); const hp = seatP(i, 0); h.position.set(hp[0], COUNTER_Y, hp[1]); h.rotation.y = hp[2]; h.userData.seat = i; scene.add(h); tableHits.push(h); }
   let owner = null, ownerKey = '', ownerTargetX = 0, ownerHeadPts = null;
+  /* 大将の接客の目線だけ: 座っている人を まん中に詰めて見せる(本当の席は変えない。お客さんの画面は今まで通り 11-24 ノブさん)
+     disp[i] = 席 i の人を 見せる場所。空いている席は 残りの場所へ(料理の入れもの・押す所も いっしょに動かす) */
+  let disp = null, dispKey = '';
+  const dSeat = (i) => (disp ? disp[i] : i);
+  function placeSeat(i) {
+    const k = dSeat(i), sp = seatP(k), tp = seatP(k, 0.08), hp = seatP(k, 0);
+    const a = seatAvatars[i]; if (a && !photo) { a.position.set(sp[0], STOOL_Y, sp[1]); a.rotation.y = Math.PI + sp[2]; }
+    tableGroups[i].position.set(tp[0], COUNTER_Y, tp[1]); tableGroups[i].rotation.y = tp[2];
+    tableHits[i].position.set(hp[0], COUNTER_Y, hp[1]); tableHits[i].rotation.y = hp[2];
+  }
+  function recompact() {
+    let m = null;
+    if (view.mode === 'owner' && !photo) {
+      const occ = [], free = []; seatAvatars.forEach((a, i) => { if (a) occ.push(i); });
+      const st = Math.floor((N - occ.length) / 2); m = new Array(N);
+      occ.forEach((s, j) => { m[s] = st + j; });
+      for (let k = 0; k < N; k++) if (k < st || k >= st + occ.length) free.push(k);
+      let f = 0; for (let i = 0; i < N; i++) if (m[i] == null) m[i] = free[f++];
+    }
+    const key = m ? m.join(',') : '';
+    if (key === dispKey) return;
+    dispKey = key; disp = m;
+    for (let i = 0; i < N; i++) placeSeat(i);
+  }
   let itemHitList = [], bumpKey = '', bumpAt = 0;
   const HIT_MAT = new THREE.MeshBasicMaterial({ visible: false });
 
@@ -2475,7 +2499,7 @@ function createShop(canvas, opts) {
   const HEAD_Y = 1.36, CAM_Y = 1.58;
   let viewShift = 0, baseAspect = 1, viewApplied = -1;   // 横向きの大将の画面: 左に会話の欄があるので、絵の中心を右へずらす(0 = ずらさない)
   function ownerFrame(portrait) {
-    const xs = [], zs = []; seatAvatars.forEach((a, i) => { if (a) { const p = seatP(i); xs.push(p[0]); zs.push(p[1]); } });
+    const xs = [], zs = []; seatAvatars.forEach((a, i) => { if (a) { const p = seatP(dSeat(i)); xs.push(p[0]); zs.push(p[1]); } });
     const nSat = xs.length;
     if (!xs.length) { xs.push(seatP(0)[0], seatP(N - 1)[0]); zs.push(seatP(0)[1]); }
     const zn = Math.min(GUEST_Z, ...zs);   // 弓のはしの人は 手前(大将の側)に出ている。その人の所で 入りきるように測る   // だれも座っていないときは 空いている席を全部
@@ -2519,7 +2543,7 @@ function createShop(canvas, opts) {
      手前の人が 右のはしで半分切れていた(11-23 総点検)。切れた人の吹き出しが となりの人の頭の上に よけていたのも これで直る */
   let fitCam = null;
   function fitOwnerDiag() {
-    const pts = []; seatAvatars.forEach((a, i) => { if (a) { const p = seatP(i); pts.push(new THREE.Vector3(p[0], HEAD_Y + 0.16, p[1]), new THREE.Vector3(p[0], 1.0, p[1])); } });
+    const pts = []; seatAvatars.forEach((a, i) => { if (a) { const p = seatP(dSeat(i)); pts.push(new THREE.Vector3(p[0], HEAD_Y + 0.16, p[1]), new THREE.Vector3(p[0], 1.0, p[1])); } });
     if (!pts.length) return;
     const cam = fitCam || (fitCam = new THREE.PerspectiveCamera(60, 1, 0.05, 100)), q = new THREE.Vector3(), right = new THREE.Vector3();
     const X0 = -0.78, X1 = 0.56, Y0 = -0.3, Y1 = 0.6;   // 右は ボタン列、上は 帯、下は 決まり文句と会話の欄
@@ -2922,11 +2946,12 @@ function createShop(canvas, opts) {
         seatKeys[i] = key;
         if (s) {
           const av = buildAvatar(s.avatar);
-          const sp = seatP(i); av.position.set(sp[0], STOOL_Y, sp[1]);
+          const sp = seatP(dSeat(i)); av.position.set(sp[0], STOOL_Y, sp[1]);
           av.rotation.y = Math.PI + sp[2];   // カウンターのほう(奥)を向く。弓のはしは 少し内向き
           scene.add(av); seatAvatars[i] = av;
         }
       }
+      recompact();
       api._hideMine();
     },
     setOwner(avatar) {
@@ -2980,7 +3005,7 @@ function createShop(canvas, opts) {
     },
     setView(mode, seat) {
       if (mode !== view.mode) { view.yaw = 0; view.pitch = 0; view.zoom = 1; }
-      view.mode = mode; view.seat = seat; api._hideMine();
+      view.mode = mode; view.seat = seat; recompact(); api._hideMine();
     },
     _hideMine() { if (photo) return; seatAvatars.forEach((a, i) => { if (a) a.visible = !(view.mode === 'first' && i === view.seat); }); if (owner) owner.visible = view.mode !== 'owner'; },
     cheer(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.cheer = 2.2; },
@@ -3057,9 +3082,9 @@ function createShop(canvas, opts) {
     },
     photoEnd() {
       if (!photo) return; photo = null;
-      seatAvatars.forEach((a, i) => { if (!a) return; photoClear(a); const sp = seatP(i); a.position.set(sp[0], STOOL_Y, sp[1]); a.rotation.y = Math.PI + sp[2]; });
+      seatAvatars.forEach((a, i) => { if (!a) return; photoClear(a); const sp = seatP(dSeat(i)); a.position.set(sp[0], STOOL_Y, sp[1]); a.rotation.y = Math.PI + sp[2]; });
       if (owner) { photoClear(owner); const op = arcP(ownerTargetX, OWNER_Z); owner.position.set(op[0], 0.88, op[1]); owner.rotation.y = op[2]; owner.userData.sx = ownerTargetX; }
-      api._hideMine();
+      dispKey = '-'; recompact(); api._hideMine();
     },
     get photoOn() { return !!photo; },
     /* いまの集合の絵を、写真の大きさ(正方形。顔の集まりは横に広いので、足が写らず顔が大きい)で1枚 写しとる。画面と同じ色の仕上げにするため、一瞬だけ大きく描く */
@@ -3098,7 +3123,7 @@ function createShop(canvas, opts) {
     lookState(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; return a ? { to: a.userData.lookTo, t: +(a.userData.lookT || 0).toFixed(2), wait: (a.userData.lookQ || []).map((q) => q.target) } : null; },   // 確認用
     /* 吹き出しを出す位置(画面の点) */
     anchors() { const r0 = canvas.getBoundingClientRect(), proj = (x, y, z) => { const v = tmp.set(x, y, z).clone().project(camera); return v.z > 1 || v.z < -1 ? null : { x: r0.left + (v.x + 1) / 2 * r0.width, y: r0.top + (1 - v.y) / 2 * r0.height }; };
-      return { tables: seatAvatars.map((a, i) => { if (!a) return null; const tp = seatP(i, -0.3); return proj(tp[0], COUNTER_Y + 0.01, tp[1]); }),   // その人のテーブルの手前のふち(大将の「出す」ボタンの高さ。料理にかからない。横は その人の頭に合わせる)
+      return { tables: seatAvatars.map((a, i) => { if (!a) return null; const tp = seatP(dSeat(i), -0.3); return proj(tp[0], COUNTER_Y + 0.01, tp[1]); }),   // その人のテーブルの手前のふち(大将の「出す」ボタンの高さ。料理にかからない。横は その人の頭に合わせる)
         seats: seatAvatars.map((a, i) => (a && a.visible ? headPos(a) : null)), owner: headPos(owner), empty: stools.map((s, i) => { const sp = seatP(i); tmp.set(sp[0], STOOL_Y + 0.25, sp[1]); const v = tmp.clone().project(camera); if (v.z > 1) return null; const r = canvas.getBoundingClientRect(); return { x: r.left + (v.x + 1) / 2 * r.width, y: r.top + (1 - v.y) / 2 * r.height }; }) }; },
     get name() { return SHOPNAME; },
     _signs() { return [lanternTex.image.toDataURL(), norenT.image.toDataURL(), tvCanvas.toDataURL()]; },   // 確かめる用(提灯・のれん・モニターの字)
