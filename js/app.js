@@ -1070,6 +1070,8 @@
   function toChip() {
     var m = callOf(chatIn.value), c = $('toChip');
     c.classList.toggle('wh', !!whMode);
+    // こそっと中は ✕ を大きく「✕ こそっと おわり」に(ノブさん 2026-11-23「バツを大きめに分かりやすく」)。送っても続く・✕ で終わる
+    $('toClear').textContent = whMode ? '✕ こそっと おわり' : '✕ 消す';
     if (whMode) { $('toName').textContent = '🤫 ' + whMode.name + 'にだけ こそっと'; c.classList.remove('hidden'); return; }
     if (!m) { if (!c.classList.contains('hidden')) c.classList.add('hidden'); return; }
     $('toName').textContent = '💬 ' + m[1] + 'へ';

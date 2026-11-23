@@ -623,7 +623,8 @@ body.owner-view .log .ln.owner.me { background: rgba(140,29,22,.95); }
 #whoPick button small { display: block; font-size: 11.5px; font-weight: 700; opacity: .75; margin-top: 2px; }
 #whoPick button.wp-wh { background: #4a3566; color: #fff; }
 .to-chip.wh { background: rgba(74,53,102,.97); color: #fff; }
-.to-chip.wh button { background: #fff; color: #4a3566; }
+.to-chip.wh { font-size: 15px; padding: 5px 5px 5px 14px; }
+.to-chip.wh button { background: #fff; color: #4a3566; font-size: 16px; padding: 10px 16px; min-height: 42px; border: 2px solid #c9b3ea; box-shadow: 0 2px 0 rgba(0,0,0,.25); }
 .chat.wh-on textarea { background: #efe6ff; box-shadow: 0 0 0 3px #7a5aa8; }
 .chat.wh-on textarea::placeholder { color: #6d5a8a; }
 .chat.wh-on button { background: #5b3f86; }
