@@ -1,0 +1,401 @@
+<title>居酒屋ノブ これから直すところ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Old+Mincho:wght@600;700&display=swap">
+<style>
+/* 紙の品書きと、藍ののれん。直し工房の確認ページと同じ作り(上の目次・提案ごとに ○/×/あとで・下のバー) */
+:root{
+  --bg:#f4f3ef; --fg:#22252d; --mut:#5f6472; --card:#fbfaf7; --line:#d9d6cc;
+  --acc:#2d4a7a; --on-acc:#ffffff; --sel:#e3e9f3;
+  --add:#a8670f; --nobu:#b8322a; --ok:#2f7a52; --warn:#9a3a2a; --bar:#e6e2d6;
+  --f-head:"Zen Old Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14161c; --fg:#e7e8ec; --mut:#a3a8b6; --card:#1c1f27; --line:#2f3440;
+    --acc:#9db7e6; --on-acc:#10141c; --sel:#232d40;
+    --add:#e3a64e; --nobu:#ec7d6f; --ok:#7fcfa2; --warn:#e8998a; --bar:#2a2e38; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#14161c; --fg:#e7e8ec; --mut:#a3a8b6; --card:#1c1f27; --line:#2f3440;
+  --acc:#9db7e6; --on-acc:#10141c; --sel:#232d40;
+  --add:#e3a64e; --nobu:#ec7d6f; --ok:#7fcfa2; --warn:#e8998a; --bar:#2a2e38; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--fg); font-family:var(--f-body); font-size:17px; line-height:1.85; margin:0;
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px))}
+body::before{content:""; position:fixed; inset:0 0 auto; height:env(safe-area-inset-top, 0px); z-index:10; background:var(--bg)}
+.wrap{max-width:40rem; margin:0 auto; display:flex; flex-direction:column; gap:30px; padding-block:18px 28px}
+h1,h2,h3{font-family:var(--f-head); line-height:1.4; text-wrap:balance; margin:0}
+h1{font-size:1.6rem}
+h2{font-size:1.3rem; padding-bottom:6px; border-bottom:2px solid var(--line)}
+p{margin:0}
+.eyebrow{font-size:.8rem; letter-spacing:.12em; color:var(--mut)}
+.sec{display:flex; flex-direction:column; gap:12px; min-width:0; scroll-margin-top:64px}
+.small{font-size:.88rem; color:var(--mut)}
+.nav{position:sticky; top:env(safe-area-inset-top, 0px); z-index:6; background:var(--bg); border-bottom:1px solid var(--line);
+  margin-inline:calc(-1 * max(16px, env(safe-area-inset-left, 0px))); padding:8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px))}
+.nav-in{max-width:40rem; margin:0 auto; display:flex; gap:8px}
+.nav a{flex:1; text-align:center; text-decoration:none; color:var(--acc); font-weight:700; font-size:.92rem; border:1px solid var(--line); background:var(--card); border-radius:99px; padding:6px 4px; min-height:40px; display:grid; place-items:center}
+.nav a:focus-visible{outline:3px solid var(--acc); outline-offset:2px}
+ul.dots{margin:0; padding-left:1.2em; display:flex; flex-direction:column; gap:6px}
+.box{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:8px}
+.box.good{border-left:4px solid var(--ok)}
+.box.bad{border-left:4px solid var(--warn)}
+.box.rule{border-left:4px solid var(--acc)}
+/* 点数 */
+.scores{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+@media (max-width:420px){ .scores{grid-template-columns:1fr} }
+.sc{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:6px; min-width:0}
+.sc .who{font-size:.85rem; color:var(--mut); font-weight:700}
+.sc .big{font-family:var(--f-head); font-size:2.2rem; line-height:1; font-variant-numeric:tabular-nums}
+.sc .big small{font-size:.95rem; color:var(--mut); font-family:var(--f-body)}
+.row{display:grid; grid-template-columns:7.5em 1fr 2.2em; gap:6px; align-items:center; font-size:.8rem}
+.row .lab{color:var(--mut); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.row .trk{position:relative; height:9px; background:var(--bar); border-radius:99px; overflow:hidden}
+.row .trk i{position:absolute; inset:0 auto 0 0; background:var(--acc); border-radius:99px}
+.row .trk i.low{background:var(--warn)}
+.row .trk b{position:absolute; top:-2px; bottom:-2px; left:70%; width:2px; background:var(--fg); opacity:.45}
+.row .v{text-align:right; font-variant-numeric:tabular-nums; font-weight:700}
+.goal{font-size:.78rem; color:var(--mut)}
+.done{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px}
+.done li{display:flex; gap:8px; align-items:flex-start; font-size:.94rem}
+.done li::before{content:"✓"; color:var(--ok); font-weight:700; flex:none}
+/* 提案 */
+.grp{display:flex; flex-direction:column; gap:12px}
+.grp > h3{font-size:1.1rem; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap}
+.grp > h3 .gt{font-family:var(--f-body); font-size:.8rem; color:var(--mut); font-weight:500}
+.q{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; display:flex; flex-direction:column; gap:10px; min-width:0}
+.q .top{display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+.q .kind{font-size:.78rem; font-weight:700; color:var(--on-acc); background:var(--acc); border-radius:99px; padding:0 10px; line-height:1.9}
+.q .kind.add{background:var(--add)}
+.q .kind.nobu{background:var(--nobu)}
+.q .time{font-size:.78rem; color:var(--mut); border:1px solid var(--line); border-radius:99px; padding:0 8px; line-height:1.8}
+.rec{font-size:.74rem; font-weight:700; color:var(--add); border:1px solid var(--add); border-radius:99px; padding:0 8px; line-height:1.8}
+.q h4{font-family:var(--f-head); font-size:1.05rem; margin:0; line-height:1.45}
+.q .where{font-size:.82rem; color:var(--mut)}
+.lbl{font-size:.74rem; font-weight:700; color:var(--mut); letter-spacing:.06em; display:block}
+.q .now{border-left:3px solid var(--line); padding-left:10px; font-size:.95rem}
+.q .idea{border-left:3px solid var(--acc); padding:4px 10px; font-size:.95rem; background:var(--sel); border-radius:0 6px 6px 0}
+.q .why{font-size:.9rem}
+.q .by{font-size:.78rem; color:var(--mut)}
+.pick{display:grid; grid-template-columns:repeat(3,1fr); gap:6px; border:0; margin:0; padding:0}
+.pick label{position:relative; display:block}
+.pick input{position:absolute; opacity:0; inset:0; width:100%; height:100%; margin:0; cursor:pointer}
+.pick span{display:grid; place-items:center; border:2px solid var(--line); border-radius:10px; padding:6px 8px; min-height:46px; background:var(--bg); font-weight:700; font-size:.92rem; text-align:center}
+.pick input:checked + span{background:var(--sel); border-color:var(--acc); color:var(--acc)}
+.pick input[value="no"]:checked + span{border-color:var(--warn); color:var(--warn); background:var(--card)}
+.pick input:focus-visible + span{outline:3px solid var(--acc); outline-offset:2px}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
+label.note{display:flex; flex-direction:column; gap:4px; font-size:.85rem; color:var(--mut)}
+textarea{width:100%; min-height:3rem; font-family:var(--f-body); font-size:16px; line-height:1.6; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px 10px; resize:vertical}
+textarea:focus-visible{outline:3px solid var(--acc); outline-offset:1px}
+.wd{display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; font-weight:700}
+.wd .b{color:var(--mut); text-decoration:line-through; text-decoration-color:var(--warn)}
+.wd .a{color:var(--acc)}
+ol.steps{margin:0; padding-left:1.4em; display:flex; flex-direction:column; gap:8px}
+/* 下のバー */
+.bar{position:sticky; bottom:0; z-index:5; background:var(--card); border-top:1px solid var(--line);
+  margin-inline:calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  padding:6px max(16px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px))}
+.bar-in{max-width:40rem; margin:0 auto; display:flex; gap:10px; align-items:center; justify-content:space-between}
+.bar-in > div{min-width:0}
+.bar .cnt{font-weight:700; font-variant-numeric:tabular-nums; font-size:.92rem}
+.bar .st{font-size:.72rem; color:var(--mut); display:block; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+button.copy{flex:none; font:inherit; font-size:.9rem; font-weight:700; background:var(--acc); color:var(--on-acc); border:0; border-radius:10px; padding:8px 12px; min-height:44px; cursor:pointer}
+button.copy:focus-visible{outline:3px solid var(--fg); outline-offset:2px}
+#copybox{display:none}
+#copybox.show{display:block; margin-top:8px; min-height:9rem}
+@media (max-width:380px){ body{font-size:16px} }
+@media (prefers-reduced-motion: reduce){ *{scroll-behavior:auto !important} }
+</style>
+
+<nav class="nav" aria-label="ページの中の場所">
+  <div class="nav-in"><a href="#s1">① 全体像</a><a href="#s2">② 直すところ</a><a href="#s3">③ 進め方</a></div>
+</nav>
+
+<div class="wrap">
+
+<header class="sec" id="s1">
+  <div class="eyebrow">これから直すところ ・ 11月23日の総点検から</div>
+  <h1>居酒屋ノブ これから直すところ</h1>
+  <p>係4人(お客さん目線・大将目線・さわって試す・作りを読む)の厳しい点検で出た指摘を、「どう直すか」と「どの順で進めるか」にまとめました。</p>
+  <p class="small">まだどれも作っていません。入れたいものに ○、いらないものに ×、迷うものは「あとで」を選んでください。答えは自動で保存されます。終わったら、チャットで「答えたよ」と言ってください。</p>
+</header>
+
+<section class="sec" aria-labelledby="h-score">
+  <h2 id="h-score">今の点数と目標</h2>
+  <div class="scores">
+    <div class="sc">
+      <span class="who">お客さん目線</span>
+      <span class="big">58<small> / 100</small></span>
+      <div class="row"><span class="lab">雰囲気</span><span class="trk"><i style="width:78%"></i><b></b></span><span class="v">78</span></div>
+      <div class="row"><span class="lab">使い方ページ</span><span class="trk"><i style="width:72%"></i><b></b></span><span class="v">72</span></div>
+      <div class="row"><span class="lab">こそっと話</span><span class="trk"><i style="width:70%"></i><b></b></span><span class="v">70</span></div>
+      <div class="row"><span class="lab">はじめての人</span><span class="trk"><i class="low" style="width:62%"></i><b></b></span><span class="v">62</span></div>
+      <div class="row"><span class="lab">話しやすさ</span><span class="trk"><i class="low" style="width:48%"></i><b></b></span><span class="v">48</span></div>
+      <div class="row"><span class="lab">字と押しやすさ</span><span class="trk"><i class="low" style="width:42%"></i><b></b></span><span class="v">42</span></div>
+    </div>
+    <div class="sc">
+      <span class="who">大将目線</span>
+      <span class="big">49<small> / 100</small></span>
+      <div class="row"><span class="lab">アイちゃん</span><span class="trk"><i class="low" style="width:65%"></i><b></b></span><span class="v">65</span></div>
+      <div class="row"><span class="lab">見た目</span><span class="trk"><i class="low" style="width:62%"></i><b></b></span><span class="v">62</span></div>
+      <div class="row"><span class="lab">接客</span><span class="trk"><i class="low" style="width:50%"></i><b></b></span><span class="v">50</span></div>
+      <div class="row"><span class="lab">まちがい防止</span><span class="trk"><i class="low" style="width:50%"></i><b></b></span><span class="v">50</span></div>
+      <div class="row"><span class="lab">操作の分かりやすさ</span><span class="trk"><i class="low" style="width:40%"></i><b></b></span><span class="v">40</span></div>
+      <div class="row"><span class="lab">はじめての大将</span><span class="trk"><i class="low" style="width:30%"></i><b></b></span><span class="v">30</span></div>
+    </div>
+  </div>
+  <p class="goal">線(70点)が次の目標です。赤い棒は、まだ届いていない所。その次の目標は、両方とも80点です。</p>
+</section>
+
+<section class="sec" aria-labelledby="h-rule">
+  <h2 id="h-rule">直すときの物差し</h2>
+  <div class="box rule">
+    <b>ノブさんの考え</b>
+    <ul class="dots">
+      <li>顔を見に来る店ではない。大将と話す・みんなでゲームや動画や曲を楽しむ・文字の会話、がメイン。</li>
+      <li>3Dは粗い形でいい。形・色・並び(デザインとバランス)で見せる。重さを測って、1つずつ良くする。</li>
+      <li>友だちと気軽に集まれる店。</li>
+    </ul>
+    <p class="small">なので、物差しは「大将が楽に回せるか」「会話が読みやすいか」「年配の人でも押せる・読めるか」の3つです。見た目を足すより、<b>整理する・大きくする・まちがえにくくする</b>を先にします。</p>
+  </div>
+  <div class="box good"><b>厳しく見た、良い所</b>
+    <ul class="dots">
+      <li>ちょうちん・明朝体の看板・お品書きのカードが温かくまとまっている(雰囲気 78点)。</li>
+      <li>「席が先 → 男女を選ぶ → 3まいの案内」の流れが短く、迷わない。</li>
+      <li>こそっと話の見せ方がとても良い。ほかのお客さんには何も出ない。</li>
+      <li>大将の注文票は「何番・だれ・何」と大きな「出す」が並び、続けて出せる。</li>
+    </ul>
+  </div>
+  <div class="box bad"><b>厳しく見た、悪い所</b>
+    <ul class="dots">
+      <li>字が小さい。名札は字 11px・高さ 21px。60〜70代の人がひとりで使うのは、いまは難しい。</li>
+      <li>大将の操作が縦に約3画面・ボタン40個。いちばん上が「閉店」で、危ない物が上にある。</li>
+      <li>交代したばかりの大将には、案内がまったく出ない。</li>
+      <li>アイちゃんのパネルはボタン153個。接客中に使うのは、ほんの一部。</li>
+      <li>右のボタンの並びが、画面の大きさで変わる。「帰る」が押しまちがえやすい場所に来る。</li>
+      <li>横向きにすると、会話がまったく見えない。</li>
+    </ul>
+  </div>
+  <div class="box"><b>もう直したもの(11月23日)</b>
+    <ul class="done">
+      <li>頼まれた品を、お客さんを押しても出せるようにした(📋 注文の印)。</li>
+      <li>小窓の中の選ぶボタンを、白地+ふちにした(ただの字に見えていた)。</li>
+      <li>席を選ぶときの案内を短くして、名札にかぶらないようにした。</li>
+      <li>こそっと中は、決まり文句のボタンを隠すようにした。</li>
+      <li>スマホの「戻る」で、すぐ外に出ないようにした(小窓を閉じる → 「お店を出ますか?」)。</li>
+      <li>ほかに不具合17件(交代のあとのページ・古いスマホで止まる・おばけの席 など)。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec" id="s2" aria-labelledby="h-props">
+  <h2 id="h-props">直すところ(<span id="nprop"></span>個)</h2>
+  <p class="small">「直す」「足す」は、入れるかどうかを選んでください。「ノブさんに」は、ノブさんにしか決められない所です。ひとこと欄には、思いつくままに話してください(まとまっていなくて大丈夫です。音声入力もできます)。</p>
+  <div id="props" class="grp"></div>
+</section>
+
+<section class="sec" id="s3" aria-labelledby="h-steps">
+  <h2 id="h-steps">進め方</h2>
+  <ol class="steps">
+    <li>○ がついたものから、<b>A(小さい直し)→ B(大将の画面)→ C(楽しさ)</b>の順に、1つずつ作ります。</li>
+    <li>本番のお店をこわさないように、長い直しは別の場所で作ってから本番に出します。</li>
+    <li>直すたびに、4つの大きさのスマホで撮って、お客さん係・大将係に採点してもらいます。点が下がった所は戻します。</li>
+    <li>古いスマホで止まらないように、毎回、重さを測ります。</li>
+    <li>両方70点を超えたら、<b>本物の友だちで試します</b>(そのための準備が要ります)。</li>
+    <li>本物の iPhone・Android と音は、ノブさんに確かめてもらいます。</li>
+  </ol>
+  <div class="box"><b>やらないこと(ノブさんの判断)</b>
+    <p class="small">座ったときに、ほかのお客さんの顔を大きく見せる作り。係の1人は「いちばんの悪い所」としましたが、ノブさんの「顔を見に来る店ではない」に合わせて、今のままにします。顔は「おしゃべり」の見え方で見られます。</p>
+  </div>
+</section>
+
+<section class="sec" aria-labelledby="h-all">
+  <h2 id="h-all">全体へのひとこと</h2>
+  <label class="note">ほかに直したい所・気になったこと・思いついたこと<textarea id="overall" rows="4"></textarea></label>
+</section>
+
+<div class="bar">
+  <div class="bar-in">
+    <div><span class="cnt" id="cnt"></span><span class="st" id="st" role="status" aria-live="polite"></span></div>
+    <button class="copy" id="copybtn" type="button">答えをコピー</button>
+  </div>
+  <textarea id="copybox" aria-label="答えの文"></textarea>
+</div>
+
+</div>
+
+<script type="application/json" id="data">
+{"title":"居酒屋ノブ これから直すところ","docid":"izakaya-1123",
+"groups":[
+ {"key":"A","title":"A. 小さく直せるもの","note":"それぞれ数十分〜半日"},
+ {"key":"W","title":"言葉の直し","note":"前 → 後"},
+ {"key":"B","title":"B. 大将の画面を整理する","note":"いちばん点が上がる所・全部で1〜2日"},
+ {"key":"C","title":"C. 楽しさを足す","note":"A・B のあと"},
+ {"key":"N","title":"ノブさんに決めてほしいこと","note":"ノブさんにしか決められない所"}
+],
+"props":[
+ {"id":"a1","g":"A","type":"直す","rec":1,"time":"半日","title":"字と押す所を大きくする","where":"お店の中(名札・右のボタン・会話・？)","now":"名札は字11px・高さ21px。右のボタンの字10.5px、会話13.5px、「？」は28px角。","idea":"名札は14px以上にして、押せる範囲を44px角に(見えない余白を足す)。ボタンの字13px、会話15px、「？」40px角。","why":"名札は、話しかける・こそっと話すの入口で、いちばん大事。年配の人が押せない・読めない。","by":"お客さん係(字と押しやすさ 42点)"},
+ {"id":"a2","g":"A","type":"足す","time":"1〜2時間","title":"「字を大きく」の切りかえ","where":"お店の設定","now":"字の大きさは、みんな同じ。","idea":"「字を大きく」ボタンを1つ置く。押すと、名札・会話・ボタンが一回り大きくなる。","why":"目が疲れやすい人も、ひとりで使えるように。","by":"お客さん係"},
+ {"id":"a3","g":"A","type":"直す","rec":1,"time":"1〜2時間","title":"横向きでも、新しい会話を2〜3行出す","where":"横向きのお店の画面","now":"横向きにすると、会話もこそっとの返事も「全部見る」を押さないと読めない。","idea":"左下に、新しい会話を2〜3行いつも出す。","why":"文字の会話がメインなのに、横向きで会話が消えるのは困る。","by":"お客さん係"},
+ {"id":"a4","g":"A","type":"直す","rec":1,"time":"1〜2時間","title":"注文した人の名札に 📋 を付ける","where":"大将の画面(縦の「接客」・横の小さいカード)","now":"縦の「接客」では、だれが注文したか分からない。横の小さいカードでは、注文の印がはみ出して見えない。","idea":"注文した人の名札に 📋 を付ける。どの見え方でも、すぐ分かるように。","why":"大将が、注文を見落とさないように。","by":"大将係"},
+ {"id":"a5","g":"A","type":"足す","time":"1〜2時間","title":"こそっと話の入口「🤫」ボタン","where":"会話の入力欄の横","now":"こそっと話は、小さい名札(か大将の体)を押さないと始められない。3まいの案内にも出てこない。","idea":"入力欄の横に「🤫」ボタンを置く。札は「🤫 こそっと中」と短くする(小さい画面で切れていた)。案内にも入れる。","why":"いい機能なのに、見つけにくい。","by":"お客さん係"},
+ {"id":"a6","g":"A","type":"直す","time":"30分","title":"乾杯の輪の札を分かりやすく","where":"乾杯のとき","now":"「🍻 1人」の丸い札が、説明なしで浮かぶ。決まり文句のボタンや、お品書きの上にも出る。","idea":"「乾杯の輪 1人(みんなを待っています)」と書く。お品書きの板より下に出す。","why":"何の札か分からない。","by":"お客さん係"},
+ {"id":"w1","g":"W","type":"直す","before":"☰ メニュー","after":"☰ ほか","title":"「☰ メニュー」→「☰ ほか」","why":"居酒屋で「メニュー」は品書きの意味になるため。","by":"大将係"},
+ {"id":"w2","g":"W","type":"直す","before":"店主","after":"大将の操作","title":"「店主」→「大将の操作」","why":"ほかの所は、すべて「大将」と呼んでいるため。","by":"大将係"},
+ {"id":"w3","g":"W","type":"直す","before":"大将あり","after":"大将がいます","title":"「大将あり」→「大将がいます」","why":"「あり」だと、何があるのか分かりにくいため。","by":"お客さん係"},
+ {"id":"w4","g":"W","type":"直す","before":"👁(いまの見え方の名前)","after":"👁 見え方","title":"👁 のボタン →「見え方」","why":"今は、今の見え方の名前が出ていて、押すと何になるのか分からないため。","by":"お客さん係"},
+ {"id":"w5","g":"W","type":"直す","before":"「食べる」「飲む」を2回押すと空になり…","after":"食べ終わると大将が下げます","title":"お品書きの説明を短く","why":"ややこしくて、字も小さいため。","by":"お客さん係"},
+ {"id":"b1","g":"B","type":"直す","rec":1,"time":"半日","title":"大将の操作を3つの見出しに分ける","where":"大将の操作(🏮)","now":"縦に約3画面・項目11・ボタン40。いちばん上が「閉店」、次が「会話を全部消す」。","idea":"「いまの営業」(延長・料理の出し方・お祝い)/「お店づくり」(雰囲気・看板・席の数・曲)/「おしまい」(閉店・全部消す)に分ける。危ない物はいちばん下。","why":"よく使う物が下にあり、危ない物が上にある。","by":"大将係(操作の分かりやすさ 40点)"},
+ {"id":"b2","g":"B","type":"直す","rec":1,"time":"2〜3時間","title":"押したら5秒だけ「元に戻す」","where":"席の数・料理を下げる・お祝い・アイちゃんの設定を戻す","now":"確認なしで、1回押すとすぐ変わる。席の数を変えると、みんなの画面のカウンターが作り直される。","idea":"押したら、5秒だけ「元に戻す」が出る知らせを出す(確認の小窓より手早い)。","why":"まちがえて押しても、すぐ戻せるように。","by":"大将係(まちがい防止 50点)"},
+ {"id":"b3","g":"B","type":"直す","rec":1,"time":"1時間","title":"交代した大将には、危ないボタンを出さない","where":"大将を交代したとき","now":"交代した大将(お客さん)も、閉店・会話を全部消す・帰ってもらう・席の数を、全部できる。","idea":"交代した大将には、この4つを出さない。","why":"慣れていない人の押しまちがいで、お店が閉まらないように。","by":"大将係"},
+ {"id":"b4","g":"B","type":"足す","time":"2〜3時間","title":"交代した大将への案内(見習いモード)","where":"大将を交代したとき","now":"お客さんには3まいの案内があるが、大将には何も出ない。注文がどこに来るのかも分からない。","idea":"交代して最初の1回だけ、3まいの案内(「📋注文票 → 出す」「お客さんを押す」「🏮でお店の設定」)。注文票ボタンを光らせる。終わったら「今日の大将」の記念カード。","why":"はじめての大将でも使えるか、が30点。","by":"大将係"},
+ {"id":"b5","g":"B","type":"直す","time":"半日","title":"アイちゃんのパネルを分ける","where":"アイちゃんのパネル(👧)","now":"ボタン153個・全部開くと縦に約5画面。接客中に使う「ひとこと」は横にずらす作りで、隠れている言葉が多い。","idea":"パネルは「来る・帰る」と「ひとこと」だけにする。服とくわしい設定は、別の見出しに。","why":"接客中に、さっと使えるように。","by":"大将係"},
+ {"id":"b6","g":"B","type":"直す","rec":1,"time":"半日〜1日","title":"右のボタンを、いつも同じ場所に","where":"お客さん・大将の両方","now":"画面の大きさや ☰ を開くかどうかで、並びが変わる。「帰る」が押しまちがえやすい所に来る。小さい画面では大将の顔がかくれる。","idea":"下に4〜5個の固定の列を置く。お客さん: 話す・注文・見え方・ほか。大将: 注文票・大将の操作・アイちゃん・見え方。「帰る」は「ほか」の中へ。","why":"いつも同じ場所にあると、迷わない。","by":"お客さん係・大将係"},
+ {"id":"b7","g":"B","type":"直す","time":"1〜2時間","title":"縦の「接客」のカメラ","where":"大将の縦の画面","now":"いちばん手前の人が半分切れている。こそっとの吹き出しが、別の人の頭の上に出る。","idea":"少し引いて、中心をずらす。吹き出しの場所を直す。","why":"お客さんみんなが見えるように。","by":"大将係"},
+ {"id":"c1","g":"C","type":"足す","time":"半日","title":"「わたしの店」を1回で呼び出す","where":"大将の操作","idea":"雰囲気・看板・曲・アイちゃんの服をまとめて保存して、1回押すだけで呼び出す。交代した人も、自分の店にできる。","why":"大将ごとの個性が、すぐ出せる。","by":"大将係"},
+ {"id":"c2","g":"C","type":"足す","time":"2〜3時間","title":"大将の「今日のおすすめ」黒板","where":"お品書き","idea":"大将が3品選ぶと、お客さんの注文画面のいちばん上に出る。","why":"大将ごとの個性・話のきっかけになる。","by":"大将係"},
+ {"id":"c3","g":"C","type":"足す","time":"1〜2時間","title":"帰るときの「またおいで!」","where":"お店を出るとき","now":"確認のあと、すぐ入口に戻るだけで味気ない。","idea":"大将の「またおいで!」・自動の「ごちそうさま」・次に開く日の表示。","why":"また来たくなるように。","by":"お客さん係"},
+ {"id":"c4","g":"C","type":"足す","time":"2〜3時間","title":"会話が止まったときの「今日のお題」","where":"お店の中","idea":"大将から「今日のお題」を出せる。会話に一言の反応(LINE のように)も付けられる。","why":"沈黙をふせぐ。乾杯で振り向くのは、もう入れた。","by":"お客さん係"},
+ {"id":"c5","g":"C","type":"足す","time":"半日","title":"常連のうれしさ","where":"入口・お店の中","idea":"名前で迎える・常連の札が壁に増える・「いつもの」で前回の飲み物を頼める。","why":"来るたびに、少しうれしいことがあるように。","by":"お客さん係"},
+ {"id":"c6","g":"C","type":"足す","time":"2〜3時間","title":"使い方ページに画面の写真","where":"使い方ページ","now":"字だけで、写真が1枚もない。","idea":"「このボタン」と写真で見せる。","why":"年配の人には、写真のほうが伝わる。","by":"お客さん係(使い方ページ 72点)"},
+ {"id":"c7","g":"C","type":"足す","time":"半日〜1日","title":"「かんたんモード」","where":"入口で選ぶ","idea":"ボタンを「話す・注文・帰る」の3つだけにして、字を大きく。","why":"60〜70代の人が、ひとりで使えるように。","by":"お客さん係"},
+ {"id":"n1","g":"N","type":"ノブさん","title":"本物の友だちで試すのは、いつごろ・だれと?","now":"今は「おためしモード」で、1台の中でしか動かない。こそっと話も、本物では試せていない。","idea":"試す日が決まれば、そこから逆算して、みんながつながる準備(無料の保存場所)を先にします。","why":"本物の人で試すと、点検では見つからないことが分かる。"},
+ {"id":"n2","g":"N","type":"ノブさん","title":"交代した大将に、どこまで任せる?","now":"今は、交代した人も大将と同じことが全部できる。","idea":"例: 料理を出す・曲・アイちゃんはOK、閉店・席の数・全部消すはノブさんだけ、など。","why":"B-3 と B-4 の作り方が、これで決まる。"}
+]}
+</script>
+<script>
+(function(){
+  var D = JSON.parse(document.getElementById("data").textContent);
+  function el(id){ return document.getElementById(id); }
+  function esc(s){ var d=document.createElement("div"); d.textContent = s==null ? "" : String(s); return d.innerHTML; }
+  var KIND = {"直す":["直す",""], "足す":["足す","add"], "ノブさん":["ノブさんに","nobu"]};
+  el("nprop").textContent = D.props.length;
+
+  /* 提案を並べる(まとまりごと) */
+  var h = "", n = 0;
+  D.groups.forEach(function(g){
+    var list = D.props.filter(function(p){ return p.g === g.key; });
+    if(!list.length) return;
+    h += '<div class="grp"><h3>'+esc(g.title)+'<span class="gt">'+esc(g.note)+'</span></h3>';
+    list.forEach(function(p){
+      n++;
+      var k = KIND[p.type] || [p.type, ""];
+      h += '<section class="q" aria-labelledby="'+p.id+'-h"><div class="top"><span class="kind '+k[1]+'">'+esc(k[0])+'</span>'
+        + (p.rec ? '<span class="rec">おすすめ</span>' : '') + (p.time ? '<span class="time">目安 '+esc(p.time)+'</span>' : '') + '</div>'
+        + '<h4 id="'+p.id+'-h">'+n+'. '+esc(p.title)+'</h4>'
+        + (p.where ? '<div class="where">場所:'+esc(p.where)+'</div>' : '');
+      if(p.before) h += '<div class="wd"><span class="b">'+esc(p.before)+'</span><span aria-hidden="true">→</span><span class="a">'+esc(p.after)+'</span></div>';
+      if(p.now) h += '<div class="now"><span class="lbl">いま</span>'+esc(p.now)+'</div>';
+      if(p.idea) h += '<div class="idea"><span class="lbl">こう直す</span>'+esc(p.idea)+'</div>';
+      if(p.why) h += '<div class="why">'+esc(p.why)+'</div>';
+      if(p.by) h += '<div class="by">言った係:'+esc(p.by)+'</div>';
+      if(p.type !== "ノブさん"){
+        h += '<fieldset class="pick"><legend class="sr">'+esc(p.title)+'</legend>'
+          + '<label><input type="radio" name="'+p.id+'" value="yes"><span>○ 入れる</span></label>'
+          + '<label><input type="radio" name="'+p.id+'" value="no"><span>× いらない</span></label>'
+          + '<label><input type="radio" name="'+p.id+'" value="later"><span>あとで</span></label></fieldset>';
+      }
+      h += '<label class="note">'+(p.type === "ノブさん" ? "ここに話してください(音声入力できます)" : "ひとこと(音声入力できます)")
+        + '<textarea id="'+p.id+'-n" rows="'+(p.type === "ノブさん" ? 4 : 2)+'"></textarea></label></section>';
+    });
+    h += '</div>';
+  });
+  el("props").innerHTML = h;
+
+  /* 答えの状態 */
+  var state = {pr:{}, all:""};
+  D.props.forEach(function(p){ state.pr[p.id] = {c:"", n:""}; });
+  function paint(){
+    D.props.forEach(function(p){
+      var s = state.pr[p.id];
+      document.querySelectorAll('input[name="'+p.id+'"]').forEach(function(r){ r.checked = (r.value === s.c); });
+      var t = el(p.id+"-n"); if(t && t !== document.activeElement) t.value = s.n;
+    });
+    if(el("overall") !== document.activeElement) el("overall").value = state.all;
+    count();
+  }
+  function count(){
+    var a = 0, y = 0;
+    D.props.forEach(function(p){ var s = state.pr[p.id]; if(s.c || s.n.trim()) a++; if(s.c === "yes") y++; });
+    el("cnt").textContent = "答えた " + a + " / " + D.props.length + " ・ ○ " + y;
+  }
+  function setStatus(t){ el("st").textContent = t; }
+
+  /* 保存(db)。つながらなくても、コピーで送れる */
+  var ref = null, timer = null, pending = false, saving = false, again = false;
+  function schedule(){ pending = true; if(!ref){ setStatus("保存先がありません。「答えをコピー」で送ってください"); return; } clearTimeout(timer); timer = setTimeout(flush, 700); setStatus("保存しています…"); }
+  function flush(){
+    if(!ref) return;
+    if(saving){ again = true; return; }
+    saving = true;
+    ref.set({answers: state, updatedAt: new Date().toISOString()}).then(function(){
+      saving = false;
+      if(again){ again = false; flush(); } else { pending = false; setStatus("保存しました"); }
+    }, function(){ saving = false; pending = false; setStatus("保存できませんでした。「答えをコピー」で送ってください"); });
+  }
+  document.addEventListener("change", function(e){
+    var t = e.target; if(!t || t.type !== "radio") return;
+    if(state.pr[t.name]){ state.pr[t.name].c = t.value; count(); schedule(); }
+  });
+  document.addEventListener("input", function(e){
+    var t = e.target; if(!t || t.tagName !== "TEXTAREA" || t.id === "copybox") return;
+    if(t.id === "overall"){ state.all = t.value; schedule(); return; }
+    var id = t.id.replace(/-n$/, "");
+    if(state.pr[id]){ state.pr[id].n = t.value; count(); schedule(); }
+  });
+
+  /* コピー */
+  function buildText(){
+    var out = ["【" + D.title + " の答え】"], L = {yes:"○ 入れる", no:"× いらない", later:"あとで"}, i = 0;
+    D.groups.forEach(function(g){
+      var list = D.props.filter(function(p){ return p.g === g.key; }); if(!list.length) return;
+      out.push("", "■ " + g.title);
+      list.forEach(function(p){
+        i++; var s = state.pr[p.id];
+        out.push(i + ". " + p.title + ":" + (L[s.c] || (p.type === "ノブさん" ? "" : "(未回答)")) + (s.n ? "\n   " + s.n : ""));
+      });
+    });
+    if(state.all) out.push("", "■ 全体へ", state.all);
+    return out.join("\n");
+  }
+  el("copybtn").addEventListener("click", function(){
+    var text = buildText(), box = el("copybox");
+    function fallback(){ box.value = text; box.className = "show"; box.focus(); box.select(); setStatus("下の文を選んでコピーしてください"); }
+    try{
+      if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(function(){ setStatus("コピーしました"); }, fallback); }
+      else fallback();
+    }catch(e){ fallback(); }
+  });
+
+  /* 保存先につなぐ */
+  var loadTimer = setTimeout(function(){ if(!ref) setStatus("保存先につながりません。「答えをコピー」で送ってください"); }, 10000);
+  setStatus("準備中…"); count();
+  try{
+    if(window.claude && window.claude.use){
+      window.claude.use("db").then(function(db){
+        if(!db){ clearTimeout(loadTimer); setStatus("この画面では保存できません。「答えをコピー」で送ってください"); return; }
+        ref = db.doc("answers/" + D.docid);
+        setStatus("保存の準備ができました");
+        ref.onSnapshot(function(snap){
+          clearTimeout(loadTimer);
+          if((snap.metadata && snap.metadata.hasPendingWrites) || pending || saving) return;
+          if(!snap.exists) return;
+          var a = snap.data() && snap.data().answers; if(!a) return;
+          var ae = document.activeElement; if(ae && ae.tagName === "TEXTAREA") return;
+          if(a.pr) Object.keys(state.pr).forEach(function(k){
+            var v = a.pr[k]; if(v && typeof v === "object") state.pr[k] = {c: typeof v.c === "string" ? v.c : "", n: typeof v.n === "string" ? v.n : ""};
+          });
+          if(typeof a.all === "string") state.all = a.all;
+          paint(); setStatus("前の答えを読みこみました");
+        }, function(){ setStatus("保存先を読めませんでした。「答えをコピー」で送ってください"); });
+      }, function(){ clearTimeout(loadTimer); setStatus("この画面では保存できません。「答えをコピー」で送ってください"); });
+    } else { clearTimeout(loadTimer); setStatus("この画面では保存できません。「答えをコピー」で送ってください"); }
+  }catch(e){ setStatus("この画面では保存できません。「答えをコピー」で送ってください"); }
+})();
+</script>
