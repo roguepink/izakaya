@@ -2445,7 +2445,8 @@ function createShop(canvas, opts) {
     wantFov = portrait ? 70 : 55;
     switch (view.mode) {
       case 'first': wantPos.set(x, 1.5, GUEST_Z + 0.22); wantLook.set(x, portrait ? 1.08 : 1.24, -0.95); break;   // 勝手に動かさない(大将がほかの席へ行っても まっすぐ前のまま)   // 横向きは少し上を見る(モニターが入るように)   // 向きすぎると となりの頭でふさがる
-      case 'back': wantPos.set(x * 0.85, 2.3, GUEST_Z + 1.35); wantLook.set(x * 0.75, 1.0, -0.45); break;   // 頭ごしに 自分の料理が見える高さ
+      case 'back': { const sd = x > 0.05 ? -1 : 1;   // 肩ごし(お店の真ん中の側)に少しずらす。真後ろだと 自分の頭で料理がかくれていた(ノブさん 11-23)
+        wantPos.set(x + sd * (portrait ? 0.42 : 0.5), portrait ? 2.45 : 2.3, GUEST_Z + (portrait ? 1.2 : 1.3)); wantLook.set(x - sd * 0.08, 0.98, -0.5); break; }
       case 'owner': ownerFrame(portrait); break;
       case 'ownerAll': viewShift = portrait ? 0 : 0.69;   // 大将の「全体」: お客さんの全体と同じ映し方。横向きは左の会話の欄の分 右へずらす
       // fall through
