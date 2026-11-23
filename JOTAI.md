@@ -378,3 +378,14 @@
 - 11-23 夜おそく: C を本番へ(sw v111)。今日のおすすめ(state.osusume・お品書きの上の木札 osuBoardHTML・頼まれると REG.TALK.osusume)/ 大将→アイちゃんの返し(REG.TALK.orq/orp/orf/org/oro)/ いつもの(iz-itsumo・iz-itsumo-now)/ わたしの店(iz-myshop)/ 料理の出し方は 何も選んでいなければ「自動 おすすめ」(curAuto・手で出すは 'hand')。
 - 帰るときの形(byeShow・3D の bow)は作ったが SHOP.BYE_V2=false。ノブさんが お辞儀の絵を見て OK したら true(深さは BYE_BOW)。#byetest で ためせる。大将の声「また来てくださいね」(o_matakite)は ノブさんが録る。
 - 使い方ページの写真(c6)は、右のボタン(その2 の D-1)が決まってから撮る。
+
+## 11-24 夜中: その2 の答え → 本番へ(sw v112)
+- 答え(answers/izakaya-1123b、https://claude.ai/artifact/2grrxGb31hQAoksoUApTGy): d1 A案 / d2 ○(説明がほしい) / d3 ○ / d4 ×(「🍻 1人」のままで分かる) / d5 テーマ曲は賛成だが保留(1人ずつ作りたい・選び方の仕組みが難しい) / e1〜e4 ○ / e5・e6 あとで(説明がほしい) / e7 × / e8 あとで(早すぎず遅すぎず・ずっと残すのはいや) / f1 ○。お辞儀は「深め」。アイちゃんの新しい言葉に Gemini の声。
+- 本番に出した:
+  - 画面を消した・戻るで閉じた → 曲・動画・声を止める(hushAll / wakeAll。もどると curKey='' で流しなおす)
+  - 右のボタン A案: SIDE_MAIN(お客さん=見え方・曲・注文・撮影、大将=見え方・注文票・アイちゃん・大将の操作)+ ☰ほか(moreMenu の小窓・MORE_LIST)。⚙️ 設定のシート(sheetKind 'settings')
+  - おしゃべり: 言葉は顔の上に大きく(talkSay.big 4〜9秒)→ 顔の下に小さく残す(.tk-bub.keep・TALK_KEEP 2分・次に話すまで)。この残し方は 11-24 のノブさんの直接の頼み(e8 の答えとあわせた)/ → 相手の名前(talkToName)・話しかけられた人のカードが青く光る(.called)/ ✍️ 書いています(members/<uid>/typing・4秒に1回まで・こそっと中は送らない)/ 長押しで大きく(talkFocus)/ 横向きは顔を左6割・会話を右の列(talkLand・placeTalkLog)
+  - 帰るとき: SHOP.BYE_V2 = true、BYE_BOW 0.62(深め)。大将がいない時は アイちゃん(BYE_AI)、だれもいない時は 🏮 と「ありがとうございました」
+  - 提灯は縦書きで何文字でも(4文字まで1列・5〜8文字は2列・右の列から)。のれんは長いと2行、モニターは字を小さく。店の名前は8文字まで(「居酒屋」は数えない。NAME_MAX・nameOk)
+  - 声: voice/ai/osu*・or*(25こ)・voice/o_*/o_matakite.m4a(6声)。make-voices.py は「大将」を「たいしょう」で渡す(4こ「たいちょう」と読んだ)・聞き起こしで切るときも いちばん長い無音で切る(「えへへ」が前にくっついた)
+- 次: c6 使い方ページの写真(右のボタンが決まったので撮れる)/ e5・e6・e8・d2 の説明への返事待ち / テーマ曲は保留 / a1 は慎重に。
