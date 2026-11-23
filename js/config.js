@@ -77,7 +77,7 @@ var SHOP = {
     { id: 'orange',   cat: 'drink', kind: 'drink', name: 'オレンジジュース', emoji: '🍊', model: 'glass', color: '#f39a1c', desc: '' },
     /* 名物(ダジャレ。中身はふつうの料理) */
     { id: 'mansion',  cat: 'meibutsu', kind: 'food', name: 'マンション系ラーメン', emoji: '🍜', model: 'ramen',    pun: true, real: '家系ラーメン', desc: '家系より、ちょっと上の階' },
-    { id: 'indozou',  cat: 'meibutsu', kind: 'food', name: 'インド像カレー',       emoji: '🍛', model: 'curry',    pun: true, real: 'カレーライス', desc: 'ゾウさんも びっくり' },
+    { id: 'indozou',  cat: 'meibutsu', kind: 'food', name: 'インド象カレー',       emoji: '🍛', model: 'curry',    pun: true, real: 'カレーライス', desc: 'ゾウさんも びっくり' },
     { id: 'nobuya',   cat: 'meibutsu', kind: 'food', name: 'のぶ屋の牛丼',         emoji: '🍚', model: 'gyudon',   pun: true, real: '牛丼', desc: 'はやい・うまい・ノブ' },
     { id: 'shinseki', cat: 'meibutsu', kind: 'food', name: '親戚丼',               emoji: '🍳', model: 'oyakodon', pun: true, real: '親子丼', desc: '親子より ちょっと遠い' },
     { id: 'tororo',   cat: 'meibutsu', kind: 'food', name: 'とろ〜ろそば',         emoji: '🥢', model: 'tororosoba', pun: true, real: 'とろろそば', desc: 'のばすと おいしくなる' },

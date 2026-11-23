@@ -1949,7 +1949,7 @@
   function closeShop() {
     var st = tree.state || {};
     event({ type: 'phrase', id: 'oyasumi', seat: 'owner' });
-    net.update('state', { closedAt: TS, closedFor: st.openFor || 'manual', forceUntil: null, forceFrom: null, forceLen: null, ext: null, live: null, baton: null });
+    net.update('state', { closedAt: TS, closedFor: st.openFor || 'manual', forceUntil: null, forceFrom: null, forceLen: null, ext: null, live: null, seatN: null, baton: null });   // 看板の名前・延長・席の数は その回だけ(雰囲気は 次の回にも引き継ぐ。ノブさん 11-23)
     setTimeout(function () { ['chat', 'orders', 'tables', 'seats', 'queue', 'members'].forEach(function (p) { net.remove(p); }); }, 6000);
   }
   function showClosing() {
@@ -2322,6 +2322,8 @@
     $('kpJoin').classList.toggle('hidden', !canJoin);
     $('kpUi').classList.remove('hidden'); document.body.classList.add('kp-on'); kpCount();   // kp-on: 乾杯の間は「🍶 出す」を隠す(ボタンが重なる)
     clearTimeout(kpT); kpT = setTimeout(function () { kpEnd(false); }, rem);
+    // みんなが 乾杯した人のほうを 振り向く(ノブさん 11-23「乾杯をしたら、乾杯をした人に みんなが振り向く形に」)
+    withScene(function (s) { if (!s.lookAt) return; for (var li = 0; li < N; li++) if (li !== who && seatUid(li)) s.lookAt(li, who, 3.5); if (who !== 'owner') s.lookAt('owner', who, 3.5); });
     // おためし客は 少しずつ続く
     var rk = regSeat(); if (rk >= 0 && amLeader() && e.by !== REG_UID && +aic('kanpai')) setTimeout(function () { if (kp && kp.key === key && regSeat() === rk) { net.push('events', { type: 'kanpaiJoin', ref: key, seat: rk, at: TS, by: REG_UID }); if (Math.random() < 0.5) setTimeout(function () { regLine('kanpai'); }, 600); } }, 700 + Math.random() * 1800);   // 常連の子は ほかの人の乾杯に加わる(自分からはしない)
     if (LOCAL) Object.keys(bots).forEach(function (u) { var b = bots[u]; if (u === e.by || Math.random() < 0.15) return; setTimeout(function () { if (kp && kp.key === key) net.push('events', { type: 'kanpaiJoin', ref: key, seat: b.seat, at: TS, by: u }); }, 400 + Math.random() * 2000); });
