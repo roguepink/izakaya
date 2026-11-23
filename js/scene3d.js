@@ -2189,10 +2189,15 @@ function createShop(canvas, opts) {
   const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 40);
 
   // 明かり
-  scene.add(new THREE.HemisphereLight('#ffd9a8', '#3a2010', 0.9));
+  const hemi = new THREE.HemisphereLight('#ffd9a8', '#3a2010', 0.9); scene.add(hemi);
   const L = N * SEAT_GAP + 1.8;
-  [-L / 4, L / 4].forEach((x) => { const p = new THREE.PointLight('#ffb766', 6, 7, 1.6); p.position.set(x, 2.2, 0.1); scene.add(p); });
+  const pts = [-L / 4, L / 4].map((x) => { const p = new THREE.PointLight('#ffb766', 6, 7, 1.6); p.position.set(x, 2.2, 0.1); scene.add(p); return p; });
   const back = new THREE.PointLight('#ffcf8a', 3, 5, 1.8); back.position.set(0, 2.0, -1.6); scene.add(back);
+  /* お店の雰囲気(大将が選ぶ 11-23): 明るさ・ちょうちんの色・のれんの色。明かりは数を増やさず 強さと色だけ変える(重くしない) */
+  const MOOD_LIGHT = { bright: [1.25, 8, 4, '#ffc27a'], normal: [0.9, 6, 3, '#ffb766'], dim: [0.55, 4.2, 2.2, '#ff9a50'] };
+  const MOOD_LAN = { red: ['#c8261c', '#ff5a2a', '#1a0a06'], white: ['#f1e9da', '#ffe2a8', '#2a1a10'], yellow: ['#e5a91e', '#ffc040', '#2a1406'], pink: ['#ef7f9f', '#ff9ab8', '#3a0a16'] };
+  const MOOD_NOREN = { navy: ['#1f2a4a', '#f3efe6'], red: ['#9e1f18', '#f3efe6'], white: ['#ece5d6', '#2a1a10'], brown: ['#5a3a1e', '#f3efe6'], green: ['#2d5238', '#f3efe6'] };
+  let moodLan = MOOD_LAN.red, moodNoren = MOOD_NOREN.navy, moodKey = '';
 
   // 床・かべ・天井
   const floorT = canvasTex(256, 256, (g) => {
@@ -2327,10 +2332,10 @@ function createShop(canvas, opts) {
 
   // ちょうちん
   const drawLantern = (g) => {
-    g.fillStyle = '#c8261c'; g.fillRect(0, 0, 256, 256);
+    g.fillStyle = moodLan[0]; g.fillRect(0, 0, 256, 256);
     g.strokeStyle = 'rgba(0,0,0,0.25)'; g.lineWidth = 3;
     for (let y = 16; y < 256; y += 22) { g.beginPath(); g.moveTo(0, y); g.lineTo(256, y); g.stroke(); }
-    g.fillStyle = '#1a0a06'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = moodLan[2]; g.textAlign = 'center'; g.textBaseline = 'middle';
     const chars = Array.from(SHOPNAME.replace(/^居酒屋\s*/, '') || '酒').slice(0, 3);
     const sz = chars.length === 1 ? 120 : chars.length === 2 ? 78 : 58;
     g.font = 'bold ' + sz + 'px ' + FONT_JP;
@@ -2353,8 +2358,8 @@ function createShop(canvas, opts) {
   }
   // 入口ののれん(お客さんの後ろ)
   const drawNoren = (g) => {
-    g.fillStyle = '#1f2a4a'; g.fillRect(0, 0, 512, 256);
-    g.fillStyle = '#f3efe6'; g.font = 'bold 120px ' + FONT_JP; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillStyle = moodNoren[0]; g.fillRect(0, 0, 512, 256);
+    g.fillStyle = moodNoren[1]; g.font = 'bold 120px ' + FONT_JP; g.textAlign = 'center'; g.textBaseline = 'middle';
     const nm = SHOPNAME.replace(/^居酒屋\s*/, '') || SHOPNAME;
     g.fillText(nm.slice(0, 4), 256, 140);
   };
@@ -2789,6 +2794,14 @@ function createShop(canvas, opts) {
       if (key === celebKey) return; celebKey = key;
       if (celeb) { celeb.dispose(); celeb = null; }
       if (kind) celeb = makeCeleb(kind, opts);
+    },
+    setMood(m) {
+      m = m || {}; const key = [m.light, m.lan, m.noren].join('|'); if (key === moodKey) return; moodKey = key;
+      const li = MOOD_LIGHT[m.light] || MOOD_LIGHT.normal; hemi.intensity = li[0]; pts.forEach((p) => { p.intensity = li[1]; p.color.set(li[3]); }); back.intensity = li[2];
+      moodLan = MOOD_LAN[m.lan] || MOOD_LAN.red; moodNoren = MOOD_NOREN[m.noren] || MOOD_NOREN.navy;
+      lanterns.forEach((lg) => { const b = lg.children[0]; if (b && b.material && b.material.emissive) b.material.emissive.set(moodLan[1]); });
+      const lc = lanternTex.image, lgc = lc.getContext('2d'); lgc.clearRect(0, 0, lc.width, lc.height); drawLantern(lgc); lanternTex.needsUpdate = true;
+      const nc = norenT.image, ngc = nc.getContext('2d'); ngc.clearRect(0, 0, nc.width, nc.height); drawNoren(ngc); norenTexs.forEach((t) => { t.needsUpdate = true; });
     },
     setZoom(z) { view.zoom = z; },   // 見本: 全体を少し遠めに(1より小さいと広く見える)
     confetti(kind) { confettiBurst(kind === 'xmas' ? ['#ff3b3b', '#3bff6a', '#ffffff', '#ffd23b'] : kind === 'newyear' ? ['#ffd23b', '#d01e28', '#ffffff', '#f2c14a'] : ['#ff4a6a', '#ffd23b', '#4ac8ff', '#8ae04a', '#c87aff', '#ff9a3a']); },

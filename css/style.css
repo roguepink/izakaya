@@ -655,3 +655,9 @@ body.owner-view .log .ln.wh.me { background: rgba(74,53,102,.88); color: #fff; }
 .fg-btns button { flex: 1; border-radius: 999px; padding: 12px; font-weight: 800; font-size: 16px; }
 #fgSkip { background: #efe2cb; color: #6b4a2a; }
 #fgNext { background: #d12a1e; color: #fff; }
+
+/* お店の雰囲気: 看板の名前の欄 */
+.mood-name { display: flex; gap: 6px; margin: 4px 0 6px; }
+.mood-name input { flex: 1; min-width: 0; font-size: 16px; padding: 8px 10px; border-radius: 10px; border: 1.5px solid #c9a46a; background: #fff8ec; color: #2a1a10; }
+.mood-name button { flex: none; border-radius: 10px; padding: 8px 12px; font-weight: 800; background: #8c1d16; color: #fff; }
+.mood-name button#moodNameBack { background: #efe2cb; color: #6b4a2a; }
