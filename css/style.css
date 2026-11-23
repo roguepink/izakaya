@@ -722,3 +722,18 @@ body.demo .chat .wh-btn { display: none; }
   body.talk-on .log-wrap:not(.big) .log { max-height: none; height: 100%; padding-top: 22px; }
   body.talk-on .log-wrap:not(.big) .log > :first-child { margin-top: auto; }
 }
+
+/* ===== B: 大将の操作を3つの見出しに(11-23 夜) ===== */
+.osec { margin: 10px 0; border-radius: 14px; background: rgba(255,255,255,.55); border: 1.5px solid #d8c19a; }
+.osec > summary { list-style: none; cursor: pointer; padding: 12px 40px 12px 14px; position: relative; display: flex; flex-direction: column; gap: 2px; }
+.osec > summary::-webkit-details-marker { display: none; }
+.osec > summary b { font-size: 17px; }
+.osec > summary small { font-size: 12px; color: #8a6a3a; font-weight: 600; }
+.osec > summary::after { content: '▼'; position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 12px; color: #8a6a3a; transition: transform .2s; }
+.osec[open] > summary::after { transform: translateY(-50%) rotate(180deg); }
+.osec-in { padding: 0 12px 12px; }
+.osec-in > .sh-sec:first-child, .osec-in > .small-note:first-child { margin-top: 0; }
+.osec-end { border-color: #e2a99e; background: rgba(255,236,230,.6); }
+.osec-end > summary b { color: #a0281c; }
+.bt-how button small { white-space: normal; }
+.ai-fuku > summary { font-weight: 800; }
