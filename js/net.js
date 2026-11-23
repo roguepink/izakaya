@@ -106,6 +106,11 @@ var Net = (function () {
     var k = this.newKey(); this.set(path + '/' + k, value); return Promise.resolve(k);
   };
   LocalNet.prototype.remove = function (path) { return this.set(path, null); };
+  LocalNet.prototype.claim = function (path, value, okFn) {   // 空いているときだけ書く(席の取りあい 11-24)
+    this._load(); var cur = getAt(this.tree, path);
+    if (cur != null && cur !== value && !(okFn && okFn(cur))) return Promise.resolve(false);
+    return this.set(path, value).then(function () { return true; });
+  };
   LocalNet.prototype.leaveBeacon = function (path) { this.set(path, null); };
   LocalNet.prototype.patchBeacon = function (path, obj) { this.update(path, obj); };
 
@@ -169,6 +174,25 @@ var Net = (function () {
     var k = this.newKey(); return this._req('PUT', path + '/' + k, value).then(function () { return k; });
   };
   FireNet.prototype.remove = function (path) { return this._req('DELETE', path); };
+  /* 空いているときだけ書く(席の取りあい。11-24 点検: 電波が遅いと あとから書いた人が勝ち、知らせが食いちがっていた)。
+     Firebase の「読んだときの印(ETag)と同じなら書く」を使う。印が読めないときは ふつうに書く */
+  FireNet.prototype.claim = function (path, value, okFn) {
+    var self = this, u = this._url(path);
+    var plain = function () { return self.set(path, value).then(function () { return true; }); };
+    return fetch(u, { headers: { 'X-Firebase-ETag': 'true' } }).then(function (r) {
+      if (!r.ok) throw new Error('net ' + r.status);
+      var tag = r.headers.get('ETag');
+      return r.json().then(function (cur) {
+        if (cur != null && cur !== value && !(okFn && okFn(cur))) return false;
+        if (!tag) return plain();
+        return fetch(u, { method: 'PUT', body: JSON.stringify(value), headers: { 'Content-Type': 'application/json', 'if-match': tag } }).then(function (r2) {
+          if (r2.status === 412) return false;
+          if (!r2.ok) throw new Error('net ' + r2.status);
+          return true;
+        });
+      });
+    }, plain);
+  };
   /* 画面を閉じるときの書きこみ。DELETE・PATCH の fetch は 送る前の確認(preflight)が要るので、閉じる途中だと 送られないことがあった(11-23)。
      sendBeacon(POST・text/plain = 確認がいらない)に Firebase の「x-http-method-override」を付けて送る。使えないときは 前の送り方 */
   FireNet.prototype._beacon = function (path, method, obj) {
@@ -189,7 +213,7 @@ var Net = (function () {
 
   function connect(room) {
     var url = (SHOP.FIREBASE && SHOP.FIREBASE.databaseURL) || '';
-    if (url && !/[#&]local\b/.test(location.hash)) return new FireNet(url, room);
+    if (url && !/[#&](local|demo)\b/.test(location.hash)) return new FireNet(url, room);   // 見本(#demo)は 本物に書かない(11-24 点検)
     return new LocalNet(room);
   }
 
