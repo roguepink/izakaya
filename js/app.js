@@ -16,7 +16,8 @@
   var SIT = !OWNER_MODE && !DEMO ? +((/[#&]sit=(\d+)/.exec(location.hash) || [])[1] || -1) : -1;
   var HASH_NM = (function () { try { return decodeURIComponent((/[#&]nm=([^&]*)/.exec(location.hash) || [])[1] || '').slice(0, 12); } catch (e) { return ''; } })();
   var MAXS = Math.max(1, Math.min(20, SHOP.MAX_SEATS || 12));
-  function clampSeats(v) { return Math.max(1, Math.min(MAXS, (v | 0) || (SHOP.SEATS | 0) || 7)); }
+  var MINS = Math.min(MAXS, SHOP.MIN_SEATS || 7);   // 席は 7〜12(ノブさん 11-23「最低7席で最大12席」)
+  function clampSeats(v) { return Math.max(MINS, Math.min(MAXS, (v | 0) || (SHOP.SEATS | 0) || 7)); }
   var N = clampSeats((function () { try { return +sessionStorage.getItem('iz-seats') || +localStorage.getItem('iz-seats') || SHOP.SEATS; } catch (e) { return SHOP.SEATS; } })());
   var JST = 9 * 3600e3, MIN = 60e3, DAY = 86400e3;
   var WEEK = ['日', '月', '火', '水', '木', '金', '土'];
@@ -125,6 +126,20 @@
   function liveKey() { return status(now()).key || ('d' + dayOf(now())); }   // 「その回」の目印(準備中・おためしのときは その日)
   function planName() { var c = curSession(); return (c && c.plan && c.plan.title) || SHOP.NAME; }   // 予定で決めた名前(バトンタッチの「もどす」先)
   function seatsFor(sess) { return clampSeats((sess && sess.plan && sess.plan.seats) || SHOP.SEATS); }
+  /* 大将が決めた席の数(店主の操作 → state.seatN)。決めていなければ 予定の席の数 */
+  function wantSeats() { var v = +(tree && tree.state || {}).seatN; return v >= MINS && v <= MAXS ? v : seatsFor(curSession()); }
+  /* 席の数を その場で変える: 3D のお店を 作りなおす(ページは読みなおさない。お店にいる人は そのまま) */
+  function rebuildSeats(n) {
+    n = clampSeats(n); if (n === N) return;
+    N = n; try { localStorage.setItem('iz-seats', n); sessionStorage.setItem('iz-seats', n); } catch (e) {}
+    if (!scene || !scene.anchors || typeof scene.setMood !== 'function') { if (scene && !inside) { try { scene.stop(); } catch (e) {} scene = null; start3D(); } return; }
+    var old = scene; scene = null; try { old.stop(); } catch (e) {}
+    var c = $('stage'), c2 = c.cloneNode(false); c.parentNode.replaceChild(c2, c);   // 新しい 絵の入れ物で 作りなおす
+    $('tags').innerHTML = ''; tagEls = {}; tagSize = {}; tagSizeN = 0;
+    start3D();
+    if (inside) setView(view);
+    $('schedule').innerHTML = scheduleText();
+  }
 
   function status(now) {
     var st = (tree && tree.state) || {};
@@ -625,6 +640,7 @@
       if (scene.setName) { scene.setName(shopName()); $('tbName').textContent = shopName(); document.title = shopName() + (OWNER_MODE ? ' 大将' : ''); }
       else if (!inside && window.IZ3D) { try { scene.stop(); } catch (e) {} scene = null; start3D(); return; }
     }
+    if (inside && wantSeats() !== N && scene && scene.anchors) { rebuildSeats(wantSeats()); return; }   // 大将が席の数を変えた(作りなおすと もう一度 ここへ来る)
     var ms = members();
     var seats = [];
     var st = tree.state || {};
@@ -707,9 +723,10 @@
   /* 次の回の席の数が いまの3Dとちがえば、店に入る前に読みなおす(何度もくり返さないように見張る) */
   function checkSeats() {
     if (inside || !NEWS && !(tree && tree.schedule)) return;
-    var want = seatsFor(curSession());
+    var want = wantSeats();
     try { localStorage.setItem('iz-seats', want); } catch (e) {}
     if (want === N) return;
+    if (scene && scene.anchors) { rebuildSeats(want); return; }
     var tries = 0; try { tries = +sessionStorage.getItem('iz-seats-reload') || 0; sessionStorage.setItem('iz-seats-reload', tries + 1); sessionStorage.setItem('iz-seats', want); } catch (e) {}
     if (tries < 3 && !document.querySelector('#maker:not(.hidden), #reserve:not(.hidden)')) location.reload();
   }
@@ -2043,7 +2060,7 @@
         '<div class="sh-sec">片づけ</div><div class="btn-row"><button id="clearChat">💬 会話を全部消す</button><button id="clearTables">🍽️ 料理を下げる</button></div>' +
         regSheetHTML() +
         gameSheetHTML() +
-        moodSheetHTML() + celebSheetHTML() +
+        seatSheetHTML() + moodSheetHTML() + celebSheetHTML() +
         '<div class="sh-sec">大将の見た目</div><div class="btn-row"><button id="ownerLook">👕 着がえる(アバターを変える)</button></div>' +
         '<div class="sh-sec">記念写真</div><div class="btn-row"><button id="phListBtn">📸 記念写真を見る</button></div>' +
         (ROLE === 'nobu' ? '<div class="sh-sec">大将の声</div><div class="btn-row"><button id="recBtn">🎙 ノブの声を録音する</button></div><p class="small-note">大将の決まり文句を、ノブさんの声で録れます。録った声は、このスマホではすぐ流れます(大将の声を「ノブの声(録音)」にしたとき)。みんなに聞こえるようにするには「まとめて送る」→ Google ドライブの「居酒屋ノブの声」フォルダに保存 → Claude に「声入れたよ」と伝えてください。</p>' : '') +   // 録音は ノブさんだけ(バトンタッチ・マスターの人には出さない)
@@ -2129,7 +2146,7 @@
         setTimeout(function () { refreshSheet(true); }, 150);
       }; });
     } else if (sheetKind === 'owner') {
-      wireMood(q); wireCeleb(q); wireReg(q); wireGamePick();
+      wireSeatN(q); wireMood(q); wireCeleb(q); wireReg(q); wireGamePick();
       q('#openBtn').onclick = function () { net.update('state', { forceFrom: now(), forceUntil: now() + 60 * MIN, closedAt: null, closedFor: null }); sys('🏮 臨時で開店しました(1時間)'); closeSheet(); };
       q('#closeBtn').onclick = function () { if (confirm('閉店しますか?(会話と料理は片づけられます)')) { closeSheet(); closeShop(); } };
       q('#clearChat').onclick = function () { if (confirm('会話を全部消しますか?')) { net.remove('chat'); closeSheet(); } };
@@ -2193,7 +2210,7 @@
   function planEditHTML(key) {
     var x = findSess(key); if (!x) return '<p>その回は見つかりませんでした</p>';
     var p = x.plan, other = !!p.master, opts = '';
-    for (var i = 1; i <= MAXS; i++) opts += '<option value="' + i + '"' + (i === seatsFor(x) ? ' selected' : '') + '>' + i + '席' + (i === SHOP.SEATS ? '(いつも)' : '') + (i > 10 ? '(スマホだと見にくい)' : '') + '</option>';
+    for (var i = MINS; i <= MAXS; i++) opts += '<option value="' + i + '"' + (i === seatsFor(x) ? ' selected' : '') + '>' + i + '席' + (i === SHOP.SEATS ? '(いつも)' : '') + (i > 10 ? '(スマホだと見にくい)' : '') + '</option>';
     return '<div class="pl-form"><div class="pl-when">' + fmtDay(x.start) + ' ' + fmtTime(x.start) + '〜' + fmtTime(x.end) + (p.extra ? ' ・ 臨時' : '') + '</div>' +
       '<label>店の名前<input id="peTitle" maxlength="16" value="' + esc(p.title || SHOP.NAME) + '"></label>' +
       '<div class="pl-lbl">マスター(カウンターの中に立つ人)</div><div class="opts pl-opts"><button data-master="me" class="' + (other ? '' : 'on') + '">ノブさん(自分)</button><button data-master="other" class="' + (other ? 'on' : '') + '">ほかの人</button></div>' +
@@ -2603,6 +2620,24 @@
     lan: ['🏮 ちょうちんの色', [['red', '赤'], ['white', '白'], ['yellow', '黄'], ['pink', '桜色']]],
     noren: ['🎌 のれんの色', [['navy', '紺'], ['red', '赤'], ['white', '白'], ['brown', '茶'], ['green', '緑']]]
   };
+  /* 席の数(ノブさん 11-23「大将の設定で席数を決める。最低7席・最大12席」)。state.seatN。みんなの画面の お店が その場で作りなおされる。
+     人が座っている席・予約の席より 少なくはできない */
+  function seatUsedMax() { var mx = -1, ms = members(), rs = reservationsNow(); for (var i = 0; i < MAXS; i++) { var u = seatUid(i); if ((u && ms[u] && (fresh(ms[u]) || away(ms[u]) || ms[u].bot)) || rs[i]) mx = i; } return mx; }
+  function seatSheetHTML() {
+    var cur = N, mx = seatUsedMax(), set = +(tree.state || {}).seatN, h = '<div class="sh-sec">🪑 席の数</div><div class="ph-chips cel-pick">';
+    for (var i = MINS; i <= MAXS; i++) h += '<button data-seatn="' + i + '"' + (i === cur ? ' class="on"' : '') + (i <= mx ? ' disabled' : '') + '>' + i + '席</button>';
+    h += '</div><p class="small-note">いま ' + cur + '席' + (set ? '(大将が決めました)' : '(いつもの数)') + '。押すと、みんなの画面のカウンターが すぐ変わります。' + (mx >= MINS ? (mx + 1) + '番の席に人(または予約)があるので、それより少なくはできません。' : '') + (MAXS > 10 ? '11席より多いと、スマホでは少し見にくくなります。' : '') + '</p>';
+    if (set) h += '<div class="btn-row"><button id="seatNBack">↩️ いつもの席の数(' + seatsFor(curSession()) + '席)に戻す</button></div>';
+    return h;
+  }
+  function wireSeatN(q) {
+    document.querySelectorAll('#shBody [data-seatn]').forEach(function (b) { b.onclick = function () {
+      var n = +b.getAttribute('data-seatn'); if (n === N) return;
+      if (n <= seatUsedMax()) { toast((seatUsedMax() + 1) + '番の席に人がいるので、' + n + '席にはできません', 2200); return; }
+      net.update('state', { seatN: n }); sys('🪑 カウンターを ' + n + '席にしました'); toast('🪑 ' + n + '席にしました', 1500); setTimeout(function () { refreshSheet(true); }, 600);
+    }; });
+    var bk = q('#seatNBack'); if (bk) bk.onclick = function () { var n = seatsFor(curSession()); if (n <= seatUsedMax()) { toast((seatUsedMax() + 1) + '番の席に人がいるので、戻せません', 2200); return; } net.update('state', { seatN: null }); setTimeout(function () { rebuildSeats(n); refreshSheet(true); }, 400); };
+  }
   function moodSheetHTML() {
     var md = (tree.state || {}).mood || {}, def = { light: 'normal', lan: 'red', noren: 'navy' };
     var h = '<div class="sh-sec">🏮 お店の雰囲気</div>';
