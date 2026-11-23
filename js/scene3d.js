@@ -2476,31 +2476,45 @@ function createShop(canvas, opts) {
   let viewShift = 0, baseAspect = 1, viewApplied = -1;   // 横向きの大将の画面: 左に会話の欄があるので、絵の中心を右へずらす(0 = ずらさない)
   function ownerFrame(portrait) {
     const xs = [], zs = []; seatAvatars.forEach((a, i) => { if (a) { const p = seatP(i); xs.push(p[0]); zs.push(p[1]); } });
+    const nSat = xs.length;
     if (!xs.length) { xs.push(seatP(0)[0], seatP(N - 1)[0]); zs.push(seatP(0)[1]); }
     const zn = Math.min(GUEST_Z, ...zs);   // 弓のはしの人は 手前(大将の側)に出ている。その人の所で 入りきるように測る   // だれも座っていないときは 空いている席を全部
     const x0 = xs.length ? Math.min(...xs) : -SEAT_GAP, x1 = xs.length ? Math.max(...xs) : SEAT_GAP;
     const span = x1 - x0, cx = (x0 + x1) / 2;
     viewShift = portrait ? 0 : 0.69;
-    const asp = baseAspect * (portrait ? 1 : 0.62);
+    const asp = baseAspect * (portrait ? 0.78 : 0.62);   // 縦向きは 右のボタン列に かからない 幅で測る(はしの人が ボタンの下に隠れていた 11-24)
     const p = portrait ? 0.38 : 0.52;          // 頭を画面の上から何割の高さに置くか(下は会話の欄、上は吹き出しの場所)
     const needW = span + (portrait ? Math.max(0.8, 1.25 - span * 0.15) : 1.5) + (span > 1.6 ? ARC_D * 0.6 : 0), needH = portrait ? 1.3 : 1.15;   // 弓のはしの人は カメラに近い(大きく見える)ので、その分 広く
-    const dMax = zn - (portrait ? -4.15 : -1.85);   // 縦向きは 奥の壁の向こうまで下がれる(壁ぎわの物は隠す)
+    const few = nSat > 0 && nSat <= 3;   // 1〜3人は いつも正面から(はなれて座っていても 斜めにしない 11-24 ノブさん)
+    const dMax = zn - (portrait ? -4.15 - (few ? 3 : 0) : -1.85);   // 縦向きは 奥の壁の向こうまで下がれる(壁ぎわの物は隠す)
     const fit = (fov) => { const t = Math.tan(THREE.MathUtils.degToRad(fov / 2)); return Math.max(needW / (2 * t * asp), needH / (2 * t)); };
     let fov = portrait ? 66 : 46, d = fit(fov);
-    while (d > dMax && fov < (portrait ? 88 : 92)) { fov += 2; d = fit(fov); }
-    if (d <= dMax || !portrait) {
+    while (d > dMax && fov < (portrait ? (few ? 92 : 88) : 92)) { fov += 2; d = fit(fov); }
+    if (d <= dMax || !portrait || few) {
       d = Math.min(Math.max(d, 1.7), dMax);
       const t = Math.tan(THREE.MathUtils.degToRad(fov / 2));
-      wantFov = fov; wantPos.set(cx, CAM_Y + Math.max(0, d - 2.6) * 0.12, zn - d);
-      wantLook.set(cx, HEAD_Y - (1 - 2 * p) * t * d, zn);   // 頭が上から p の高さに来るように、見る点を下げる
+      const sx = portrait ? cx + 0.17 * t * baseAspect * d : cx;   // 縦向きは 絵を少し左へ(右のボタン列の分)
+      wantFov = fov; wantPos.set(sx, CAM_Y + Math.max(0, d - 2.6) * 0.12, zn - d);
+      wantLook.set(sx, HEAD_Y - (1 - 2 * p) * t * d, zn);   // 頭が上から p の高さに来るように、見る点を下げる
       return;
     }
-    // 縦向きで人数が多い・はなれているとき: はしから斜めに見る(前からの形)
-    const ex = Math.max(0, N - 7) * 0.22;
-    wantPos.set(-L / 2 - 0.1 - ex * 0.5, 2.1 + ex * 0.4 + ARC_D * 0.6, -1.25 - ex * 0.3 - ARC_D * 1.3); wantLook.set(L * 0.12, 0.95, 1.45 - ARC_D * 0.5);   // 弓のはしは 大将の側へ回りこむので、その分 うしろ・上から
-    wantFov = 64 + Math.max(0, N - 7) * 1.5;
+    // 縦向きで 正面に入りきらないとき: 正面から はしの斜めへ、はみ出す量に合わせて 少しずつ回す
+    // (前は いきなり はしの斜めに飛んでいた。11-24 ノブさん「極端にではなく 少しずつ」)
+    const ex = Math.max(0, N - 7) * 0.22, KSLOPE = 0.65;
+    d = Math.min(Math.max(d, 1.7), dMax);
+    const t0 = Math.tan(THREE.MathUtils.degToRad(fov / 2));
+    const F = [new THREE.Vector3(cx, CAM_Y + Math.max(0, d - 2.6) * 0.12, zn - d), new THREE.Vector3(cx, HEAD_Y - (1 - 2 * p) * t0 * d, zn), fov];   // 正面(いちばん うしろ)
+    const G = [new THREE.Vector3(-L / 2 - 0.1 - ex * 0.5, 2.1 + ex * 0.4 + ARC_D * 0.6, -1.25 - ex * 0.3 - ARC_D * 1.3), new THREE.Vector3(L * 0.12, 0.95, 1.45 - ARC_D * 0.5), 64 + Math.max(0, N - 7) * 1.5];   // はしの斜め(弓のはしは 大将の側へ回りこむので、その分 うしろ・上から)
+    const over = fit(fov) / dMax;   // 正面だと どれだけ はみ出すか(1 = ちょうど)
+    const k = THREE.MathUtils.clamp((over - 1) * KSLOPE, 0.12, 1);   // はみ出すほど 斜めに(少しずつ)
+    setLerp(F, G, k);
     fitOwnerDiag();
   }
+  function setLerp(F, G, k) {
+    const e = k * k * (3 - 2 * k);   // なめらかに
+    wantPos.lerpVectors(F[0], G[0], e); wantLook.lerpVectors(F[1], G[1], e); wantFov = F[2] + (G[2] - F[2]) * e;
+  }
+
   /* 縦の接客(はしから斜め): 座っている人が みんな 画面の見える所(右のボタン列・下の会話の欄の外)に入るように、向きを合わせ、入らなければ 広く・うしろへ。
      手前の人が 右のはしで半分切れていた(11-23 総点検)。切れた人の吹き出しが となりの人の頭の上に よけていたのも これで直る */
   let fitCam = null;
