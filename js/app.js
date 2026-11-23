@@ -76,7 +76,8 @@
   }
   function upcoming(now, days, withCancelled) {
     var out = [], seen = {};
-    function add(x) { if (seen[x.key] || x.end <= now || x.start > now + (days + 1) * DAY) return; seen[x.key] = 1; out.push(x); }
+    function add(x) { var ex = tree && tree.state && tree.state.ext; if (ex && ex.for === x.key && ex.min > 0) x = { start: x.start, end: x.end + Math.min(ex.min, EXT_MAX) * MIN, key: x.key, ext: Math.min(ex.min, EXT_MAX) };   // 大将が延長した回(state.ext)
+      if (seen[x.key] || x.end <= now || x.start > now + (days + 1) * DAY) return; seen[x.key] = 1; out.push(x); }
     var evs = newsEvents(), evDays = {};
     evs.forEach(function (e) { evDays[dayOf(e.start)] = 1; });
     var sched = (tree && tree.schedule) || {};
@@ -141,6 +142,7 @@
     $('schedule').innerHTML = scheduleText();
   }
 
+  var EXT_MAX = 180;   // 延長は 合わせて3時間まで(ノブさん 11-23「営業時間を伸ばす場合がある」)
   function status(now) {
     var st = (tree && tree.state) || {};
     if (st.forceUntil && st.forceUntil > now && !(st.closedAt > st.forceFrom)) {
@@ -150,7 +152,7 @@
     var s = list[0];
     if (s && st.closedAt && st.closedAt >= s.start - SHOP.DOORS_OPEN_BEFORE * MIN && st.closedAt < s.end) { s = list[1]; }   // 早じまいした回
     if (s && now >= s.start - SHOP.DOORS_OPEN_BEFORE * MIN) {
-      return { phase: now >= s.start ? 'open' : 'doors', start: s.start, end: s.end, key: s.key, lastCall: now >= s.end - SHOP.LAST_CALL_BEFORE * MIN };
+      return { phase: now >= s.start ? 'open' : 'doors', start: s.start, end: s.end, key: s.key, ext: s.ext || 0, lastCall: now >= s.end - SHOP.LAST_CALL_BEFORE * MIN };
     }
     return { phase: 'closed', next: s || null };
   }
@@ -1931,7 +1933,7 @@
   function closeShop() {
     var st = tree.state || {};
     event({ type: 'phrase', id: 'oyasumi', seat: 'owner' });
-    net.update('state', { closedAt: TS, closedFor: st.openFor || 'manual', forceUntil: null, forceFrom: null, live: null, baton: null });
+    net.update('state', { closedAt: TS, closedFor: st.openFor || 'manual', forceUntil: null, forceFrom: null, forceLen: null, ext: null, live: null, baton: null });
     setTimeout(function () { ['chat', 'orders', 'tables', 'seats', 'queue', 'members'].forEach(function (p) { net.remove(p); }); }, 6000);
   }
   function showClosing() {
@@ -2054,9 +2056,7 @@
       if (!force) return;
       title = '店主の操作';
       var s = status(now());
-      html = '<div class="sh-sec">お店</div><div class="btn-row">' +
-        '<button id="openBtn">🏮 臨時で開ける(1時間)</button><button id="closeBtn" class="red">🌙 閉店する</button></div>' +
-        '<p class="small-note">いま: ' + (LOCAL ? 'おためしモード' : s.phase === 'open' ? '営業中(' + fmtTime(s.end) + 'まで)' : s.phase === 'doors' ? 'まもなく開店' : '準備中') + '</p>' +
+      html = '<div class="sh-sec">お店</div>' + hoursHTML(s) +
         '<div class="sh-sec">片づけ</div><div class="btn-row"><button id="clearChat">💬 会話を全部消す</button><button id="clearTables">🍽️ 料理を下げる</button></div>' +
         regSheetHTML() +
         gameSheetHTML() +
@@ -2146,8 +2146,7 @@
         setTimeout(function () { refreshSheet(true); }, 150);
       }; });
     } else if (sheetKind === 'owner') {
-      wireSeatN(q); wireMood(q); wireCeleb(q); wireReg(q); wireGamePick();
-      q('#openBtn').onclick = function () { net.update('state', { forceFrom: now(), forceUntil: now() + 60 * MIN, closedAt: null, closedFor: null }); sys('🏮 臨時で開店しました(1時間)'); closeSheet(); };
+      wireHours(q); wireSeatN(q); wireMood(q); wireCeleb(q); wireReg(q); wireGamePick();
       q('#closeBtn').onclick = function () { if (confirm('閉店しますか?(会話と料理は片づけられます)')) { closeSheet(); closeShop(); } };
       q('#clearChat').onclick = function () { if (confirm('会話を全部消しますか?')) { net.remove('chat'); closeSheet(); } };
       q('#clearTables').onclick = function () { net.remove('tables'); closeSheet(); };
@@ -2620,6 +2619,36 @@
     lan: ['🏮 ちょうちんの色', [['red', '赤'], ['white', '白'], ['yellow', '黄'], ['pink', '桜色']]],
     noren: ['🎌 のれんの色', [['navy', '紺'], ['red', '赤'], ['white', '白'], ['brown', '茶'], ['green', '緑']]]
   };
+  /* 営業時間(ノブさん 11-23「大将の設定で営業時間も決められるように。伸ばす場合がある」)
+     予定の回: state.ext = { for: 回の key, min: 延長した分 }(upcoming で終わりの時刻に足す)。臨時の回: forceUntil を のばす。合わせて3時間まで */
+  var openLen = 60;
+  function extNow(s) { s = s || status(now()); if (s.phase === 'closed') return 0; if (s.forced) { var st = tree.state || {}; return Math.max(0, Math.round(((st.forceUntil || 0) - (st.forceFrom || 0)) / MIN) - (st.forceLen || 60)); } return s.ext || 0; }
+  function hoursHTML(s) {
+    var on = s.phase !== 'closed', ex = extNow(s), h = '';
+    if (on) {
+      h += '<p class="small-note hours-now">⏰ いま: ' + (s.phase === 'open' ? '営業中' : 'まもなく開店') + ' ' + fmtTime(s.start) + '〜<b>' + fmtTime(s.end) + '</b>' + (ex ? '(' + ex + '分 延長中)' : '') + '</p>';
+      h += '<div class="ai-g">⏰ 営業時間を のばす</div><div class="ph-chips cel-pick">' + [15, 30, 60].map(function (m) { return '<button data-ext="' + m + '"' + (ex + m > EXT_MAX ? ' disabled' : '') + '>＋' + (m === 60 ? '1時間' : m + '分') + '</button>'; }).join('') + (ex ? '<button data-ext="0">↩️ 延長を取り消す</button>' : '') + '</div>' +
+        '<p class="small-note">お客さんの画面の「あと〇分」も すぐ変わります。延長は 合わせて3時間までです。</p>';
+      h += '<div class="btn-row"><button id="closeBtn" class="red">🌙 閉店する</button></div>';
+    } else {
+      h += '<p class="small-note">いま: ' + (LOCAL ? 'おためしモード' : '準備中') + '</p><div class="ai-g">🏮 臨時で開ける(何時間)</div><div class="ph-chips cel-pick">' + [30, 60, 120, 180].map(function (m) { return '<button data-openlen="' + m + '"' + (openLen === m ? ' class="on"' : '') + '>' + (m < 60 ? m + '分' : m / 60 + '時間') + '</button>'; }).join('') + '</div>' +
+        '<div class="btn-row"><button id="openBtn">🏮 臨時で開ける</button><button id="closeBtn" class="red">🌙 閉店する</button></div>';
+    }
+    return h;
+  }
+  function wireHours(q) {
+    document.querySelectorAll('#shBody [data-openlen]').forEach(function (b) { b.onclick = function () { openLen = +b.getAttribute('data-openlen'); b.parentNode.querySelectorAll('button').forEach(function (y) { y.classList.toggle('on', y === b); }); }; });
+    var ob = q('#openBtn'); if (ob) ob.onclick = function () { var t = now(); net.update('state', { forceFrom: t, forceUntil: t + openLen * MIN, forceLen: openLen, closedAt: null, closedFor: null, ext: null }); sys('🏮 臨時で開店しました(' + (openLen < 60 ? openLen + '分' : openLen / 60 + '時間') + ')'); closeSheet(); };
+    document.querySelectorAll('#shBody [data-ext]').forEach(function (b) { b.onclick = function () {
+      var m = +b.getAttribute('data-ext'), s = status(now()); if (s.phase === 'closed') return;
+      var ex = extNow(s), nx = m === 0 ? 0 : Math.min(EXT_MAX, ex + m), st = tree.state || {};
+      if (s.forced) net.update('state', { forceUntil: (st.forceFrom || now()) + ((st.forceLen || 60) + nx) * MIN });
+      else net.update('state', { ext: nx ? { for: s.key, min: nx } : null });
+      var endT = s.end + (nx - ex) * MIN;
+      sys(m === 0 ? '⏰ 延長を取り消しました(' + fmtTime(endT) + 'まで)' : '⏰ 営業時間を ' + (m === 60 ? '1時間' : m + '分') + ' のばしました(' + fmtTime(endT) + 'まで)');
+      toast(m === 0 ? '延長を取り消しました' : fmtTime(endT) + 'まで のばしました', 1800); setTimeout(function () { refreshSheet(true); }, 500);
+    }; });
+  }
   /* 席の数(ノブさん 11-23「大将の設定で席数を決める。最低7席・最大12席」)。state.seatN。みんなの画面の お店が その場で作りなおされる。
      人が座っている席・予約の席より 少なくはできない */
   function seatUsedMax() { var mx = -1, ms = members(), rs = reservationsNow(); for (var i = 0; i < MAXS; i++) { var u = seatUid(i); if ((u && ms[u] && (fresh(ms[u]) || away(ms[u]) || ms[u].bot)) || rs[i]) mx = i; } return mx; }
