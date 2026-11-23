@@ -1092,8 +1092,20 @@ function buildAvatar(raw, opt = {}) {
     if (!short) fore.add(tm(new THREE.CylinderGeometry(wide ? 0.052 : 0.04, wide ? 0.05 : 0.04, 0.018, 14), shade(cc, 0.86), 0, -0.11, 0, 0));
     // 手(ミトン形+親指)
     const hand = new THREE.Group(); hand.position.set(0, -0.135, 0.005); fore.add(hand);
-    const palm = tm(new THREE.SphereGeometry(0.032, 14, 10), skinC, 0, 0, 0, LN); palm.scale.set(0.95, 1.15, 0.7); hand.add(palm);
-    const thumb = tm(new THREE.CapsuleGeometry(0.011, 0.02, 4, 8), skinC, -s * 0.026, 0.008, 0.012, LN); thumb.rotation.z = s * 0.7; hand.add(thumb);
+    const paa = raw && raw._paa && raw._paa[s < 0 ? 0 : 1];   // パーの手(帰るときに 手をふる アイちゃんの写真だけ 11-24)。[ひねり x, y, z, 大きさ]
+    if (paa) {
+      hand.rotation.set(paa[0] || 0, paa[1] || 0, paa[2] || 0); hand.scale.setScalar(paa[3] || 1);
+      const pm = tm(new THREE.SphereGeometry(0.03, 16, 12), skinC, 0, -0.006, 0, LN); pm.scale.set(1.08, 1.0, 0.5); hand.add(pm);   // 手のひら(うすく平ら)
+      [0.026, 0.03, 0.028, 0.022].forEach((L, j) => {   // 指4本: 人さし指 → 小指。少しずつ 広げる
+        const t = 1.5 - j, fg = new THREE.Group(); fg.position.set(-s * t * 0.0108, -0.026, 0); fg.rotation.z = -s * t * 0.13; hand.add(fg);
+        fg.add(tm(new THREE.CapsuleGeometry(0.0074, L, 4, 8), skinC, 0, -(L / 2 + 0.004), 0, 0.0026));
+      });
+      const tg = new THREE.Group(); tg.position.set(-s * 0.022, -0.012, 0.003); tg.rotation.z = -s * 0.95; hand.add(tg);   // 親指は 横へ
+      tg.add(tm(new THREE.CapsuleGeometry(0.0085, 0.02, 4, 8), skinC, 0, -0.016, 0, 0.0026));
+    } else {
+      const palm = tm(new THREE.SphereGeometry(0.032, 14, 10), skinC, 0, 0, 0, LN); palm.scale.set(0.95, 1.15, 0.7); hand.add(palm);
+      const thumb = tm(new THREE.CapsuleGeometry(0.011, 0.02, 4, 8), skinC, -s * 0.026, 0.008, 0.012, LN); thumb.rotation.z = s * 0.7; hand.add(thumb);
+    }
     sh.rotation.x = -0.45; sh.rotation.z = 0.06 * s;
     body.add(sh); arms.push(sh); fores.push(fore); hands.push(hand);
   });
@@ -3208,6 +3220,7 @@ function portrait(raw, size, opt) {   // opt.full: 全身(大将の「👧 ア�
   ptR.setSize(pw, size, false); ptC.aspect = pw / size; ptC.updateProjectionMatrix();
   try { if (ptR.getContext().isContextLost()) return ''; } catch (e) {}   // 3D の係が 落ちているときは 透明の絵を 返さない(11-22)
   if (opt.face) raw = Object.assign({}, raw, { _face: opt.face });   // 表情(帰るときの アイちゃんの笑顔 11-24)
+  if (opt.paa) raw = Object.assign({}, raw, { _paa: opt.paa });   // パーの手(帰るときの アイちゃん 11-24)
   const av = buildAvatar(raw, { standing: true }); av.rotation.y = -0.18; ptS.add(av);
   const hat = !!(raw && raw.costume && String(raw.costume).split('|')[0]);   // かぶりものが あるときは 少し引いて 上まで入れる
   const ly = hat ? 0.8 : 0.72, dist = hat ? 3.1 : 2.55;

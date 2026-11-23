@@ -908,7 +908,7 @@
     var words = who === 'ai' ? BYE_AI : who === 'shop' ? ['ありがとうございました'] : BYE_WORDS;
     /* アイちゃんは お辞儀より「またね〜」と手をふる形(ノブさん 11-24「お辞儀のアイちゃんが全然可愛くない。作り込んで」):
        目を細めた笑顔・ほっぺ・首をかしげる・こちらを見る。絵を2枚 交互に出して 手をふって見せる */
-    var img2 = '', AIB = { bowA: 0.08, side: -0.3, headA: -0.02, headZ: 0.17, bodyZ: -0.04, face: { eyes: 'smile', mouth: 'grin', cheek: 2 }, lookDown: 0.15, camUp: -0.02, camZ: 3.55 }, AIL = [-0.3, -0.14, -0.55];
+    var img2 = '', AIB = { bowA: 0.08, side: -0.3, headA: -0.02, headZ: 0.17, bodyZ: -0.04, face: { eyes: 'smile', mouth: 'grin', cheek: 2 }, lookDown: 0.15, camUp: -0.02, camZ: 3.55, paa: [null, [0, 0, 0, 1.25]] }, AIL = [-0.3, -0.14, -0.55];
     try {
       if (who === 'owner' && window.IZ3D && IZ3D.portrait) img = IZ3D.portrait(av, 440, { full: true, bow: true });
       if (who === 'ai' && window.IZ3D && IZ3D.portrait) { img = IZ3D.portrait(av, 440, Object.assign({ full: true, bow: true, arm: [AIL, [-2.15, 0.5, -1.05]] }, AIB)); img2 = IZ3D.portrait(av, 440, Object.assign({ full: true, bow: true, arm: [AIL, [-2.15, 0.8, -1.05]] }, AIB)); }
