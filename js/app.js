@@ -3174,8 +3174,10 @@
     // ミニゲーム: いる間に 1回だけ遊ぶ(30秒「ゲーム中」→ ほどほどの点数)。お客さんがゲーム中のときは待つ
     if (!regGameAt) regGameAt = n + rnd(REG.GAME_MIN[0], REG.GAME_MIN[1]) * MIN;
     if (regGameAt > 0 && n >= regGameAt && !regGaming && +aic('game') && guests <= aiMax() && !phOn && window.IZGAME && todayGame()) { regGaming = n; regGame = [gameId(), gameKey()]; IZGAME.load(gameId()).catch(function () {}); net.update('members/' + REG_UID, { game: TS }); if (ownerPresent() && regEvery() !== 0) regLine('game', 'owner'); }   // 大将がいたら「大将、ゲームやってもいいですか？」
-    if (regGaming && n - regGaming > 20000 && n - regGameSeen > 20000 && n - regGaming <= IZGAME.sec(regGame[0]) * 1000) { regGameSeen = n; net.update('members/' + REG_UID, { game: TS }); }   // 長いゲーム(ゴルフ)でも「🎮 ゲーム中」を 消さない(45秒で消えていた 11-23)
-    if (regGaming && n - regGaming > IZGAME.sec(regGame[0]) * 1000 + 1500) {
+    var aiGameMs = Math.min(40, window.IZGAME && regGame[0] ? IZGAME.sec(regGame[0]) : 30) * 1000;   // アイちゃんは 長いゲームでも40秒で切り上げる(ゴルフの150秒ずっと「ゲーム中」だった 11-23)
+    if (!regGaming && m.game && n - m.game > 5000) net.update('members/' + REG_UID, { game: null });   // まとめ役が代わった・読みなおした などで 残った「ゲーム中」を消す
+    if (regGaming && n - regGaming > 20000 && n - regGameSeen > 20000 && n - regGaming <= aiGameMs) { regGameSeen = n; net.update('members/' + REG_UID, { game: TS }); }   // 長いゲーム(ゴルフ)でも「🎮 ゲーム中」を 消さない(45秒で消えていた 11-23)
+    if (regGaming && (n - regGaming > aiGameMs + 1500 || n < regGaming - 60000)) {   // 時計が戻ったときも 終わらせる
       regGaming = 0; regGameAt = -1; net.update('members/' + REG_UID, { game: null });
       var mx = IZGAME.maxScore(regGame[0], regGame[1]); if (mx == null || mx > 5000) mx = 300;   // 読みこめなかったときは だいたい
       var sc = Math.round(mx * rnd(REG.GAME_RATE[0], REG.GAME_RATE[1]) / 5) * 5;

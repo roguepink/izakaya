@@ -2193,7 +2193,7 @@ function createShop(canvas, opts) {
   const L = N * SEAT_GAP + 1.8;
   /* ゆるい弓形のカウンター(ノブさん 11-23「ゆるい弓の形で」)。両はしの席が 大将の側へ ARC_D だけ回りこみ、少し内向きになる。
      はしの席から 遠くの人の顔が ななめに見える。まっすぐのときの (x, z) を arcP で 弓の上へ移す(x は 弓にそった長さ) */
-  const ARC_D = window.__izFlat ? 0 : 0.42, ARC_HALF = Math.max(SEAT_GAP, (N - 1) / 2 * SEAT_GAP);
+  const ARC_D = window.__izFlat ? 0 : 0.62, ARC_HALF = Math.max(SEAT_GAP, (N - 1) / 2 * SEAT_GAP);
   const ARC_R = ARC_D > 0 ? (ARC_HALF * ARC_HALF + ARC_D * ARC_D) / (2 * ARC_D) : 1e5, ARC_CZ = GUEST_Z - ARC_R;
   const arcP = (x, z) => { const th = x / ARC_R, r = ARC_R - (GUEST_Z - z); return [r * Math.sin(th), ARC_CZ + r * Math.cos(th), th]; };
   const seatP = (i, z = GUEST_Z) => arcP(seatX(i, N), z);
@@ -2264,13 +2264,29 @@ function createShop(canvas, opts) {
   const items = must.concat(SHOP.MENU.filter((m) => m.pun), SHOP.MENU.filter((m) => !m.pun && m.kind !== 'drink'), SHOP.MENU.filter((m) => m.kind === 'drink')).filter((m) => !m.only)   // お祝いの日だけの品は 木札にしない
     .filter((m, i, a) => a.indexOf(m) === i).slice(0, tagXs.length);
   items.forEach((it, i) => {
-    const t = canvasTex(64, 200, (g) => {
-      g.fillStyle = '#e8d3a6'; g.fillRect(0, 0, 64, 200);
-      g.strokeStyle = '#8a6a3a'; g.lineWidth = 3; g.strokeRect(2, 2, 60, 196);
-      g.fillStyle = '#2a1a10'; g.font = '30px ' + FONT_JP; g.textAlign = 'center'; g.textBaseline = 'top';
-      const chars = Array.from(it.name).slice(0, 6);
-      const sz = chars.length > 5 ? 26 : 30; g.font = sz + 'px ' + FONT_JP;
-      chars.forEach((ch, k) => { if (ch === 'ー') { g.save(); g.translate(32, 14 + k * (sz + 2) + sz / 2); g.rotate(Math.PI / 2); g.fillText(ch, 0, -sz / 2); g.restore(); } else g.fillText(ch, 32, 12 + k * (sz + 2)); });
+    const t = canvasTex(96, 300, (g) => {   // 名前は 全部入れる(ノブさん 11-23「マンション系で終わらせないで ラーメンまで。2段になってもいい」)。7字までは1列、8字から2列(右から読む)
+      g.fillStyle = '#e8d3a6'; g.fillRect(0, 0, 96, 300);
+      g.strokeStyle = '#8a6a3a'; g.lineWidth = 4; g.strokeRect(3, 3, 90, 294);
+      g.fillStyle = '#2a1a10'; g.textAlign = 'center'; g.textBaseline = 'top';
+      const chars = Array.from(it.name.replace(/\s+/g, '')), n = chars.length;
+      const kind = (c) => /[\u4e00-\u9faf々]/.test(c) ? 'k' : /[\u30a0-\u30ff]/.test(c) ? 'K' : 'h';
+      let cols = [chars];
+      if (n >= 8) {   // 2列に分ける: まん中あたりで、漢字のあと・字の種類が変わる所を えらぶ
+        let best = Math.ceil(n / 2), bs = 1e9;
+        for (let k = Math.max(2, Math.ceil(n / 2) - 2); k <= Math.min(n - 2, Math.ceil(n / 2) + 2); k++) {
+          const a = kind(chars[k - 1]), b = kind(chars[k]); const sc = Math.abs(k - n / 2) - (a !== b ? (a === 'k' || a === 'h' ? 2 : 1) : 0);
+          if (sc < bs || (sc === bs && k > best)) { bs = sc; best = k; }
+        }
+        cols = [chars.slice(0, best), chars.slice(best)];
+      }
+      const per = Math.max(...cols.map((c) => c.length)), sz = Math.floor(Math.min(cols.length > 1 ? 40 : 46, 280 / per - 3));
+      g.font = sz + 'px ' + FONT_JP;
+      const cxs = cols.length > 1 ? [70, 26] : [48];   // 2列は 右の列が先
+      cols.forEach((col, ci) => col.forEach((ch, k) => {
+        const y = 12 + k * (sz + 3);
+        if (/[ー〜～…\-]/.test(ch)) { g.save(); g.translate(cxs[ci], y + sz / 2); g.rotate(Math.PI / 2); g.fillText(ch, 0, -sz / 2); g.restore(); }   // のばす棒は たて書きの向きに
+        else g.fillText(ch, cxs[ci], y);
+      }));
     });
     const tag = mesh(new THREE.PlaneGeometry(tagW, tagH), new THREE.MeshLambertMaterial({ map: t }), tagXs[i], 2.45, -2.08);
     tag.userData.menuId = it.id; tagList.push(tag);   // 押すと注文できる
