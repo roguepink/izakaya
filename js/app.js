@@ -601,7 +601,7 @@
   function members() { return tree.members || {}; }
   function fresh(m) { return m && now() - (m.seen || 0) < 50000; }
   var AWAY_MS = 3 * MIN;   // 自分で「帰る」を押さずに画面を閉じた人は、3分は席を取っておく(戻ればそのまま座れる)
-  function away(m) { return m && !m.bot && !fresh(m) && now() - (m.seen || 0) < AWAY_MS; }
+  function away(m) { return m && !m.bot && !m.prep && !fresh(m) && now() - (m.seen || 0) < AWAY_MS; }   // アバターを作る前(prep)の人は 取っておかない: 50秒 音さたが無ければ 席を空ける(11-23)
   function seatUid(i) { var s = tree.seats || {}; return s[i] || null; }
   function amLeader() {
     if (!inside) return false;
@@ -654,13 +654,13 @@
     var s2 = -1; for (var k = 0; k < N; k++) if (seatUid(k) === ME.uid) s2 = k;
     if (s2 !== mySeat) {
       mySeat = s2; if (!OWNER_MODE) setView(mySeat >= 0 ? (view === 'overview' ? 'first' : view) : 'overview');
-      if (mySeat >= 0 && !OWNER_MODE && !DEMO && !lsGet('iz-tip-kigae')) { lsSet('iz-tip-kigae', 1); setTimeout(function () { toast('自分の名札を押すと、着がえられます 👕', 3000); }, 2500); }   // 1回だけ教える
+      if (mySeat >= 0 && !OWNER_MODE && !DEMO && !ME.tempAvatar && !lsGet('iz-tip-kigae')) { lsSet('iz-tip-kigae', 1); setTimeout(function () { toast('自分の名札を押すと、着がえられます 👕', 3000); }, 2500); }   // 1回だけ教える
     }
     $('pickHint').classList.toggle('hidden', OWNER_MODE || mySeat >= 0);
     if (!OWNER_MODE && mySeat < 0) {   // 満席で立っているときに「空いている席を押して」と出ていた(11-23)
       var rsv = reservationsNow(), free = 0;
       for (var fk = 0; fk < N; fk++) { var fu = seatUid(fk); if (!(fu && ms[fu]) && !(rsv[fk] && rsv[fk].uid !== ME.uid)) free++; }
-      var ph = free ? '空いている席を押して座ってください' : 'いまは満席です。空くまでお待ちください';
+      var ph = free ? (ME.tempAvatar ? '空いている席を押してください(アバターは 座ってから作れます)' : '空いている席を押して座ってください') : 'いまは満席です。空くまでお待ちください';
       if ($('pickHint').textContent !== ph) $('pickHint').textContent = ph;
     }
     document.body.classList.toggle('picking', inside && !OWNER_MODE && !DEMO && mySeat < 0);   // 座る前(横向きは 会話の欄をしまって 席を押せるように)
@@ -770,7 +770,10 @@
     if (entering || inside) return;
     var name = $('nameInput').value.trim().slice(0, 12);
     if (!name) { msg('お名前を入れてください'); $('nameInput').focus(); return; }
-    if (!myAvatar()) { pendingEnter = true; if (OWNER_MODE) ME.ownerName = name; else ME.name = name; saveMe(); toast('はじめに アバターを作ってください', 2200); openMaker(); return; }
+    if (!myAvatar() && OWNER_MODE) { pendingEnter = true; ME.ownerName = name; saveMe(); toast('はじめに アバターを作ってください', 2200); openMaker(); return; }
+    // はじめてのお客さんは「席が先」(ノブさん 11-23「アバターを作っている間に 満席になる。まず席を取ってから アバター・説明」)。
+    // 仮の見た目で入って席を取り、座ったら すぐアバター作りへ。作り終わる前に閉じたら 席はすぐ空く(pagehide)
+    if (!myAvatar()) { ME.avatar = AVATAR.random(); ME.tempAvatar = 1; }
     if (OWNER_MODE) ME.ownerName = name; else ME.name = name;
     saveMe();
     var pass = $('passInput').value.trim();
@@ -802,7 +805,7 @@
     seenChat = {}; seenEvt = {};
     Object.keys(tree.chat || {}).forEach(function (k) { seenChat[k] = 1; });
     Object.keys(tree.events || {}).forEach(function (k) { seenEvt[k] = 1; });
-    net.set('members/' + ME.uid, { name: name, avatar: myAvatar(), owner: OWNER_MODE, at: TS, seen: TS, voice: myAvatar().voice || '' });
+    net.set('members/' + ME.uid, { name: name, avatar: myAvatar(), owner: OWNER_MODE, at: TS, seen: TS, voice: myAvatar().voice || '', prep: !OWNER_MODE && ME.tempAvatar ? 1 : null });
     if (OWNER_MODE) {
       net.update('state', { ownerAvatar: nobuLook(ownerAvatar), ownerName: name, ownerRole: ROLE });
       if (TAKE_OK) { net.update('state', { baton: null }); TAKE = ''; try { history.replaceState(null, '', location.pathname + location.search + location.hash.replace(/[#&]take=[\w-]+/, '').replace(/&nm=[^&]*/, '')); } catch (e) {} }
@@ -859,7 +862,7 @@
   document.addEventListener('visibilitychange', hereNow); window.addEventListener('pageshow', hereNow);
   window.addEventListener('pagehide', function () {
     if (!inside || !net) return;
-    if (OWNER_MODE || mySeat < 0) { if (mySeat >= 0) net.leaveBeacon('seats/' + mySeat); net.leaveBeacon('members/' + ME.uid); return; }
+    if (OWNER_MODE || mySeat < 0 || ME.tempAvatar) { if (mySeat >= 0) { net.leaveBeacon('seats/' + mySeat); net.leaveBeacon('tables/' + mySeat); } net.leaveBeacon('members/' + ME.uid); return; }   // アバターを作り終える前に閉じた はじめての人も、席をすぐ空ける(ほかの人が座れるように)
     if (net.patchBeacon) net.patchBeacon('members/' + ME.uid, { seen: now() - 51000 });
   });
   function currentName() { var m = members()[ME.uid]; return (m && m.name) || ME.name; }
@@ -904,6 +907,7 @@
           sys('🏮 ' + honor(currentName()) + 'が来店しました');
           var r = reservationsNow()[i], rs = reserveSession();
           if (r && r.uid === ME.uid && rs) net.remove('reservations/' + rs.key + '/' + i);   // 予約の席に座れたら 予約は おしまい(帰ったあとも「予約済み」が残っていた 11-23)
+          if (ME.tempAvatar && !OWNER_MODE && !DEMO) setTimeout(function () { if (!inside || mySeat < 0) return; toast('席をとりました。つぎに アバターを作りましょう 🎨', 2600); openMaker(true); }, 900);
           return;
         }
         if (u && u !== ME.uid) { sitting = 0; toast('ほかの人が先に座りました。別の席をえらんでください'); return; }
@@ -2879,6 +2883,22 @@
 
   $('bMenu').onclick = function () { if (!OWNER_MODE && mySeat < 0) { toast('先に席に座ってください'); return; } openSheet('menu'); };
   $('bMusic').onclick = function () { openSheet('music'); };
+  /* ---------------- 使い方(ノブさん 11-23) ----------------
+     くわしい説明は guide.html の1か所だけ(ホームページのボタンからも同じページ)。ここでは 同じ画面の中に開く */
+  function openHelp(sec) { var f = $('helpFrame'); f.src = 'guide.html#app'; if (sec) f.onload = function () { try { var el = f.contentDocument.getElementById(sec); if (el) el.scrollIntoView(); } catch (e) {} }; $('helpBox').classList.remove('hidden'); }
+  $('bHelp').onclick = function () { openHelp(); };
+  $('helpClose').onclick = function () { $('helpBox').classList.add('hidden'); $('helpFrame').src = 'about:blank'; };
+  /* はじめての人に 3まいだけ(アバターを作り終えたあと 1回だけ)。長い説明は「？」へ */
+  var FG = [
+    { i: '💬', t: '話してみよう', p: '下の欄に書いて「送る」。<br>「かんぱーい」などのボタンでも話せます。<br>人の名札を押すと、その人に話しかけられます。' },
+    { i: '🍺', t: '注文してみよう', p: '右の「注文」から 料理と飲み物を選べます。<br>大将が出してくれたら、押して食べたり飲んだり。<br>もちろん無料です。' },
+    { i: '👁', t: '見え方を変えよう', p: '右上の「👁」で 目線・後ろ・全体 に変わります。<br>くわしい使い方は、上の「？」でいつでも見られます。' }
+  ];
+  var fgI = 0;
+  function fgShow() { var g = FG[fgI]; $('fgBody').innerHTML = '<div class="fg-ico">' + g.i + '</div><h3>' + g.t + '</h3><p>' + g.p + '</p>'; $('fgDots').innerHTML = FG.map(function (_, k) { return '<i' + (k === fgI ? ' class="on"' : '') + '></i>'; }).join(''); $('fgNext').textContent = fgI === FG.length - 1 ? 'はじめる' : 'つぎへ'; }
+  window.izFirstGuide = function () { if (OWNER_MODE || DEMO || lsGet('iz-guide1')) return; lsSet('iz-guide1', 1); fgI = 0; fgShow(); $('firstGuide').classList.remove('hidden'); };
+  $('fgNext').onclick = function () { if (fgI < FG.length - 1) { fgI++; fgShow(); } else $('firstGuide').classList.add('hidden'); };
+  $('fgSkip').onclick = function () { $('firstGuide').classList.add('hidden'); };
   $('nowPlaying').onclick = function () { openSheet('music'); };
   /* 大将だけ: 今の曲・動画を取り消して次へ */
   var skipAt = 0;
@@ -3271,8 +3291,8 @@
     mkTab = 0; sexStep = false; updateDraft(); renderMaker();
   }
   var sexStep = false;
-  function openMaker() {
-    var cur = myAvatar();
+  function openMaker(fresh) {
+    var cur = fresh ? null : myAvatar();
     draft = cur ? AVATAR.fix(JSON.parse(JSON.stringify(cur))) : null;
     sexStep = !draft;
     $('maker').dataset.back = inside ? 'shop' : 'entrance';
@@ -3360,8 +3380,8 @@
   $('mkSave').onclick = function () {
     if (!draft) return;
     if (OWNER_MODE) { draft.owner = true; ownerAvatar = AVATAR.fix(draft); lsSet('iz-owner-avatar', ownerAvatar); if (inside) net.update('state', { ownerAvatar: nobuLook(ownerAvatar) }); }
-    else { draft.owner = false; ME.avatar = AVATAR.fix(draft); saveMe(); }
-    if (inside) net.update('members/' + ME.uid, { avatar: myAvatar(), voice: myAvatar().voice });
+    else { draft.owner = false; var wasTemp = !!ME.tempAvatar; delete ME.tempAvatar; ME.avatar = AVATAR.fix(draft); saveMe(); if (wasTemp && inside) setTimeout(function () { if (window.izFirstGuide) izFirstGuide(); }, 700); }
+    if (inside) net.update('members/' + ME.uid, { avatar: myAvatar(), voice: myAvatar().voice, prep: null });
     drawFace2D($('meFace'), myAvatar());
     toast('アバターを決めました', 1400);
     closeMaker();

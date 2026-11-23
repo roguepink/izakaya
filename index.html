@@ -104,12 +104,14 @@
 <div id="tv" class="hidden"><div id="tvHolder"></div><div id="tvCatch"></div><div id="tvBadge" class="hidden">🔇 さわると音が出ます</div></div>
 <button id="tvClose" class="hidden">✕ モニターにもどす</button>
 
+<div id="helpBox" class="help-box hidden"><div class="help-bar"><b>📖 使い方</b><button id="helpClose" type="button">✕ 閉じる</button></div><iframe id="helpFrame" title="使い方"></iframe></div>
+<div id="firstGuide" class="first-guide hidden"><div class="fg-card"><div id="fgBody"></div><div class="fg-dots" id="fgDots"></div><div class="fg-btns"><button id="fgSkip" type="button">とばす</button><button id="fgNext" type="button">つぎへ</button></div></div></div>
 <div id="talkBg" class="hidden"></div>
 <section id="shop" class="hidden">
   <div id="talk" class="hidden"></div>
   <div class="topbar">
     <div class="tb-left"><b id="tbName">居酒屋ノブ</b><span id="tbState"></span><span id="tbCeleb" class="tb-celeb hidden"></span></div>
-    <div class="tb-right"><span id="tbCount"></span></div>
+    <div class="tb-right"><span id="tbCount"></span><button id="bHelp" class="tb-help" aria-label="使い方">？</button></div>
   </div>
   <div class="np-row"><button id="nowPlaying" class="np">🎵 <span id="npTitle">—</span></button><button id="npSkip" class="np-skip owner-only">⏭ 次へ</button></div>
   <div class="side">

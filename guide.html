@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>使い方 | 居酒屋ノブ</title>
+<meta name="description" content="スマホの中の小さな居酒屋「居酒屋ノブ」の使い方。入り方・席・話し方・注文・目線・ゲームなど。">
+<meta name="theme-color" content="#2a1810">
+<link rel="icon" href="icon-192.png">
+<!-- 2026-11-23 ノブさん「ホームページに よくあるアプリの使い方の説明をボタンで置いて、そこで細かく説明。お客さんの画面にも 細かい所を見るボタン」
+     → 説明はこの1ページだけ(ホームページのボタンからも、アプリの「？」からも 同じページ)。直すときはここだけ直す。
+     ★ 個人の事情・「本日」は書かない。 -->
+<style>
+  :root { --bg:#2a1810; --card:#3a2414; --line:rgba(232,163,61,.35); --ink:#fff4e0; --sub:#e8c89a; --mute:#c9b38a; --red:#d12a1e; --gold:#e8a33d; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.8 -apple-system, 'Hiragino Sans', 'Noto Sans JP', sans-serif; padding: 0 16px calc(env(safe-area-inset-bottom) + 40px); }
+  .wrap { max-width: 640px; margin: 0 auto; }
+  header { text-align: center; padding: calc(env(safe-area-inset-top) + 28px) 0 8px; }
+  header small { color: var(--sub); font-weight: 700; letter-spacing: .25em; font-size: 12px; }
+  h1 { font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif; font-size: 30px; margin: 2px 0 6px; letter-spacing: .08em; }
+  .lead { color: var(--sub); font-size: 15px; margin: 0; }
+  nav { margin: 22px 0 8px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  nav a { color: var(--ink); text-decoration: none; font-weight: 700; font-size: 14px; padding: 6px 12px; border-radius: 999px; background: rgba(243,230,204,.1); border: 1px solid var(--line); }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 18px 18px 8px; margin: 18px 0; }
+  h2 { font-size: 20px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  h2 .n { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--red); color: #fff; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; }
+  h3 { font-size: 16px; margin: 16px 0 4px; color: var(--gold); }
+  p, li { margin: 0 0 10px; }
+  ol, ul { padding-left: 1.3em; margin: 0 0 10px; }
+  .b { display: inline-block; background: #f3e6cc; color: #2a1a10; border-radius: 8px; padding: 0 7px; font-weight: 800; font-size: 14px; line-height: 1.7; white-space: nowrap; }
+  .tip { background: rgba(232,163,61,.13); border-left: 4px solid var(--gold); border-radius: 8px; padding: 8px 12px; margin: 6px 0 14px; font-size: 15px; }
+  .wh { background: rgba(74,53,102,.55); border-left-color: #b89be6; }
+  table { width: 100%; border-collapse: collapse; margin: 4px 0 14px; font-size: 15px; }
+  td { border-top: 1px solid var(--line); padding: 7px 4px; vertical-align: top; }
+  td:first-child { white-space: nowrap; font-weight: 800; padding-right: 10px; }
+  .top { display: block; text-align: right; font-size: 13px; color: var(--mute); text-decoration: none; margin: -2px 0 8px; }
+  .go { display: block; text-align: center; margin: 26px auto 8px; max-width: 360px; background: var(--red); color: #fff; font-weight: 900; font-size: 18px; text-decoration: none; border-radius: 999px; padding: 14px; box-shadow: 0 4px 0 #7a1810; }
+  footer { text-align: center; color: var(--mute); font-size: 13px; margin-top: 18px; }
+  body.in-app .go, body.in-app footer .hp { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header id="top">
+  <small>スマホの中の 小さな居酒屋</small>
+  <h1>居酒屋ノブの使い方</h1>
+  <p class="lead">週に一度、1時間だけ開く居酒屋です。<br>すべて無料。アプリを入れなくても、ブラウザで遊べます。</p>
+</header>
+
+<nav>
+  <a href="#hairu">入り方</a><a href="#seki">席と予約</a><a href="#hanasu">話す</a><a href="#kosotto">こそっと</a><a href="#chumon">注文</a><a href="#mesen">目線</a><a href="#tanoshimi">曲・写真・ゲーム</a><a href="#kaeru">帰る</a><a href="#taisho">大将になる</a><a href="#qa">よくある質問</a>
+</nav>
+
+<section id="hairu">
+  <h2><span class="n">1</span>お店に入る</h2>
+  <ol>
+    <li>開いている時間に、居酒屋ノブのページを開きます。</li>
+    <li><b>お名前(呼び名)</b>を入れます。本名でなくてかまいません。</li>
+    <li><span class="b">🏮 のれんをくぐる</span> を押すと、お店の中に入れます。</li>
+    <li><b>空いている席を押して座ります。</b>席の上の名札か、いすを押してください。</li>
+    <li>はじめての人は、座ったあとで <b>アバター(自分の分身)</b> を作ります。女性・男性を選んで、髪・目・服・声を好きに選べます。<span class="b">おまかせ</span> でもかまいません。</li>
+  </ol>
+  <div class="tip">席は先に取っておけます。アバターを作っている間に、ほかの人に席を取られることはありません。作る途中で画面を閉じると、席は空きます。</div>
+  <a class="top" href="#top">▲ 上へ</a>
+</section>
+
+<section id="seki">
+  <h2><span class="n">2</span>席と予約</h2>
+  <p>カウンターは、ふだん7席です。満席のときは、空くまで待ちます。</p>
+  <h3>席の予約</h3>
+  <ul>
+    <li>入口の <span class="b">席を予約</span> から、開店の3時間前から予約できます。</li>
+    <li>予約した席は、開店して15分まで取っておきます。その間に入ると、自動でその席に案内されます。</li>
+    <li>予約は1人1席です。もう一度押すと取り消せます。</li>
+  </ul>
+  <h3>席を外すとき</h3>
+  <p>「帰る」を押さずに画面を閉じると、<b>「席を外しています」</b> になります。3分以内にもどれば、同じ席と料理がそのまま残っています。</p>
+  <a class="top" href="#top">▲ 上へ</a>
+</section>
+
+<section id="hanasu">
+  <h2><span class="n">3</span>話す</h2>
+  <ul>
+    <li>下の欄に書いて <span class="b">送る</span>。お店にいるみんなに聞こえます。声で読み上げられます。</li>
+    <li><span class="b">🍻 かんぱーい</span> <span class="b">うまい</span> などのボタンを押すと、すぐに言えます。<span class="b">全部見る</span> で、ほかの言葉も出ます。</li>
+    <li><b>人の名札を押すと</b>、その人に話しかけられます(「〇〇さん、」から始まります)。</li>
+    <li>話しかけられた人は、こちらを向いてくれます。</li>
+    <li>自分の言葉は、右側に明るい色で出ます。</li>
+  </ul>
+  <a class="top" href="#top">▲ 上へ</a>
+</section>
+
+<section id="kosotto">
+  <h2><span class="n">4</span>🤫 大将に こそっと話す</h2>
+  <ol>
+    <li>大将(カウンターの中の人)の名札を押します。</li>
+    <li><span class="b">🤫 こそっと話す</span> を選びます。</li>
+    <li>入力欄が <b>むらさき色</b> になります。この間に書いたことは、<b>大将にだけ</b> 届きます。</li>
+    <li>やめるときは <span class="b">✕ こそっと おわり</span> を押します。押すまで、こそっとのままです。</li>
+  </ol>
+  <div class="tip wh">ほかのお客さんの画面には、何も出ません。ただし、パスワード・住所・電話番号など、大事なことは書かないでください。</div>
+  <p>誕生日をこっそり伝える、ちょっとした相談をする、などに使えます。お客さんどうしの こそっと話は ありません。</p>
+  <a class="top" href="#top">▲ 上へ</a>
+</section>
+
+<section id="chumon">
+  <h2><span class="n">5</span>注文する・食べる</h2>
+  <ol>
+    <li>右の <span class="b">🍺 注文</span> を押して、料理や飲み物を選びます。</li>
+    <li>大将が出してくれると、カウンターの自分の前に置かれます。</li>
+    <li>下に出る <span class="b">飲む</span> <span class="b">食べる</span> を押すか、料理そのものを押すと、食べたり飲んだりできます。</li>
+  </ol>
+  <p>もちろん全部無料です。本物の料理は届きません。</p>
+  <a class="top" href="#top">▲ 上へ</a>
+</section>
+
+<section id="mesen">
+  <h2><span class="n">6</span>目線を変える</h2>
+  <p>右上の <span class="b">👁</span> を押すたびに、見え方が変わります。指でなぞると、少し見回せます。</p>
+  <table>
+    <tr><td>目線</td><td>自分の席から、カウンターの中を見ます。大将と向かい合う見え方です。</td></tr>
+    <tr><td>後ろ</td><td>自分の肩ごしに見ます。自分のアバターと、注文した物が見えます。</td></tr>
+    <tr><td>全体</td><td>お店ぜんぶを、ななめから見ます。</td></tr>
+    <tr><td>おしゃべり</td><td>みんなの顔を並べて、話すのに集中できます。</td></tr>
+  </table>
+  <a class="top" href="#top">▲ 上へ</a>
+</section>
+
+<section id="tanoshimi">
+  <h2><span class="n">7</span>曲・写真・ゲーム・着がえ</h2>
+  <table>
+    <tr><td>🎵 曲</td><td>お店に流れている曲を、みんなで同じように聞きます。上の曲名を押すと、曲の画面が開きます。</td></tr>
+    <tr><td>📸 撮影</td><td>みんなで記念写真を撮れます。顔(表情)も選べます。写りたくない人は、写らないこともできます。</td></tr>
+    <tr><td>🎮 ゲーム</td><td>大将やお客さんと、ミニゲームで勝負できます(ゲームのある日だけ)。</td></tr>
+    <tr><td>👕 着がえ</td><td>自分の名札を押すか、着がえのボタンで、アバターの服や髪を変えられます。</td></tr>
+  </table>
+  <a class="top" href="#top">▲ 上へ</a>
+</section>
+
+<section id="kaeru">
+  <h2><span class="n">8</span>帰る</h2>
+  <p>右下の <span class="b">🚪 帰る</span> を押すと、お店を出ます。席は次の人のために空きます。</p>
+  <p>閉店の時間になると、お店は自動で閉まります。また来週!</p>
+  <a class="top" href="#top">▲ 上へ</a>
+</section>
+
+<section id="taisho">
+  <h2><span class="n">9</span>大将になってみる</h2>
+  <p>大将から「交代しませんか?」と頼まれることがあります。<span class="b">やる</span> を押すと、その回の間だけ、あなたが大将としてカウンターに立てます。</p>
+  <ul>
+    <li>料理を出したり、お店の雰囲気(明るさ・ちょうちんの色など)を変えたりできます。</li>
+    <li>常連のアイちゃんを呼んだり、帰ってもらったりもできます。</li>
+    <li>同じやり方で、大将を返せます。</li>
+  </ul>
+  <a class="top" href="#top">▲ 上へ</a>
+</section>
+
+<section id="qa">
+  <h2><span class="n">?</span>よくある質問</h2>
+  <h3>お金はかかりますか?</h3>
+  <p>かかりません。すべて無料です。</p>
+  <h3>アプリを入れないと使えませんか?</h3>
+  <p>ブラウザのままで使えます。ホーム画面に入れると、次からすぐ開けます。</p>
+  <h3>声が出ません</h3>
+  <p>スマホの音量と、消音(マナーモード)を確かめてください。画面を一度さわると、音が出るようになります。</p>
+  <h3>アイちゃんってだれ?</h3>
+  <p>お店の常連さんです。ときどき話しかけてくれます。人ではなく、お店のキャラクターです。</p>
+  <h3>いやなことを言われたら?</h3>
+  <p>大将に こそっと伝えてください。大将は、お客さんに帰ってもらうことができます。</p>
+  <a class="top" href="#top">▲ 上へ</a>
+</section>
+
+<a class="go" href="./">🏮 お店を開く</a>
+<footer>居酒屋ノブ <span class="hp">・ <a href="https://www.roguepink.com/" style="color:inherit">ROGUE PINK</a></span></footer>
+</div>
+<script>
+  // アプリの「？」から開いたとき(#app)は、「お店を開く」などを出さない
+  if (/(^#|&)app\b/.test(location.hash) || window.top !== window) document.body.classList.add('in-app');
+</script>
+</body>
+</html>
