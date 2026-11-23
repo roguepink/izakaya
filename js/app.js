@@ -228,11 +228,11 @@
       onTap: null, onFrame: null,
       setSeats: function (list) { seated = list; list.forEach(function (s, i) { els[i].classList.toggle('on', !!s); els[i].firstChild.textContent = s ? '🙂' : '🪑'; }); },
       setOwner: function () {}, ownerGoTo: function () {}, setTables: function () {}, setView: function () {},
-      cheer: function () {}, cheerAll: function () {}, talk: function () {},
-      setCelebrate: function () {}, setMood: function () {}, lookAt: function () {}, confetti: function () {}, bump: function () {}, setZoom: function () {}, is2D: true, stop: function () { api.onFrame = null; },   // 3D の部品と同じ名前だけ(何もしない)。無いと お店が止まっていた 11-23
+      cheer: function () {}, talk: function () {},
+      setCelebrate: function () {}, setMood: function () {}, lookAt: function () {}, confetti: function () {}, bump: function () {}, setZoom: function () {}, is2D: true, stop: function () { api.onFrame = null; api._stopped = true; },   // 3D の部品と同じ名前だけ(何もしない)。無いと お店が止まっていた 11-23
       anchors: function () { return { seats: els.map(function (e, i) { return seated[i] ? pos(e) : null; }), owner: pos(ownerEl), empty: els.map(pos) }; }
     };
-    (function loop() { requestAnimationFrame(loop); if (api.onFrame) api.onFrame(); })();
+    var lastF = 0; (function loop(t) { if (api.onFrame === null && api._stopped) return; requestAnimationFrame(loop); if (api.onFrame && t - lastF > 66) { lastF = t; api.onFrame(); } })(0);   // 2D の代わり: 1秒に15回まで(古い iPhone 用 11-24)
     return api;
   }
 
@@ -650,7 +650,7 @@
       else if (!inside && window.IZ3D) { try { scene.stop(); } catch (e) {} scene = null; start3D(); return; }
     }
     if (inside && wantSeats() !== N && scene && scene.anchors) { rebuildSeats(wantSeats()); return; }
-    if (inside && whMode) { var wt = whTarget(whMode.seat); if (!wt || wt.uid !== whMode.uid) { setWhisper(null); toast('相手がいなくなったので、こそっと話を終わりました', 2600); } }   // 相手が帰った・交代した 11-23   // 大将が席の数を変えた(作りなおすと もう一度 ここへ来る)
+    if (inside && whMode) { var wt = whTarget(whMode.seat); if (!wt || wt.uid !== whMode.uid) { setWhisper(null); toast('相手がいなくなったので、こそっと話を終えました', 2600); } }   // 相手が帰った・交代した 11-23   // 大将が席の数を変えた(作りなおすと もう一度 ここへ来る)
     var ms = members();
     var seats = [];
     var st = tree.state || {};
@@ -974,7 +974,7 @@
   function leaveAskOpen() { return !$('leaveAsk').classList.contains('hidden'); }
   function askLeave() {
     $('laTtl').textContent = OWNER_MODE ? '奥に下がりますか?' : 'お店を出ますか?';
-    $('laSub').textContent = OWNER_MODE ? 'お客さんは、そのまま お店にいられます' : (mySeat >= 0 ? '席と料理は 片づけられます' : '入口にもどります');
+    $('laSub').textContent = OWNER_MODE ? 'お客さんは、そのまま お店にいられます' : (mySeat >= 0 ? '席と料理は 片づけます' : '入口にもどります');
     $('laGo').textContent = OWNER_MODE ? '奥に下がる' : '出る';
     $('leaveAsk').classList.remove('hidden');
   }
@@ -1062,7 +1062,7 @@
   $('bView').onclick = function () {
     var order = OWNER_MODE ? (TALK_OWNER ? ['owner', 'ownerAll', 'talk'] : ['owner', 'ownerAll']) : DEMO ? ['overview', 'first', 'back'] : (mySeat >= 0 ? ['first', 'back', 'overview', 'talk'] : ['overview']);
     var i = order.indexOf(view); setView(order[(i + 1) % order.length]);
-    toast('視点: ' + VIEW_NAMES[view] + (view === 'owner' ? '(座っている人を大きく)' : view === 'ownerAll' ? '(お店ぜんぶ)' : view === 'talk' ? '(みんなの顔を見ながら 話す)' : ''), 1500);
+    toast('見え方: ' + VIEW_NAMES[view] + (view === 'owner' ? '(座っている人を大きく)' : view === 'ownerAll' ? '(お店ぜんぶ)' : view === 'talk' ? '(みんなの顔を見ながら 話す)' : ''), 1500);
   };
 
   /* ---------------- おしゃべり画面(ノブさん 2026-11-22「リモートで話すような、会話がメインの画面」) ----------------
@@ -1099,7 +1099,8 @@
   /* 顔写真は 1人4枚: n ふつう / b まばたき / o 口をあける(話している間) / s 笑顔(楽しい言葉のあと)。11-22 ノブさん */
   var TALK_FACES = { n: null, b: { blink: 1 }, o: { mouth: 'tk_open' }, s: { mouth: 'tk_laugh', eyes: 'smile', cheek: 2 } };
   function talkPic(av) {   // { n, b, o, s }。まだ撮っていない分は 順番に撮る(1枚ずつ 間をあけて、画面が かたまらないように)
-    var k = JSON.stringify(av || {}), f = talkPics[k] || (talkPics[k] = {});
+    var k = JSON.stringify(av || {}); if (!talkPics[k]) { var ks = Object.keys(talkPics); if (ks.length > 40) delete talkPics[ks[0]]; }   // 顔写真は 40人分まで(服を変えるたびに 増え続けていた 11-24)
+    var f = talkPics[k] || (talkPics[k] = {});
     Object.keys(TALK_FACES).forEach(function (v) { if (!f[v] && talkQ.indexOf(k + '\n' + v) < 0) talkQ.push(k + '\n' + v); });
     if (!talkBusy) talkNext();
     return f;
@@ -1144,7 +1145,7 @@
       var fr = talkPic(p.av), pic = fr.n || '', say = talkSay[String(p.key)], on = say && t < say.until, glow = say && t < say.glow;
       var fresh1 = on && t < say.big, toN = on ? talkToName(say.to) : '', toMe = toN === 'あなた', called = (talkSay['@' + String(p.key)] || 0) > t;
       var typing = p.m && p.m.typing && now() - p.m.typing < 7000;
-      var badge = p.away ? '💤 席をはずしています' : p.m && kigaeNow(p.m.kigae) ? '👚 着がえ中' : p.m && gameNow(p.m.game) ? '🎮 ゲーム中' : '';
+      var badge = p.away ? '💤 席を外しています' : p.m && kigaeNow(p.m.kigae) ? '👚 着がえ中' : p.m && gameNow(p.m.game) ? '🎮 ゲーム中' : '';
       return '<button class="tk-card' + (p.owner ? ' owner' : '') + (glow ? ' talk' : '') + (called && !glow ? ' called' : '') + (p.away ? ' away' : '') + (p.drink ? ' dr' : '') + (big ? ' tk-big' : '') + '" data-tk="' + p.key + '" style="width:' + cw + 'px;height:' + ch + 'px">' +
         (pic && pic !== 'x' ? '<img alt="" data-av="' + esc(JSON.stringify(p.av || {})) + '" data-k="' + p.key + '" src="' + pic + '">' : '<span class="tk-wait">' + (pic === 'x' ? '🙂' : '…') + '</span>') +
         (on ? '<span class="tk-bub' + (fresh1 ? '' : ' keep') + (!fresh1 && t > say.until - 30000 ? ' old' : '') + '">' + (toN ? '<i class="tk-to' + (toMe ? ' me' : '') + '">→ ' + esc(toN) + '</i>' : '') + esc(say.text) + '</span>' : '') +
@@ -1333,7 +1334,7 @@
     var msg = { uid: ME.uid, name: currentName(), seat: OWNER_MODE ? 'owner' : mySeat, owner: OWNER_MODE, text: t, at: TS };
     if (whMode) {   // こそっと: 相手がまだいるか 確かめてから
       var wt = whTarget(whMode.seat);
-      if (!wt || wt.uid !== whMode.uid) { toast('相手がいなくなったので、こそっと話すのを やめました', 2400); setWhisper(null); return false; }
+      if (!wt || wt.uid !== whMode.uid) { toast('相手がいなくなったので、こそっと話を終えました', 2400); setWhisper(null); return false; }
       lastSent = Date.now(); typingMark(false);
       msg.wh = 1; msg.to = wt.seat; msg.toUid = wt.uid;
       net.push('chat', msg);
@@ -1388,7 +1389,7 @@
       whMode = t; replyPick = null; chatIn.value = dropCall(chatIn.value);
     }
     $('chatForm').classList.toggle('wh-on', !!whMode); document.body.classList.toggle('wh-mode', !!whMode);   // こそっと中は 決まり文句ボタンを隠す(押すと みんなに聞こえていた)
-    chatIn.placeholder = whMode ? whMode.name + 'にだけ聞こえます…' : '話しかける…';
+    chatIn.placeholder = whMode ? whMode.name + 'にだけ届きます…' : '話しかける…';
     growInput();
     if (whMode) { try { chatIn.focus(); } catch (e) {} chatIn.classList.remove('to-flash'); void chatIn.offsetWidth; chatIn.classList.add('to-flash'); }
   }
@@ -1418,7 +1419,7 @@
   /* お客さんが 大将を押したとき: ふつうに話すか、こそっと話すか */
   function guestOwnerPick() {
     if (DEMO || !inside || OWNER_MODE || mySeat < 0 || !ownerUid()) { replyToSeat('owner', false); return; }
-    var w = popWho('<div class="wp-name">' + esc(whTarget('owner').name) + '</div><button data-w="talk">💬 話しかける<small>みんなに聞こえる</small></button><button data-w="wh" class="wp-wh">🤫 こそっと話す<small>' + esc(whTarget('owner').name) + 'にだけ</small></button>');
+    var w = popWho('<div class="wp-name">' + esc(whTarget('owner').name) + '</div><button data-w="talk">💬 話しかける<small>みんなに届く</small></button><button data-w="wh" class="wp-wh">🤫 こそっと話す<small>' + esc(whTarget('owner').name) + 'にだけ</small></button>');
     w.querySelector('[data-w=talk]').onclick = function () { closeWho(); setWhisper(null); replyToSeat('owner', false); };
     w.querySelector('[data-w=wh]').onclick = function () { closeWho(); setWhisper('owner'); };
   }
@@ -1610,7 +1611,7 @@
         try { history.replaceState(null, '', location.pathname + location.search + location.hash.replace(/[#&]sit=\d*/, '').replace(/&nm=[^&]*/, '')); } catch (e) {}
         setTimeout(function () {
           var u = seatUid(k);
-          if (k >= 0 && k < N && !u) { net.set('seats/' + k, ME.uid).then(function () { net.update('members/' + ME.uid, { seat: k }); }); toast('お客さんの席に座りました。またバトンタッチで戻れます', 2600); }
+          if (k >= 0 && k < N && !u) { net.set('seats/' + k, ME.uid).then(function () { net.update('members/' + ME.uid, { seat: k }); }); toast('お客さんの席に座りました。大将から返してもらうと、また大将にもどれます', 2600); }
           else toast('空いている席を押して座ってください', 2200);
         }, 600);
       })();
@@ -1913,7 +1914,7 @@
       if (p.cat !== cat) { h += (cat ? '</div>' : '') + '<div class="sh-sec">' + esc(p.cat) + '</div><div class="ph-grid">'; cat = p.cat; }
       h += '<button data-ph="' + esc(p.id) + '">' + esc(phraseLabel(p)) + '</button>';
     });
-    return h + '</div><p class="small-note">押すと、みんなに声と吹き出しで届きます。' + (OWNER_MODE ? '声は「アバター」の「大きさと声」で選べます。' : '声は「アバター」の「大きさと声」で、男性3つ・女性3つから選べます。') + '</p>';
+    return h + '</div><p class="small-note">押すと、みんなに声と吹き出しで届きます。' + (OWNER_MODE ? '声は「アバター」の「体と声」で選べます。' : '声は「アバター」の「体と声」で選べます(30種類)。') + '</p>';
   }
   function processEvents() {
     var ev = tree.events || {};
@@ -2070,7 +2071,7 @@
     net.set('orders/' + key, { uid: ME.uid, name: currentName(), seat: mySeat, item: id, at: TS }).then(function () {
       toast((it ? it.emoji + ' ' + it.name : '') + ' を注文しました', 3000, '取り消す', function () {
         if ((tree.orders || {})[key]) { net.remove('orders/' + key); toast('注文を取り消しました', 1500); }
-        else toast('もう出てきました(食べ終わると、また頼めます)', 2000);
+        else toast('もう出てきたので、取り消せません(食べ終わると、また頼めます)', 2400);
       });
     });
     event({ type: 'order', seat: mySeat, item: id });
@@ -2215,7 +2216,7 @@
       var seatM = sheetKind === 'menu' ? mySeat : sheetArg;
       if (sheetKind === 'seat') { var u2 = seatUid(seatM), m2 = u2 && members()[u2]; if (!m2) { closeSheet(); return; } title = (seatM + 1) + '番 ' + honor(m2.name) + 'に出す'; }
       else title = 'お品書き';
-      html = (sheetKind === 'menu' ? osuBoardHTML(seatM) : '') + menuHTML(seatM) + (sheetKind === 'menu' ? '<p class="small-note">' + (ownerPresent() ? '大将に注文が届きます。' : 'いまは大将がおまかせ中なので、すぐに出てきます。') + '</p>'
+      html = (sheetKind === 'menu' ? osuBoardHTML(seatM) : '') + menuHTML(seatM) + (sheetKind === 'menu' ? '<p class="small-note">' + (ownerPresent() ? '大将に注文が届きます。' : 'いまは大将がいないので、自動ですぐに出てきます。') + '</p>'
         : (fullOwner() ? '<div class="sh-sec">そのほか</div><div class="btn-row"><button id="kickBtn" class="red">帰ってもらう</button></div>' : ''));
       if (!force && body._h === html) return;
       var list0 = body.querySelector('.mn-list'), keep = list0 ? list0.scrollTop : 0, keepB = body.scrollTop;
@@ -2376,7 +2377,7 @@
         var url = q('#ytIn').value.trim(), id = ytId(url);
         if (id) pushYT(url, '', q('#ytTall') && q('#ytTall').checked);
         else if (/^https:\/\/[^\s]+\.(mp4|webm|m4v|mov)(\?[^\s]*)?$/i.test(url)) pushQueue({ kind: 'video', id: 'v' + Date.now(), src: url, title: '動画' });
-        else { toast('リンクが読めませんでした(YouTube か、mp4 などの動画のリンク)'); return; }
+        else { toast('このリンクは流せません。YouTube か mp4 のリンクを貼ってください', 3200); return; }
         q('#ytIn').value = '';
       };
     } else if (sheetKind === 'baton') {
@@ -3188,9 +3189,10 @@
     if (phOn) { toast('いま撮影中です'); return; }
     if (Date.now() - phReqAt < 20000) { toast('大将にお願いしてあります。少し待ってください'); return; }
     phReqAt = Date.now();
+    if (!ownerPresent()) { phReqAt = 0; toast('記念撮影は、大将がいるときに お願いできます', 2600); return; }   // かなわないお願いが みんなの会話に残っていた(11-24 点検)
     event({ type: 'photoReq', seat: mySeat, name: currentName() });
-    sys('📸 ' + honor(currentName()) + 'が記念撮影をリクエストしました');
-    toast(ownerPresent() ? '大将に記念撮影をお願いしました' : '大将がいるときに撮影できます');
+    sys('📸 ' + honor(currentName()) + 'が記念撮影をお願いしました');
+    toast('大将に記念撮影をお願いしました');
   };
   function phChips() {
     var S = scene || {}, poses = S.photoPoses || [], faces = S.photoFaces || [];
@@ -3240,7 +3242,7 @@
     if (st.ai && regHere && amLeader() && phAiSaid !== st.id) { phAiSaid = st.id; setTimeout(function () { regSay(['えっ、わたしもいいの？うれしい！', 'わーい、一緒に撮ろう！', 'えへへ、入れてくれて ありがとう'][Math.floor(Math.random() * 3)]); }, 900); }
     $('phHide').classList.toggle('on', myPick.hide);
     $('phChoose').classList.toggle('off', myPick.hide || !picking);
-    $('phNote').textContent = myPick.hide ? 'あなたは この写真に写りません。ほかの人の写真は受けとれます。'
+    $('phNote').textContent = myPick.hide ? 'あなたは この写真に写りません。写真は あなたのスマホにも できます。'
       : locked ? '選んだポーズで撮ります' : picking ? 'あと ' + Math.ceil(rem - PH.PICK_TO) + '秒 選べます' : 'あと ' + Math.ceil(rem - PH.PICK_FROM) + '秒で ポーズと表情を選べます。写りたくない人は「今回は写らない」を押してください';
     withScene(function (s) { if (s.photoSet) s.photoSet(photoList(), PH.LAYOUT); });
     // 大将の声(みんなのスマホで、それぞれ同じ時に鳴らす)
@@ -3344,7 +3346,7 @@
   var FG = [
     { i: '💬', t: '会話してみよう', p: '下の欄に書いて「送る」。文字で みんなに届きます(声にはなりません)。<br>「かんぱーい」などのボタンは 声も出ます。<br>人の名札を押すと、その人あてに書けます。' },
     { i: '🍺', t: '注文してみよう', p: '右の「注文」から 料理と飲み物を選べます。<br>大将が出してくれたら、押して食べたり飲んだり。<br>もちろん無料です。' },
-    { i: '👁', t: '見え方を変えよう', p: '右上の「👁」で 目線・後ろ・全体 に変わります。<br>くわしい使い方は、上の「？」でいつでも見られます。' }
+    { i: '👁', t: '見え方を変えよう', p: '右上の「👁」で 目線・後ろ・全体・おしゃべり に変わります。<br>くわしい使い方は、上の「？」でいつでも見られます。' }
   ];
   var fgI = 0;
   function fgShow() { var g = FG[fgI]; $('fgBody').innerHTML = '<div class="fg-ico">' + g.i + '</div><h3>' + g.t + '</h3><p>' + g.p + '</p>'; $('fgDots').innerHTML = FG.map(function (_, k) { return '<i' + (k === fgI ? ' class="on"' : '') + '></i>'; }).join(''); $('fgNext').textContent = fgI === FG.length - 1 ? 'はじめる' : 'つぎへ'; }
@@ -3462,7 +3464,6 @@
     if (REG.VOICE) a.voice = REG.VOICE;
     return a;
   }
-  function regPhrase(id) { var m = regMember(), k = regSeat(); if (!m || k < 0) return; net.push('events', { type: 'phrase', id: id, seat: k, at: TS, by: REG_UID, voice: m.voice || '' }); }
   /* 言葉の種類から1つ選んで言う。kind: idle / eat / hello / bye / thanks / kanpai / owner / winter / summer / spring */
   var regLast = '';
   function regLine(kind, to, filter) { var L = (REG.TALK || {})[kind] || []; if (filter) L = L.filter(filter); if (L.length > 1) L = L.filter(function (x) { return x[0] !== regLast; }); if (!L.length) return false; var x = L[Math.floor(Math.random() * L.length)]; regLast = x[0]; regSay(x[1], to, x[0]); return true; }   // 同じ言葉を続けて言わない

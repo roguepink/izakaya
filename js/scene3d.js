@@ -590,12 +590,6 @@ function buildHair(head, a, R, D) {
 
   /* ---- 横と後ろ(髪型ごと) ---- */
   const sides = (len, n = 3, curl = -0.25, w = 0.045, wave = 0, from = 1.15, to = 1.75) => [-1, 1].forEach((sg) => row(n, from, to, (ph, t, k) => st({ th: 0.75 + t * 0.15, ph: sg * ph, len: len * (1 - t * 0.12) + jit(k, 0.01), curl, flare: 0.05, wave }, w)));
-  const backs = (len, n = 9, curl = -0.25, w = 0.055, layer2 = true, wave = 0, spread = 2.4) => {
-    row(n, Math.PI - spread / 2, Math.PI + spread / 2, (ph, t, k) => st({ th: 0.55 + Math.abs(t - 0.5) * 0.4, ph, len: len * (0.95 + jit(k, 0.08)), curl, flare: 0.1, wave }, w));
-    if (layer2) row(n - 2, Math.PI - spread / 2.4, Math.PI + spread / 2.4, (ph, t, k) => st({ th: 0.3, ph, len: len * 0.82, curl: curl * 0.8, flare: 0.14, lift: 0.03, wave }, w * 1.05));
-  };
-  const nape = (len = R * 0.9) => row(7, Math.PI - 1.1, Math.PI + 1.1, (ph, t, k) => st({ th: 0.9, ph, len, curl: 0.05, flare: 0.02 }, 0.04));
-  const topTex = (n = 7, back = true) => HAT ? 0 : row(n, -0.9, 0.9, (ph, t, k) => st({ th: 0.12, ph: ph + (back ? Math.PI : 0), len: R * 0.9, leave: 3, lift: 0.025, sweep: 0 }, 0.05, 0.3));
 
   /* ---- 前髪 ---- */
   const bangs = () => {
@@ -1763,7 +1757,6 @@ function bowl(r = 0.075, h = 0.055, color = '#3a2a24', inner) {
 function disc(r, y, color, o) { return mesh(new THREE.CylinderGeometry(r, r, 0.004, 28), mat(color, o), 0, y, 0); }
 function blob(r, sx, sy, sz, color, x = 0, y = 0, z = 0) { const m = mesh(new THREE.SphereGeometry(r, 14, 10), mat(color), x, y, z); m.scale.set(sx, sy, sz); return m; }
 function box(w, h, d, color, x = 0, y = 0, z = 0, ry = 0) { const m = mesh(new THREE.BoxGeometry(w, h, d), mat(color), x, y, z); m.rotation.y = ry; return m; }
-function stick(len, r, color, x, y, z, rx = 0, ry = 0, rz = Math.PI / 2) { const m = mesh(new THREE.CylinderGeometry(r, r, len, 6), mat(color), x, y, z); m.rotation.set(rx, ry, rz); return m; }
 function noodles(n, R, y, color, thick = 0.004) {   // どんぶりの中のめん(弧を何本も)
   const g = new THREE.Group();
   for (let k = 0; k < n; k++) {
@@ -2668,13 +2661,13 @@ function createShop(canvas, opts) {
   const tmp = new THREE.Vector3();
   let running = true;
   // 電池・熱の調整: 1秒に描く回数と、細かさ。動画を大きく見ている間は 3D を休ませる
-  const perf = { fps: 30, ratio: 1.5, rest: false }; let lastDraw = 0, backHidden = false;
+  const perf = { fps: 30, ratio: 1.5, rest: false }; let lastDraw = 0, restAt = 0, backHidden = false;
   function frame() {
     if (!running) return;
     requestAnimationFrame(frame);
     if (document.hidden) return;
     const tDraw = performance.now();
-    if (perf.rest) { if (api.onFrame) api.onFrame(); return; }
+    if (perf.rest) { if (api.onFrame && tDraw - restAt > 250) { restAt = tDraw; api.onFrame(); } return; }   // 休み中(おしゃべり画面・ゲームなど)は 1秒に4回だけ(毎秒60回 配置を測っていた 11-24)
     if (tDraw - lastDraw < 1000 / perf.fps - 3) return;
     lastDraw = tDraw;
     const dt = Math.min(clock.getDelta(), 0.1);
@@ -3011,7 +3004,6 @@ function createShop(canvas, opts) {
     cheer(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.cheer = 2.2; },
     bow(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.bow = BOW_T; },
     cheerAt(seat, e) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.cheer = Math.max(0.001, CHEER_T - e); },   // 確認用: 乾杯の途中の形
-    cheerAll() { seatAvatars.forEach((a) => a && (a.userData.cheer = 2.2)); if (owner) owner.userData.cheer = 2.2; },
     talk(seat) { const a = seat === 'owner' ? owner : seatAvatars[seat]; if (a) a.userData.talk = 1.6; },
     /* ---------- 記念撮影(大将の自撮り風) ----------
        list = [{ key: 席の番号 か 'owner', pose, face }](写らない人は入れない)。何回よんでもよい(選びなおし・人の出入り) */
@@ -3213,14 +3205,17 @@ function createPreview(canvas) {
   window.addEventListener('pointermove', (e) => { if (drag) rotY = drag.r + (e.clientX - drag.x) * 0.01; });
   window.addEventListener('pointerup', () => { drag = null; });
   let zoom = 0;
-  function resize() {
+  let lastW = 0, lastH = 0;
+  function resize() {   // 大きさが変わったときだけ(毎回 setSize していた 11-24)
     const w = canvas.clientWidth, h = canvas.clientHeight;
-    if (!w || !h) return;
-    renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+    if (!w || !h || (w === lastW && h === lastH)) return;
+    lastW = w; lastH = h; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
   }
-  let running = true; const clock = makeClock();
-  function frame() {
+  let running = true, lastT = 0; const clock = makeClock();
+  function frame(t) {
     if (!running) return; requestAnimationFrame(frame);
+    if (document.hidden || !canvas.clientWidth || !canvas.offsetParent) { clock.getDelta(); return; }   // 見本の画面を閉じている間は 描かない(閉じたあとも 毎秒200回以上 描いていた 11-24)
+    if (t - lastT < 30) return; lastT = t;   // 1秒に30回まで
     resize();
     const dt = Math.min(clock.getDelta(), 0.1);
     if (av) { animateAvatar(av, dt); av.rotation.y = rotY; }
