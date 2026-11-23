@@ -117,8 +117,8 @@
   </div>
   <div class="np-row"><button id="nowPlaying" class="np">🎵 <span id="npTitle">—</span></button><button id="npSkip" class="np-skip owner-only">⏭ 次へ</button></div>
   <div class="side">
-    <button id="bMore" class="sbtn owner-only"><span>☰</span><small id="bMoreLbl">メニュー</small></button>
-    <button id="bView" class="sbtn" title="視点"><span>👁</span><small id="bViewLbl">目線</small></button>
+    <button id="bMore" class="sbtn owner-only"><span>☰</span><small id="bMoreLbl">ほか</small></button>
+    <button id="bView" class="sbtn" title="視点"><span>👁</span><small id="bViewLbl">見え方</small></button>
     <button id="bMusic" class="sbtn"><span>🎵</span><small>曲</small></button>
     <button id="bMenu" class="sbtn"><span>🍺</span><small>注文</small></button>
     <button id="bPhoto" class="sbtn"><span>📸</span><small>撮影</small></button>
@@ -126,7 +126,7 @@
     <button id="bCos" class="sbtn hidden"><span>👕</span><small id="bCosLbl">着がえ</small></button>
     <button id="bOrders" class="sbtn owner-only"><span>📋</span><small>注文票</small><i id="ordBadge" class="badge hidden">0</i></button>
     <button id="bAi" class="sbtn owner-only hidden"><span>👧</span><small>アイちゃん</small><i id="aiDot" class="ai-dot hidden"></i></button>
-    <button id="bOwner" class="sbtn owner-only"><span>🏮</span><small>店主</small></button>
+    <button id="bOwner" class="sbtn owner-only"><span>🏮</span><small>大将の操作</small></button>
     <button id="bBot" class="sbtn hidden"><span>🤖</span><small>おためし客</small></button>
     <button id="bLeave" class="sbtn"><span>🚪</span><small>帰る</small></button>
   </div>
@@ -135,9 +135,10 @@
     <div id="mine" class="mine hidden"></div>
     <div id="tkQuick" class="tk-quick hidden"></div>
     <div id="phrases" class="phrases"></div>
-    <div class="log-wrap"><div id="log" class="log"></div><button id="logBtn" class="log-btn" type="button">全部見る ▲</button></div>
+    <div class="log-wrap"><div id="log" class="log"></div><button id="fzBtn" class="fz-btn" type="button">Aa 字の大きさ<b>ふつう</b></button><button id="logBtn" class="log-btn" type="button">全部見る ▲</button></div>
     <div id="toChip" class="to-chip hidden"><span id="toName"></span><button type="button" id="toClear" aria-label="消す">✕ 消す</button></div>
     <form id="chatForm" class="chat">
+      <button type="button" id="whBtn" class="wh-btn" aria-label="こそっと話す"><span>🤫</span><small>こそっと</small></button>
       <textarea id="chatInput" rows="1" maxlength="500" placeholder="話しかける…" autocomplete="off"></textarea>
       <button type="submit" id="sendBtn">送る</button>
     </form>

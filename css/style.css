@@ -156,21 +156,21 @@ body:not(.is-owner) .owner-only { display: none; }
 .ph-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
 .ph-grid button { background: #f3e6cc; color: var(--ink); border-radius: 12px; padding: 11px 8px; font-weight: 800; font-size: 15px; text-align: left; line-height: 1.25; }
 .ph-grid button:active { transform: scale(.97); }
-.phrases button { flex: none; background: rgba(243,230,204,.92); color: var(--ink); border-radius: 999px; padding: 7px 12px; font-weight: 800; font-size: 14px; }
+.phrases button { flex: none; background: rgba(243,230,204,.92); color: var(--ink); border-radius: 999px; padding: 7px 12px; font-weight: 800; font-size: calc(14px * var(--fz, 1)); }
 .log-wrap { position: relative; }
-.log { max-height: 16vh; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; font-size: 13.5px; line-height: 1.45;
+.log { max-height: 16vh; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; font-size: calc(13.5px * var(--fz, 1)); line-height: 1.45;
   mask-image: linear-gradient(180deg, transparent 0, transparent 20px, #000 56px); -webkit-mask-image: linear-gradient(180deg, transparent 0, transparent 20px, #000 56px); padding-top: 20px; }   /* 上の「全部見る」の下は 文字を見せない(長い文が ボタンに かぶっていた 11-23) */
 .log .ln { background: rgba(0,0,0,.35); align-self: flex-start; border-radius: 10px; padding: 3px 9px; max-width: 92%; word-break: break-word; white-space: pre-wrap; }
 .log .ln b { color: var(--gold); margin-right: 5px; }
 .log .ln.owner b { color: #ff8a6a; }
-.log .ln.sys { color: var(--paper2); font-size: 12px; background: transparent; }
+.log .ln.sys { color: var(--paper2); font-size: calc(12px * var(--fz, 1)); background: transparent; }
 .log-btn { position: absolute; right: 2px; top: -6px; background: rgba(20,12,8,.8); border: 1px solid rgba(232,163,61,.6); color: var(--paper2);
   border-radius: 999px; padding: 4px 10px; font-size: 11.5px; font-weight: 700; }
 /* 会話の記録を 画面いっぱいに広げたとき */
 .log-wrap.big { position: fixed; left: 8px; right: 8px; top: calc(var(--sat) + 52px); bottom: calc(var(--sab) + 70px); z-index: 12;
   background: rgba(20,12,8,.985); border-radius: 16px; border: 1px solid rgba(232,163,61,.4); padding: 34px 10px 10px; }
 .log-wrap.big .log > :first-child { margin-top: auto; }
-.log-wrap.big .log { max-height: 100%; height: 100%; mask-image: none; -webkit-mask-image: none; padding-top: 0; font-size: 15px; gap: 6px; }
+.log-wrap.big .log { max-height: 100%; height: 100%; mask-image: none; -webkit-mask-image: none; padding-top: 0; font-size: calc(15px * var(--fz, 1)); gap: 6px; }
 .log-wrap.big .log-btn { top: 8px; right: 10px; }
 .chat { display: flex; gap: 6px; align-items: flex-end; }
 .chat textarea { flex: 1; min-width: 0; padding: 11px 14px; border-radius: 22px; border: 0; background: rgba(255,250,240,.96); color: var(--ink);
@@ -180,23 +180,23 @@ body:not(.is-owner) .owner-only { display: none; }
 
 /* 頭の上の札と吹き出し */
 #tags, #bubbles, #floaters { position: fixed; inset: 0; pointer-events: none; z-index: 9; overflow: hidden; }
-.tag { position: absolute; transform: translate(-50%, -100%); font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;
+.tag { position: absolute; transform: translate(-50%, -100%); font-size: calc(11px * var(--fz, 1)); font-weight: 700; padding: 2px 8px; border-radius: 999px;
   background: rgba(0,0,0,.55); white-space: nowrap; }
 .tag.owner { background: rgba(200,38,28,.85); }
 .tag.me { background: rgba(232,163,61,.9); color: var(--ink); }
-.tag.free { pointer-events: auto; background: rgba(243,230,204,.95); color: var(--ink); font-size: 13px; padding: 7px 12px; border: 2px solid var(--wood); cursor: pointer; }
-.tag.away { background: rgba(60,60,70,.85); color: #ddd; font-size: 11px; }
-.tag.reserved { background: rgba(80,60,40,.92); color: #ffe7b8; font-size: 12px; padding: 4px 10px; border: 1px solid rgba(232,163,61,.6); }
-.tag.moved { font-size: 10px; padding: 1px 6px; opacity: .93; }   /* ほかの名札と重なるので 小さくして上へ(11-23) */
-.tag.free.moved { font-size: 11px; padding: 3px 8px; border-width: 1.5px; }
-.tag.reserved.moved { font-size: 10px; padding: 2px 7px; }
+.tag.free { pointer-events: auto; background: rgba(243,230,204,.95); color: var(--ink); font-size: calc(13px * var(--fz, 1)); padding: 7px 12px; border: 2px solid var(--wood); cursor: pointer; }
+.tag.away { background: rgba(60,60,70,.85); color: #ddd; font-size: calc(11px * var(--fz, 1)); }
+.tag.reserved { background: rgba(80,60,40,.92); color: #ffe7b8; font-size: calc(12px * var(--fz, 1)); padding: 4px 10px; border: 1px solid rgba(232,163,61,.6); }
+.tag.moved { font-size: calc(10px * var(--fz, 1)); padding: 1px 6px; opacity: .93; }   /* ほかの名札と重なるので 小さくして上へ(11-23) */
+.tag.free.moved { font-size: calc(11px * var(--fz, 1)); padding: 3px 8px; border-width: 1.5px; }
+.tag.reserved.moved { font-size: calc(10px * var(--fz, 1)); padding: 2px 7px; }
 .bubble { position: absolute; transform: translate(-50%, calc(-100% - 22px)); width: max-content; max-width: min(62vw, 260px); white-space: pre-wrap; box-sizing: border-box; background: #fffaf0; color: var(--ink);
-  border-radius: 14px; padding: 7px 11px; font-size: 14px; line-height: 1.4; box-shadow: 0 3px 10px rgba(0,0,0,.4); word-break: break-word; transition: opacity .4s; }
+  border-radius: 14px; padding: 7px 11px; font-size: calc(14px * var(--fz, 1)); line-height: 1.4; box-shadow: 0 3px 10px rgba(0,0,0,.4); word-break: break-word; transition: opacity .4s; }
 .bubble::after { content: ''; position: absolute; left: 50%; bottom: -8px; transform: translateX(-50%); border: 8px solid transparent; border-top-color: #fffaf0; border-bottom: 0; }
-.bubble.phrase { background: var(--gold); font-weight: 800; font-size: 16px; }
+.bubble.phrase { background: var(--gold); font-weight: 800; font-size: calc(16px * var(--fz, 1)); }
 .bubble.phrase::after { border-top-color: var(--gold); }
 .bubble.fade { opacity: 0; }
-.bubble.long { max-width: min(74vw, 320px); font-size: 13.5px; }
+.bubble.long { max-width: min(74vw, 320px); font-size: calc(13.5px * var(--fz, 1)); }
 .bubble .bt { overflow: hidden; }
 .bubble .bn { display: none; font-size: 11px; font-weight: 800; color: #9a5a1a; margin-bottom: 1px; }
 .bubble.moved .bn { display: block; }
@@ -316,7 +316,7 @@ body.owner-view #bMore { display: flex; }
 body.owner-view:not(.side-open) .side > .sbtn:not(#bMore):not(#bOrders):not(#bView):not(#bAi) { display: none; }
 @media (orientation: portrait) { body.side-open .np-row { max-width: calc(100% - 150px); } }   /* ☰ を開くと ボタンが2列になるので、曲名の帯と「次へ」を短く(👧 が「次へ」に重なっていた 11-23) */   /* 👧 アイちゃんも たたんだ時に出す 11-23 */
 body.owner-view .side > #bView { order: -1; }   /* 大将も 👁 は いつも いちばん上(右上)。おしゃべり画面と 同じ所で 続けて押せる 11-22 ノブさん */
-body.owner-view .log { max-height: 27vh; font-size: 14.5px; background: rgba(20,12,8,.55); border-radius: 12px; padding: 14px 6px 6px; }
+body.owner-view .log { max-height: 27vh; font-size: calc(14.5px * var(--fz, 1)); background: rgba(20,12,8,.55); border-radius: 12px; padding: 14px 6px 6px; }
 body.owner-view .log .ln { background: rgba(255,255,255,.07); }
 body.owner-view .log .ln.owner { background: rgba(140,29,22,.9); }
 body.owner-view .log .ln.new { background: rgba(255,232,170,.2); }
@@ -335,16 +335,22 @@ body.owner-view .log .ln.new { background: rgba(255,232,170,.2); }
   .sbtn span { font-size: 19px; }
   .sbtn small { font-size: 9.5px; }
   .bottom { right: auto; width: min(60vw, 560px); padding-left: calc(env(safe-area-inset-left, 0px) + 8px); }
-  .log { display: none; }
+  /* 横向きでも 会話を出す(ノブさん 11-23「できるだけ多く。上ほど薄く、見づらいけど見えるくらい」)。
+     会話は 決まり文句の上に置き、新しい行ほど下(決まり文句の近く)。古い行ほど だんだん薄くして、うしろの絵や人に なじませる */
+  .log-wrap { order: -1; }
+  .log { display: flex; max-height: calc(100vh - 196px); max-height: calc(100dvh - 196px); padding-top: 26px;
+    mask-image: linear-gradient(180deg, transparent 0, rgba(0,0,0,.12) 26px, rgba(0,0,0,.45) 38%, rgba(0,0,0,.85) 68%, #000 84%);
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, rgba(0,0,0,.12) 26px, rgba(0,0,0,.45) 38%, rgba(0,0,0,.85) 68%, #000 84%); }
+  .log .ln { background: rgba(0,0,0,.5); text-shadow: 0 1px 2px rgba(0,0,0,.8); }
+  .log .ln.me { text-shadow: none; }
   .log-wrap.big .log { display: flex; }
-  body.owner-view .log { display: flex; max-height: calc(100vh - 222px); max-height: calc(100dvh - 222px); font-size: 13px; }
+  body.owner-view .log { display: flex; max-height: calc(100vh - 222px); max-height: calc(100dvh - 222px); font-size: calc(13px * var(--fz, 1)); }
   body.owner-view.has-tv .log { max-height: calc(100vh - 300px); max-height: calc(100dvh - 300px); }
   body.owner-view .bottom { width: min(40vw, 380px); background: linear-gradient(90deg, rgba(20,12,8,.75), rgba(20,12,8,.55)); }
   body.owner-view .topbar { width: min(40vw, 380px); }
   body.owner-view .np-row { max-width: min(40vw, 380px); }
-  .log-btn { position: static; margin-left: auto; display: block; margin-bottom: 2px; }
-  .log-wrap.big .log-btn { position: absolute; }
-  .phrases button { padding: 4px 10px; font-size: 12.5px; }
+  .log-btn { top: 0; }   /* 全部見る は 会話の右上(古くて薄い行の上)に */
+  .phrases button { padding: 4px 10px; font-size: calc(12.5px * var(--fz, 1)); }
   .bottom { gap: 4px; }
   .chat textarea { max-height: 90px; padding: 9px 12px; }
   .chat button { height: 40px; }
@@ -534,15 +540,15 @@ body.demo .side > #bGame { display: none !important; }   /* 着がえ中は 💬
 .tk-card.talk { border-color: #f5c04a; box-shadow: 0 0 0 3px rgba(245,192,74,.45), 0 0 18px rgba(245,192,74,.55); }
 .tk-card.away img { filter: grayscale(.7) brightness(.7); }
 .tk-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 30px; opacity: .6; }
-.tk-nm { position: absolute; left: 6px; bottom: 6px; max-width: calc(100% - 12px); background: rgba(20,12,8,.8); border-radius: 8px; padding: 2px 8px; font-size: 13px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tk-nm { position: absolute; left: 6px; bottom: 6px; max-width: calc(100% - 12px); background: rgba(20,12,8,.8); border-radius: 8px; padding: 2px 8px; font-size: calc(13px * var(--fz, 1)); font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tk-card.owner .tk-nm { background: #c8402c; }
 .tk-dr { position: absolute; right: 6px; bottom: 5px; font-size: 20px; }
 .tk-st { position: absolute; right: 6px; top: 6px; font-size: 11px; font-weight: 800; background: #d9442e; border-radius: 99px; padding: 2px 7px; }
-.tk-bub { position: absolute; left: 6px; right: 6px; top: 6px; background: #fffdf6; color: #2a1a10; border-radius: 12px; padding: 5px 9px; font-size: 13px; line-height: 1.35; font-weight: 800; text-align: left; box-shadow: 0 2px 6px rgba(0,0,0,.35); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.tk-bub { position: absolute; left: 6px; right: 6px; top: 6px; background: #fffdf6; color: #2a1a10; border-radius: 12px; padding: 5px 9px; font-size: calc(13px * var(--fz, 1)); line-height: 1.35; font-weight: 800; text-align: left; box-shadow: 0 2px 6px rgba(0,0,0,.35); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .tk-empty { color: #e8dcc6; text-align: center; font-size: 15px; line-height: 1.8; }
 .tk-quick { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
 .tk-quick::-webkit-scrollbar { display: none; }
-.tk-quick button { flex: none; background: #4a3a2c; color: #fbf3e4; border-radius: 999px; padding: 8px 12px; font-weight: 800; font-size: 14px; }
+.tk-quick button { flex: none; background: #4a3a2c; color: #fbf3e4; border-radius: 999px; padding: 8px 12px; font-weight: 800; font-size: calc(14px * var(--fz, 1)); }
 /* おしゃべり画面の間: 右のボタンは 上に 横ならび。頭の上の吹き出し・名札・モニターは かくす。会話の欄は 少し広く */
 body.talk-on .side { flex-direction: row-reverse; flex-wrap: wrap; left: 8px; right: 8px; max-height: none !important; gap: 5px; justify-content: flex-start; align-content: flex-start; }
 body.talk-on .side > #bView { order: -1; }   /* 👁 は いちばん右上(ふつうの画面の 👁 と だいたい同じ所。続けて押せるように 11-22 ノブさん) */   /* ボタンは 全部見えるように(入りきらなければ 2段に) */
@@ -552,8 +558,8 @@ body.talk-on .sbtn { flex: none; width: 49px; padding: 5px 0 4px; }
 body.talk-on .sbtn span { font-size: 19px; }
 body.talk-on .sbtn small { font-size: 9.5px; white-space: nowrap; letter-spacing: -.03em; }
 .tk-card.dr .tk-nm { max-width: calc(100% - 38px); }
-.tk-grid.small .tk-nm { font-size: 11.5px; padding: 1px 6px; left: 4px; bottom: 4px; }
-.tk-grid.small .tk-bub { font-size: 11.5px; padding: 4px 7px; -webkit-line-clamp: 2; left: 4px; right: 4px; top: 4px; }
+.tk-grid.small .tk-nm { font-size: calc(11.5px * var(--fz, 1)); padding: 1px 6px; left: 4px; bottom: 4px; }
+.tk-grid.small .tk-bub { font-size: calc(11.5px * var(--fz, 1)); padding: 4px 7px; -webkit-line-clamp: 2; left: 4px; right: 4px; top: 4px; }
 .tk-grid.small .tk-dr { font-size: 16px; right: 4px; bottom: 3px; }
 .tk-grid.small .tk-st { font-size: 10px; padding: 1px 5px; }
 body.talk-on .np-row, body.talk-on #bubbles, body.talk-on #tags, body.talk-on #pickHint { display: none !important; }
@@ -577,7 +583,7 @@ body.talk-on .log-wrap.big .log, body.talk-on.owner-view .log-wrap.big .log { ma
 .log .ln.owner.me b { color: #ffd36a; }
 body.owner-view .log .ln.me:not(.owner) { background: #fff1cf; }
 body.owner-view .log .ln.owner.me { background: rgba(140,29,22,.95); }
-.log .me-tag { display: inline-block; font-style: normal; font-size: 10.5px; font-weight: 800; line-height: 1; color: #fff; background: #e8463d; border-radius: 999px; padding: 3px 6px 2px; margin-right: 5px; vertical-align: 1px; }
+.log .me-tag { display: inline-block; font-style: normal; font-size: calc(10.5px * var(--fz, 1)); font-weight: 800; line-height: 1; color: #fff; background: #e8463d; border-radius: 999px; padding: 3px 6px 2px; margin-right: 5px; vertical-align: 1px; }
 .log .ln.owner.me .me-tag { background: #ffd36a; color: #5a1a10; }
 .bubble.me { border: 3px solid #e8463d; }
 /* 「あなた」の札は 11-23 にやめた(名前が入っているので) */
@@ -694,3 +700,25 @@ body.wh-mode #phrases, body.wh-mode .ph-more { display: none !important; }
 .la-btns button { flex: 1; min-height: 54px; font: inherit; font-size: 18px; font-weight: 900; border-radius: 14px; border: 2px solid #5a3a1e; cursor: pointer; }
 #laStay { background: #fff; color: #3a2412; }
 #laGo { background: #c0392b; color: #fff; border-color: #7a1c12; }
+
+/* ===== 11-23 夜 ノブさんの答え(A・言葉) ===== */
+/* 字の大きさ: 小さめ・ふつう・大きめ(人が多いときは小さく、少ないときは大きく。ノブさん 11-23)。名札・会話・吹き出し・決まり文句が変わる */
+body.fz-s { --fz: .88; } body.fz-l { --fz: 1.2; }
+.fz-btn { display: none; }
+.log-wrap.big .fz-btn { display: block; position: absolute; top: 8px; left: 10px; background: rgba(255,250,240,.12); border: 1px solid rgba(232,163,61,.6); color: var(--paper2);
+  border-radius: 999px; padding: 4px 12px; font-size: 12.5px; font-weight: 800; }
+.fz-btn b { color: var(--gold); margin-left: 4px; }
+/* 🤫 こそっと話すボタン(入力欄の左。ノブさん 11-23「大事な機能。ごちゃごちゃさせず、見やすく」) */
+.chat .wh-btn { flex: none; width: 48px; height: 44px; padding: 0; border-radius: 14px; background: rgba(74,53,102,.95); border: 1.5px solid #c9b3ea; color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0; line-height: 1; }
+.chat .wh-btn span { font-size: 19px; line-height: 1.05; }
+.chat .wh-btn small { font-size: 9.5px; font-weight: 800; letter-spacing: -.04em; margin-top: 1px; }
+.chat.wh-on .wh-btn { background: #fff; color: #4a3566; border-color: #7a5aa8; box-shadow: 0 0 0 3px #7a5aa8; }
+body.demo .chat .wh-btn { display: none; }
+@media (orientation: landscape) and (max-height: 520px) { .chat .wh-btn { height: 40px; width: 44px; } }
+/* 横向きの おしゃべりの見え方: 会話は 右下のあき(顔の下)に。左下は 決まり文句と入力 */
+@media (orientation: landscape) and (max-height: 520px) {
+  body.talk-on .log-wrap:not(.big) { position: fixed; left: calc(min(60vw, 560px) + 14px); right: calc(env(safe-area-inset-right, 0px) + 8px); bottom: calc(var(--sab) + 8px); top: 60vh; }   /* top は js(顔のカードの下) */
+  body.talk-on .log-wrap:not(.big) .log { max-height: none; height: 100%; padding-top: 22px; }
+  body.talk-on .log-wrap:not(.big) .log > :first-child { margin-top: auto; }
+}
