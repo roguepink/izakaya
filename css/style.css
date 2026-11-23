@@ -569,6 +569,7 @@ body.talk-on .log { max-height: 22vh; }
 .tk-grid.small .tk-ord { font-size: 10.5px; left: 4px; bottom: 50px; }   /* 小さいカードでは「出す」の上の段に(重なって 見えなかった 11-22) */
 body.talk-on.owner-view:not(.side-open) .side > #bView { display: flex !important; }   /* 大将の おしゃべり画面: 👁(もどる)は いつも見える */
 body.talk-on.owner-view .log { max-height: 22vh; }
+body.talk-on .log-wrap.big .log, body.talk-on.owner-view .log-wrap.big .log { max-height: 100%; }   /* 「全部見る」は おしゃべりの見え方でも 画面いっぱいに(大将の画面で 上の3分の1しか出ていなかった 11-23) */
 /* 自分の言葉(ノブさん 11-22「埋もれないように、自分が話した言葉はすぐわかるように」): 右に寄せて、明るい色+「あなた」の札 */
 .log .ln.me { align-self: flex-end; background: #fff1cf; color: #2a1a10; border: 2px solid #e8463d; font-weight: 600; }
 .log .ln.me b { color: #b5121b; }
