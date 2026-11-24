@@ -1,0 +1,175 @@
+<title>大将ノブの言葉えらび</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Dela+Gothic+One&display=swap">
+<style>
+/* 縦一列: 上に文字数の計算(3万文字の枠) → 分類の札 → 言葉の行(○ × ✏️)。のれんの藍・ちょうちんの朱(声の一覧ページと同じ色) */
+:root {
+  --bg: #f6f2ea; --paper: #fffdf8; --ink: #2a2522; --mute: #7a6f66; --line: #e3dace;
+  --ai: #1f3a5f; --aiSoft: #e3ebf5; --shu: #c2412d; --shuSoft: #fbe7e2; --ok: #3d7a4f; --okSoft: #e3f1e6;
+  --disp: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "Zen Kaku Gothic New", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #17191d; --paper: #20232a; --ink: #ece6dc; --mute: #a39a8f; --line: #343842;
+  --ai: #9fbde3; --aiSoft: #26344a; --shu: #f08a74; --shuSoft: #43251f; --ok: #8fcf9f; --okSoft: #1f3527; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #17191d; --paper: #20232a; --ink: #ece6dc; --mute: #a39a8f; --line: #343842;
+  --ai: #9fbde3; --aiSoft: #26344a; --shu: #f08a74; --shuSoft: #43251f; --ok: #8fcf9f; --okSoft: #1f3527; color-scheme: dark }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 80px; }
+.wrap { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+h1 { font-family: var(--disp); font-weight: 400; font-size: 1.5rem; letter-spacing: .04em; margin: 0; text-wrap: balance; }
+.sub { color: var(--mute); font-size: .9rem; margin: 2px 0 0; }
+.meter { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.meter .nums { display: flex; flex-wrap: wrap; gap: 6px 14px; font-variant-numeric: tabular-nums; font-size: .92rem; }
+.meter .nums b { font-size: 1.15rem; }
+.bar { height: 12px; border-radius: 6px; background: var(--line); overflow: hidden; display: flex; }
+.bar i { display: block; height: 100%; background: var(--ai); }
+.bar i.re { background: repeating-linear-gradient(45deg, var(--shu) 0 6px, transparent 6px 10px); opacity: .55; }
+.meter .note { font-size: .84rem; color: var(--mute); }
+.how { font-size: .88rem; color: var(--mute); background: var(--paper); border: 1px dashed var(--line); border-radius: 10px; padding: 8px 12px; }
+.jump { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg); padding: 6px 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.jump button { flex: 0 0 auto; font: inherit; font-size: .85rem; font-weight: 700; border: 1px solid var(--line); background: var(--paper); color: var(--ink); border-radius: 999px; padding: 6px 12px; cursor: pointer; }
+.grp { display: flex; flex-direction: column; gap: 12px; scroll-margin-top: 56px; }
+.grp > h2 { font-family: var(--disp); font-weight: 400; font-size: 1.15rem; margin: 10px 0 0; letter-spacing: .05em; color: var(--ai); }
+.cat { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.cat-h { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.cat-h h3 { margin: 0; font-size: 1rem; flex: 1; min-width: 0; }
+.cat-h .cnt { font-size: .8rem; color: var(--mute); font-variant-numeric: tabular-nums; }
+.cat-h .all { font: inherit; font-size: .78rem; font-weight: 700; border: 1px solid var(--ok); color: var(--ok); background: transparent; border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+.row { display: flex; align-items: center; gap: 6px; padding: 7px 8px 7px 12px; border-bottom: 1px solid var(--line); }
+.row:last-of-type { border-bottom: 0; }
+.row .t { flex: 1; min-width: 0; font-size: 1rem; font-weight: 500; overflow-wrap: anywhere; }
+.row .t s { color: var(--mute); font-weight: 400; font-size: .85rem; margin-left: 4px; }
+.row.ng .t { color: var(--mute); text-decoration: line-through; }
+.row.ok { background: var(--okSoft); }
+.row .new { font-size: .7rem; font-weight: 700; color: var(--shu); border: 1px solid var(--shu); border-radius: 4px; padding: 0 4px; margin-right: 4px; vertical-align: 2px; }
+.b { font: inherit; width: 40px; height: 36px; flex: 0 0 auto; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--mute); font-weight: 700; font-size: 1rem; cursor: pointer; }
+.row.ok .b.o { background: var(--ok); border-color: var(--ok); color: #fff; }
+.row.ng .b.x { background: var(--shu); border-color: var(--shu); color: #fff; }
+.edit { display: flex; gap: 6px; padding: 6px 8px 10px 12px; border-bottom: 1px solid var(--line); }
+.edit input, .add input { flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); }
+.edit button, .add button { font: inherit; font-weight: 700; border: 0; border-radius: 10px; padding: 0 14px; background: var(--ai); color: var(--paper); cursor: pointer; }
+.add { display: flex; gap: 6px; padding: 10px 12px; background: var(--aiSoft); }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--shu); outline-offset: 1px; }
+.warn { display: none; background: var(--shuSoft); color: var(--shu); border-radius: 10px; padding: 8px 12px; font-size: .9rem; }
+@media (prefers-reduced-motion: no-preference) { .bar i { transition: width .3s; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>大将ノブの言葉えらび</h1>
+    <p class="sub">イレブンラボで ノブさんの声にして作る、決まり文句の下書きです</p>
+  </header>
+  <div class="meter" id="meter"></div>
+  <div class="how">それぞれの言葉に <b>○</b>(作る)・<b>×</b>(作らない)・<b>✏️</b>(言い方を直す)。何もつけていない言葉も「作る」に数えます。分類のいちばん下で、言葉を足せます。つけた印は自動で残り、Claude が読みます。</div>
+  <div class="warn" id="warn"></div>
+  <nav class="jump" id="jump" aria-label="分類へ飛ぶ"></nav>
+  <main id="list" class="wrap" style="gap:18px"></main>
+</div>
+
+<script>
+const DATA = __DATA__;
+const BUDGET = 30000, KEEP = 10000;   // 1か月の枠と、作り直し用に残す分
+const marks = {}, adds = {};          // marks[id] = {v, text}  adds[docId] = {cat, text, v}
+let db = null, openEdit = null;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function warn(t) { const w = $('warn'); w.textContent = t; w.style.display = t ? 'block' : 'none'; }
+const say = (id, base) => (marks[id] && marks[id].text) || base;
+function allItems() {
+  const out = [];
+  DATA.forEach(g => g.cats.forEach(c => {
+    c.lines.forEach((t, i) => out.push({ id: c.code + '-' + (i + 1), cat: c.code, base: t }));
+    Object.keys(adds).filter(k => adds[k].cat === c.code).sort((a, b) => (adds[a].at || 0) - (adds[b].at || 0)).forEach(k => out.push({ id: 'add:' + k, cat: c.code, base: adds[k].text, added: true }));
+  }));
+  return out;
+}
+function stateOf(it) { return it.added ? (adds[it.id.slice(4)].v || '') : ((marks[it.id] && marks[it.id].v) || ''); }
+function renderMeter() {
+  const items = allItems(), make = items.filter(it => stateOf(it) !== 'ng');
+  const chars = make.reduce((n, it) => n + Array.from(say(it.id, it.base)).length, 0);
+  const ok = items.filter(it => stateOf(it) === 'ok').length, ng = items.filter(it => stateOf(it) === 'ng').length;
+  const room = BUDGET - KEEP - chars, per = make.length ? chars / make.length : 13;
+  $('meter').innerHTML = `<div class="nums"><span>作る言葉 <b>${make.length.toLocaleString()}</b> こ</span><span>文字数 <b>${chars.toLocaleString()}</b> / 30,000</span><span>○ ${ok} ・ × ${ng} ・ まだ ${items.length - ok - ng}</span></div>` +
+    `<div class="bar" role="img" aria-label="3万文字の枠のうち ${chars} 文字"><i style="width:${Math.min(100, chars / BUDGET * 100)}%"></i><i class="re" style="width:${KEEP / BUDGET * 100}%"></i></div>` +
+    `<div class="note">${room >= 0 ? `作り直し用に1万文字(しま模様)を残しても、あと <b>約${Math.floor(room / per).toLocaleString()}こ</b>(${room.toLocaleString()}文字)足せます。` : `作り直し用の1万文字に <b>${(-room).toLocaleString()}文字</b> 食いこんでいます。× を増やすか、2か月目に回します。`}</div>`;
+}
+function rowHtml(it) {
+  const st = stateOf(it), txt = say(it.id, it.base), edited = !it.added && marks[it.id] && marks[it.id].text;
+  let h = `<div class="row ${st}" data-id="${esc(it.id)}"><div class="t">${it.added ? '<span class="new">足した</span>' : ''}${esc(txt)}${edited ? `<s>(もと: ${esc(it.base)})</s>` : ''}</div>` +
+    `<button class="b o" data-act="ok" aria-label="作る">○</button><button class="b x" data-act="ng" aria-label="作らない">×</button><button class="b" data-act="ed" aria-label="言い方を直す">✏️</button></div>`;
+  if (openEdit === it.id) h += `<form class="edit" data-id="${esc(it.id)}"><input id="ed-${esc(it.id)}" value="${esc(txt)}" aria-label="言い方"><button>残す</button></form>`;
+  return h;
+}
+function renderList() {
+  const items = allItems(); let h = '';
+  DATA.forEach((g, gi) => {
+    h += `<section class="grp" id="g${gi}"><h2>${esc(g.name)}</h2>`;
+    g.cats.forEach(c => {
+      const its = items.filter(it => it.cat === c.code), mk = its.filter(it => stateOf(it) !== 'ng').length;
+      h += `<div class="cat"><div class="cat-h"><h3>${esc(c.name)}</h3><span class="cnt">${mk} / ${its.length}</span><button class="all" data-all="${c.code}">まだの分を ぜんぶ○</button></div>` +
+        its.map(rowHtml).join('') +
+        `<form class="add" data-cat="${c.code}"><input id="add-${c.code}" placeholder="「${esc(c.name)}」に言葉を足す" aria-label="${esc(c.name)}に言葉を足す"><button>足す</button></form></div>`;
+    });
+    h += '</section>';
+  });
+  $('list').innerHTML = h;
+  $('jump').innerHTML = DATA.map((g, gi) => `<button data-go="g${gi}">${esc(g.name)}</button>`).join('');
+}
+function render() {
+  const keep = {}, act = document.activeElement && document.activeElement.id;   // 打ちかけの文字と 入力中の場所を 守る
+  document.querySelectorAll('#list input').forEach(i => { if (i.value) keep[i.id] = i.value; });
+  renderMeter(); renderList();
+  for (const id in keep) { const i = document.getElementById(id); if (i) i.value = keep[id]; }
+  const f = (act && document.getElementById(act)) || (openEdit && document.getElementById('ed-' + openEdit));
+  if (f && f.tagName === 'INPUT') f.focus({ preventScroll: true });
+}
+
+async function setMark(it, patch) {
+  if (it.added) { const k = it.id.slice(4); adds[k] = Object.assign({}, adds[k], patch); render(); if (db) try { await db.doc('adds/' + k).update(Object.assign(patch, { at2: Date.now() })); } catch (e) { warn('印を残せませんでした。電波を確かめて、もう一度押してください。'); } return; }
+  const cur = Object.assign({ v: '', text: '' }, marks[it.id], patch); marks[it.id] = cur; render();
+  if (!db) return;
+  try { if (!cur.v && !cur.text) await db.doc('marks/' + it.id).delete(); else await db.doc('marks/' + it.id).set({ v: cur.v, text: cur.text, base: it.base, at: Date.now() }); }
+  catch (e) { warn('印を残せませんでした。電波を確かめて、もう一度押してください。'); }
+}
+const find = (id) => allItems().find(it => it.id === id);
+document.addEventListener('click', async (e) => {
+  const go = e.target.closest('[data-go]'); if (go) { document.getElementById(go.dataset.go).scrollIntoView({ behavior: 'smooth' }); return; }
+  const all = e.target.closest('[data-all]');
+  if (all) { const its = allItems().filter(it => it.cat === all.dataset.all && !stateOf(it)); for (const it of its) await setMark(it, { v: 'ok' }); return; }
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const it = find(b.closest('.row').dataset.id); if (!it) return;
+  const st = stateOf(it), act = b.dataset.act;
+  if (act === 'ed') { openEdit = openEdit === it.id ? null : it.id; render(); return; }
+  setMark(it, { v: st === act ? '' : act });
+});
+document.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target;
+  if (f.classList.contains('edit')) {
+    const it = find(f.dataset.id), v = f.querySelector('input').value.trim(); openEdit = null;
+    if (!it) return render();
+    if (it.added) { setMark(it, { text: v || it.base }); return; }
+    setMark(it, { text: v && v !== it.base ? v : '' });
+  } else if (f.classList.contains('add')) {
+    const inp = f.querySelector('input'), v = inp.value.trim(); if (!v) return;
+    inp.value = ''; inp.blur();
+    const k = 'a' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    adds[k] = { cat: f.dataset.cat, text: v, v: 'ok', at: Date.now() }; render();
+    if (db) try { await db.doc('adds/' + k).set(adds[k]); } catch (er) { warn('足した言葉を残せませんでした。電波を確かめて、もう一度足してください。'); }
+  }
+});
+
+render();
+(async () => {
+  try { db = await (window.claude && window.claude.use ? window.claude.use('db') : null); } catch (e) { db = null; }
+  if (!db) { warn('印を保存できない画面で開いています(このままでも見られます)。Claude のアプリで開きなおすと、印が残ります。'); return; }
+  const t = setTimeout(() => warn('印の読みこみに時間がかかっています。電波を確かめてください。'), 10000);
+  db.collection('marks').onSnapshot((q) => { clearTimeout(t); for (const k in marks) delete marks[k]; q.docs.forEach(d => { const x = d.data() || {}; marks[d.id] = { v: x.v || '', text: x.text || '' }; }); render(); }, () => warn('印を読みこめませんでした。'));
+  db.collection('adds').onSnapshot((q) => { for (const k in adds) delete adds[k]; q.docs.forEach(d => { adds[d.id] = d.data() || {}; }); render(); }, () => {});
+})();
+</script>
