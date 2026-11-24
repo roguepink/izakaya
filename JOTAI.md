@@ -407,3 +407,11 @@
 - イレブンラボ: Starter 月6ドル(初月1ドル)・3万文字/月・解約後も作った音声は商用OK。ノブさんの方針「最初にたくさん作って保存、季節・行事ごとに選べるように」。
 - 言葉えらびページ(Claude のページ)https://claude.ai/artifact/JRdDBNiiJtjvTSDLrjvNeB … 下書き435こ・4,815字。印は db の marks/<コード-番号>{v:'ok'|'ng', text}、足した言葉は adds。元は docs/kotoba/phrases.py(id は コード-番号。並べかえない・後ろに足す)。
 - 次: ノブさんの○×と追加 → 長い台本の録音 → イレブンラボ登録(ノブさん)→ 3つ試作 → 全部作る → アプリで季節・行事ごとに選べる仕組み。
+
+## 11-24 夜: イレブンラボで「大将ノブ」の声のまね → 決まり文句452こ
+- 契約: ElevenLabs Starter(いつものアカウント)。初月166円、12/24 から 993円/月(やめる判断はそれまでに)。使用 4,900 / 40,000。
+- 声: Instant Voice Clone「大将ノブ」(長い台本3つ・1分15秒から)。API キーは ~/.config/elevenlabs/api_key.txt(ノブさんが保存・本人だけ読める)、声の番号は voice_nobu.txt。リポジトリに入れない。
+- 作り方: tools/make-nobu-clone.py single(1こずつ。まとめて作ると切れ目が30こずれた)。読み方の直しは SAY。v4 で 1文字 約0.35〜0.4 クレジット(画面の 2〜3倍 割安)。
+- 声は ~/claude-work/izakaya-voice-raw/clone/out/<id>.mp3(まだ公開の置き場に入れていない)。一覧は docs/kotoba/final.json。
+- 聞き比べページ https://claude.ai/artifact/5aG4wBHhXdfDdL4kyMSBKy(db marks/<id> {v:'ok'|'ng', note})。ノブさんの○×待ち → ×を作り直し → アプリへ(季節・行事ごとに選べる仕組み)。
+- 人のペース: 11-24 ノブさん「公式 API・MCP は待たない」に見直し(hito-pace.py・CLAUDE.md)。

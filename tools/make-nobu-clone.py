@@ -6,7 +6,8 @@
   ~/.local/venvs/ryokoshi/bin/python tools/make-nobu-clone.py make --only 10  # はじめの10こだけ作る
   ~/.local/venvs/ryokoshi/bin/python tools/make-nobu-clone.py make            # まだ作っていない言葉を全部作る
   ~/.local/venvs/ryokoshi/bin/python tools/make-nobu-clone.py check           # 作った声を聞き起こして、言葉と合っているか表に出す
-  ~/.local/venvs/ryokoshi/bin/python tools/make-nobu-clone.py redo <id> ...   # その言葉だけ作り直す
+  ~/.local/venvs/ryokoshi/bin/python tools/make-nobu-clone.py redo <id> ...   # その言葉だけ作り直す(まとめて作るやり方)
+  ~/.local/venvs/ryokoshi/bin/python tools/make-nobu-clone.py single [id ...] # 1こずつ作る(★ふだんはこれ。切り分けがいらず ずれない)
 
 やること
   1. docs/kotoba/final.json(言葉えらびページの○×・直し・追加を反映した一覧)を読む
@@ -28,7 +29,8 @@ MODEL = 'eleven_v4'
 CHUNK_CHARS = 450          # 1回に頼む文字数のめやす
 HITO = Path.home() / '.claude/scripts/hito-pace.py'
 # 読み方の直し(画面に出す字はそのまま。声にするときだけ置きかえる)
-SAY = [('125cc', 'ひゃくにじゅうごシーシー'), ('大将', 'たいしょう')]
+SAY = [('125cc', 'ひゃくにじゅうごシーシー'), ('大将', 'たいしょう'), ('白酒', 'しろざけ'), ('恵方巻き', 'えほうまき'), ('恵方', 'えほう'), ('銀杏', 'ぎんなん'),
+       ('白子', 'しらこ'), ('熱燗', 'あつかん'), ('地酒', 'じざけ'), ('冷やと', 'ひやと'), ('土瓶蒸し', 'どびんむし'), ('お新香', 'おしんこ'), ('一期一会', 'いちごいちえ'), ('あはは！', 'あっはっは！'), ('お刺身', 'おさしみ'), ('お菓子、どうぞ', 'はい、おかし どうぞ')]
 
 
 _mv = None
@@ -152,6 +154,42 @@ def split_at(mv, pcm, texts, wav):
     return out, total
 
 
+def make_one(it):
+    """1こずつ作る(切り分けがいらないので ずれない。11-24 まとめて作ると30こほど切れ目がずれた)"""
+    req = urllib.request.Request('https://api.elevenlabs.io/v1/text-to-speech/%s?output_format=mp3_44100_128' % voice(),
+                                 headers={'xi-api-key': key(), 'Content-Type': 'application/json'},
+                                 data=json.dumps({'text': spoken(it['text']), 'model_id': MODEL, 'language_code': 'ja'}).encode())
+    for i in range(5):
+        try:
+            data = urllib.request.urlopen(req, timeout=120).read(); break
+        except urllib.error.HTTPError as e:
+            if e.code in (429, 500, 502, 503) and i < 4:
+                time.sleep(5 * (i + 1)); continue
+            raise
+    RAW.mkdir(parents=True, exist_ok=True); OUT.mkdir(parents=True, exist_ok=True)
+    src = RAW / ('one-' + it['id'] + '.mp3'); src.write_bytes(data)
+    ffmpeg('-i', str(src), '-af', 'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.08,areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.15,areverse,loudnorm=I=-16:TP=-1.5:LRA=11',
+           '-ar', '44100', '-ac', '1', '-b:a', '96k', str(OUT / (it['id'] + '.mp3')))
+    return len(spoken(it['text']))
+
+
+def cmd_single(ids=None, workers=3):
+    from concurrent.futures import ThreadPoolExecutor
+    L = items()
+    todo = [x for x in L if not ids or x['id'] in ids]
+    u0, lim = used()
+    print('はじめの使用量 %d / %d ・ 1こずつ %d こ' % (u0, lim, len(todo)), flush=True)
+    n = 0
+    with ThreadPoolExecutor(workers) as ex:
+        for k, c in enumerate(ex.map(make_one, todo), 1):
+            n += c
+            if k % 50 == 0:
+                print('  %d こ できた' % k, flush=True)
+    time.sleep(5)
+    u1, _ = used()
+    print('おわりの使用量 %d / %d ・ 今回 %d クレジット(%d 字)' % (u1, lim, u1 - u0, n))
+
+
 def cmd_list():
     L = items(); n = sum(len(spoken(x['text'])) for x in L)
     print('作る言葉 %d こ ・ 声にする文字 %d 字' % (len(L), n))
@@ -216,5 +254,7 @@ if __name__ == '__main__':
             if p.exists():
                 p.unlink()
         cmd_make(ids=set(a[1:]))
+    elif a[0] == 'single':   # 1こずつ作る(id を書けば その言葉だけ)
+        cmd_single(set(a[1:]) or None)
     elif a[0] == 'check':
         cmd_check(set(a[1:]) or None)
