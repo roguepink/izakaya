@@ -3539,7 +3539,7 @@
     if (r < 0.15 && +aic('season') && ((jst.getUTCDay() === 5 && once('fri')) || (jst.getUTCHours() >= 21 && once('late')) || (jst.getUTCMonth() === 11 && once('dec')) || (regSeason() && Math.random() < 0.4 && regLine(regSeason())))) return;   // 曜日・時間・季節の言葉(ときどき)
     if (r < pG && guests.length) { var to = members()[guests[Math.floor(Math.random() * guests.length)]].seat; if (regLine('ask', to)) return; }   // お客さんへの話しかけ(ふだんは多め・設定で変わる)
     if (r < pO && ownerPresent() && regLine('owner', 'owner')) return;   // 大将へ
-    regLine('idle');
+    regLine('idle', null, function (x) { var m = tree.state && tree.state.music; return x[0] !== 'a3' || !!(m && m.ended !== musicKey(m)); });   // 「この曲、すき」は 曲が流れているときだけ(11-24 ノブさん)
   }
   function regSeason() { var mo = new Date(now() + JST).getUTCMonth() + 1; return mo === 12 || mo <= 2 ? 'winter' : mo <= 5 ? 'spring' : mo <= 8 ? 'summer' : ''; }
   var regSayNext = 0;
