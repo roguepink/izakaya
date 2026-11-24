@@ -20,7 +20,9 @@
   .step.rec { background: #ffe1dc; box-shadow: 0 0 0 4px var(--red); }
   .step.ok { box-shadow: 0 0 0 4px var(--green); }
   .top { display: flex; justify-content: space-between; font-size: 13px; color: #7a6248; font-weight: 700; }
+  .say.long { font-size: 19px; line-height: 1.75; text-align: left; justify-content: flex-start; font-weight: 800; word-break: normal; }
   .say { font-size: 30px; font-weight: 900; line-height: 1.35; margin: 14px 0 10px; text-align: center; min-height: 82px; display: flex; align-items: center; justify-content: center; word-break: keep-all; overflow-wrap: anywhere; }
+  .long-tip { background: #fff5dc; border-radius: 10px; padding: 8px 10px; font-size: 13px; line-height: 1.6; color: #6a4a28; margin-bottom: 8px; display: none; }
   .state { text-align: center; font-size: 15px; font-weight: 800; min-height: 22px; }
   .state.ok { color: var(--green); } .state.rec { color: var(--red); } .state.wait { color: #a0522d; }
   .meter { height: 10px; border-radius: 5px; background: #e6cdb0; margin: 10px 0 2px; overflow: hidden; visibility: hidden; }
@@ -60,6 +62,7 @@
 <div class="step" id="step">
   <div class="top"><span id="cat"></span><span id="num"></span></div>
   <div class="say" id="say"></div>
+  <div class="long-tip" id="longTip">声をまねさせるための台本です。ふだんお店で話すように、ゆっくり・はっきり読んでください。つっかえても止めずに、そのまま続けて大丈夫です(90秒まで)。布団や服の多い、響かない部屋がいちばんです。</div>
   <div class="state" id="state"></div>
   <div class="meter"><i id="meter"></i></div>
   <div class="row">
@@ -86,6 +89,7 @@
 
 <details>
   <summary>使い方</summary>
+  ⓪ はじめの3つ(🎤)は、AI に ノブさんの声をまねさせるための長めの台本です。これを録っておくと、録っていない言葉も ノブさんの声で たくさん作れます<br>
   ① 「● 録る」を押してから話す。話し終わったら「■ 止める」(8秒で自動で止まります)<br>
   ② 止めると すぐ1回流れます。「▶ 聞く」で何回でも聞きなおせます<br>
   ③ よければ「✓ OK!次へ」。気に入らなければ、もう一度「● 録る」<br>
@@ -99,7 +103,12 @@
 <script>
 'use strict';
 (function () {
-  var PH = SHOP.OWNER_PHRASES.filter(function (p) { return !p.only; }).concat(SHOP.OWNER_PHRASES.filter(function (p) { return p.only; }));   // 大将用の言葉だけ(お客さん用は録らない)。お祝いのときだけの言葉は 最後に
+  var LONG = [   // 声のまね(クローン)用に 長めに読む台本。1つ 30〜40秒。いろいろな言い方が入るように(11-24 ノブさん: イレブンラボで 声をまねさせて たくさん作る)
+    { id: 'long1', cat: '声のまね用 ①元気に迎える', long: true, say: 'いらっしゃい！ 今日も一日、おつかれさまでした。外、寒かったでしょう。さあさあ、空いてる席にどうぞ。まずは何にします？ ビールですね、はいよ！ すぐ出しますから、ちょっと待っててくださいね。今日はね、いいお魚が入ったんですよ。焼いても煮てもおいしいから、あとで声かけてください。' },
+    { id: 'long2', cat: '声のまね用 ②ゆったり話す', long: true, say: 'ここはね、仕事の帰りに、ちょっと寄って、ほっとできる場所にしたいと思ってるんです。一人で来ても、だれかと来ても、気をつかわずに、ゆっくりしていってください。話したいときは話して、静かに飲みたいときは、それでいいんです。そういうお店が、ひとつくらいあってもいいでしょう。' },
+    { id: 'long3', cat: '声のまね用 ③盛り上げる', long: true, say: 'え、ほんとに？ それはすごいなあ！ おめでとうございます！ よし、じゃあみんなで乾杯しましょう。かんぱーい！ いやあ、今日はいいねえ。あ、おかわりどうします？ 最後にもう一杯いっときますか。はい、毎度ありがとうございます。気をつけて帰ってね。また来週、待ってますよ。' }
+  ];
+  var PH = LONG.concat(SHOP.OWNER_PHRASES.filter(function (p) { return !p.only; }), SHOP.OWNER_PHRASES.filter(function (p) { return p.only; }));   // 大将用の言葉だけ(お客さん用は録らない)。お祝いのときだけの言葉は 最後に
   var HAS_OLD = {}; (SHOP.NOBU_VOICE || []).forEach(function (id) { HAS_OLD[id] = 1; });   // いま お店にある ノブさんの声
   var DB = null, recs = {};      // id → { blob, type, at, sec, ok }
   var cur = null;                // 録音中 { id, mr, stream, chunks, timer, raf }
@@ -137,8 +146,9 @@
     $('progT').textContent = 'OK ' + n + ' / ' + PH.length;
     $('progB').style.width = (n / PH.length * 100) + '%';
     $('cat').textContent = p.cat + (p.only ? '(お祝いのとき)' : '');
+    $('longTip').style.display = p.long ? 'block' : 'none';
     $('num').textContent = (idx + 1) + ' / ' + PH.length;
-    $('say').textContent = p.say;
+    $('say').textContent = p.say; $('say').className = 'say' + (p.long ? ' long' : '');
     $('step').className = 'step' + (rec ? ' rec' : r && r.ok ? ' ok' : '');
     var st = $('state');
     if (rec) { st.className = 'state rec'; st.textContent = '● 録音中… 話してください'; }
@@ -154,7 +164,7 @@
     $('oldBtn').style.display = HAS_OLD[p.id] && !rec ? 'block' : 'none';
     $('chips').innerHTML = PH.map(function (q, i) {
       var x = recs[q.id];
-      return '<button class="chip' + (x && x.ok ? ' ok' : x ? ' has' : '') + (i === idx ? ' cur' : '') + '" data-i="' + i + '">' + (x && x.ok ? '✓ ' : '') + esc(q.say) + '</button>';
+      return '<button class="chip' + (x && x.ok ? ' ok' : x ? ' has' : '') + (i === idx ? ' cur' : '') + '" data-i="' + i + '">' + (x && x.ok ? '✓ ' : '') + esc(q.long ? '🎤 ' + q.cat.replace('声のまね用 ', '') : q.say) + '</button>';
     }).join('');
     var db = $('doneBox');
     if (n === PH.length) { db.style.display = 'block'; db.innerHTML = '<b>🎉 全部 OK になりました!</b><br>下の「📤 OK の声を送る」→「ドライブ」→ フォルダ「居酒屋ノブの声」に保存して、Claude に「声入れたよ」と伝えてください。'; }
@@ -195,7 +205,7 @@
         render();
       };
       mr.start();
-      cur.timer = setTimeout(stop, 8000);
+      cur.timer = setTimeout(stop, PH[idx] && PH[idx].long ? 90000 : 8000);
       try {   // 声の大きさの棒(録れているのが分かるように)
         actx = actx || new (window.AudioContext || window.webkitAudioContext)();
         if (actx.state === 'suspended') actx.resume();

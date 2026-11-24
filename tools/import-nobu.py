@@ -21,6 +21,7 @@ def _drive():   # Google ドライブ(パソコン版)の「マイドライブ/�
 DRIVE = _drive()
 OUT = os.path.join(ROOT, 'voice', 'nobu')
 CONFIG = os.path.join(ROOT, 'js', 'config.js')
+CLONE = os.path.expanduser('~/claude-work/izakaya-voice-raw/clone')   # 声のまね用の長い録音(リポジトリの外)
 
 
 def owner_ids():
@@ -75,7 +76,7 @@ def main():
     srcs = [sys.argv[1]] if len(sys.argv) > 1 else drive_sources()
     ids = owner_ids()
     os.makedirs(OUT, exist_ok=True)
-    got, skip, empty = {}, [], []
+    got, skip, empty, clone = {}, [], [], []
     with tempfile.TemporaryDirectory() as tmp:
         for zp in srcs:
             for base, data in items(zp):
@@ -83,6 +84,11 @@ def main():
                 pid = re.sub(r'\s*\(\d+\)$', '', pid)   # ドライブが付ける「(1)」を外す
                 if ext.lower() not in AUDIO:
                     continue
+                if re.match(r'long\d+$', pid):   # 声のまね(クローン)用の長い台本は、公開の置き場に入れず リポジトリの外へ そのまま保存
+                    os.makedirs(CLONE, exist_ok=True)
+                    with open(os.path.join(CLONE, pid + ext.lower()), 'wb') as f:
+                        f.write(data)
+                    clone.append(pid); continue
                 if pid not in ids:
                     skip.append(base); continue
                 src = os.path.join(tmp, 'in' + ext.lower())
@@ -111,6 +117,8 @@ def main():
         print('  × %-12s 音が入っていなかったので入れない(録りなおしてもらう)' % e)
     for b in skip:
         print('  × %s(大将用の言葉にない名前なので飛ばした)' % b)
+    for c in clone:
+        print('  🎤 %-12s 声のまね用 → %s' % (c, CLONE))
     print('ノブの声がある言葉: %d / %d' % (len(have), len(ids)))
 
 
