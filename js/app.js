@@ -311,6 +311,7 @@
   loadLocalNobu();
   function voiceFiles(ph, voiceId) {   // 鳴らす順の候補
     var owner = ph.who === 'owner', v = AVATAR.voiceOf(voiceId, owner), L = [];
+    if (ph.lib) return { files: v.rec ? ['voice/nobu/' + ph.id + '.m4a'] : [], v: v, quiet: true };   // 声のまねの言葉(11-24): ノブの声のときだけ鳴らす。ほかの声の大将は 吹き出しの文字だけ
     if (v.rec) { if (localNobu[ph.id]) L.push(localNobu[ph.id]); if ((SHOP.NOBU_VOICE || []).indexOf(ph.id) >= 0) L.push('voice/' + v.id + '/' + ph.id + '.m4a'); v = AVATAR.voiceOf(v.fallback, owner); }
     if (v.tts) L.push('voice/' + v.id + '/' + ph.id + '.m4a');
     return { files: L, v: v };
@@ -349,7 +350,7 @@
     var owner = ph.who === 'owner';
     if (owner) voiceId = ownerVoiceId();
     var c = voiceFiles(ph, voiceId);
-    speakerQueue(owner ? 'owner' : (key || 'x'), function (done) { playFiles(c.files, function (d) { speak(ph.say, c.v.id, owner, d); }, done); });
+    speakerQueue(owner ? 'owner' : (key || 'x'), function (done) { playFiles(c.files, function (d) { if (c.quiet) d(); else speak(ph.say, c.v.id, owner, d); }, done); });
   }
   function playAi(id, seat) {   // 常連のアイちゃんの言葉の声(voice/ai/)。アイちゃんの席の順番待ちに入れる
     if (DEMO || !inside || document.visibilityState === 'hidden') return;
@@ -865,7 +866,7 @@
     // 大将の画面: 視点は 大将用の「接客」「全体」だけ(お客さんの目線にはならない)。お客さん用の 注文 は出さない
     $('bMenu').classList.toggle('hidden', OWNER_MODE);
     setView(OWNER_MODE ? 'owner' : (mySeat >= 0 ? 'first' : 'overview'));   // もとの席に戻ったときは 目線で
-    buildPhrases();
+    buildPhrases(); libPrefetch();
     clearInterval(hbTimer); hbTimer = setInterval(function () { var mm = members()[ME.uid]; if (inside && mm && mm.name) net.update('members/' + ME.uid, { seen: TS }); botTick(); }, 15000);   // 名前のある自分の記録があるときだけ(消されたあとに作らない)
     var back = -1; for (var bi = 0; bi < N; bi++) if (seatUid(bi) === ME.uid) back = bi;
     if (back >= 0 && !OWNER_MODE) setTimeout(function () { toast('おかえりなさい。もとの席にもどりました'); }, 600);
@@ -1895,6 +1896,42 @@
 
   /* ---------------- 決まり文句・乾杯などの合図 ---------------- */
   function event(e) { e.at = TS; e.by = ME.uid; e.voice = myAvatar().voice || ''; net.push('events', e); }
+  /* 大将ノブの声のまねで作った言葉(js/owner-lib.js・11-24)。「💬 もっと」の棚と、その時期だけ出る「いまの時期」に使う */
+  var LIB = (window.OWNER_LIB || []).map(function (x) { return { id: x.id, cat: x.c, grp: x.g, say: x.say, w: x.w, who: 'owner', lib: true }; });
+  SHOP.PHRASES = SHOP.PHRASES.concat(LIB);
+  function libWhen(w, d) {   // w: 'MMDD-MMDD' / 'dow:N' / 'nth:月,第何,曜日,何日前から'
+    if (!w) return false;
+    var md = (d.getMonth() + 1) * 100 + d.getDate();
+    if (/^\d{4}-\d{4}$/.test(w)) { var a = +w.slice(0, 4), b = +w.slice(5); return a <= b ? (md >= a && md <= b) : (md >= a || md <= b); }
+    if (w.indexOf('dow:') === 0) return d.getDay() === +w.slice(4);
+    if (w.indexOf('nth:') === 0) {
+      var p = w.slice(4).split(',').map(Number), f = new Date(d.getFullYear(), p[0] - 1, 1), day = 1 + (p[2] - f.getDay() + 7) % 7 + (p[1] - 1) * 7;
+      var diff = Math.round((new Date(d.getFullYear(), p[0] - 1, day) - new Date(d.getFullYear(), d.getMonth(), d.getDate())) / 86400000);
+      return diff >= 0 && diff <= p[3];
+    }
+    return false;
+  }
+  function libSpan(w) {   // その言葉が出る日数(短いほど「いまだけ」なので 先に並べる)
+    if (/^\d{4}-\d{4}$/.test(w)) { var t = function (x) { return (Math.floor(x / 100) - 1) * 31 + x % 100; }, a = t(+w.slice(0, 4)), b = t(+w.slice(5)); return b >= a ? b - a + 1 : 372 - a + b + 1; }
+    return w.indexOf('nth:') === 0 ? 7 : w.indexOf('dow:') === 0 ? 1 : 999;
+  }
+  function libNow() { var d = new Date(now()); return LIB.filter(function (p) { return libWhen(p.w, d); }).map(function (p, i) { return [libSpan(p.w), i, p]; }).sort(function (x, y) { return x[0] - y[0] || x[1] - y[1]; }).map(function (x) { return x[2]; }); }
+  var FAV_KEY = 'iz-fav-o', FAV_MAX = 12, phFavMode = false;
+  function favs() { var L = lsGet(FAV_KEY, []); return Array.isArray(L) ? L.filter(function (id) { return SHOP.PHRASES.some(function (p) { return p.id === id; }); }) : []; }
+  function favToggle(id) {
+    var L = favs(), i = L.indexOf(id);
+    if (i >= 0) L.splice(i, 1); else { if (L.length >= FAV_MAX) { toast('お気に入りは ' + FAV_MAX + 'こまでです。先に どれかを外してください', 2600); return; } L.push(id); }
+    lsSet(FAV_KEY, L); buildPhrases(); refreshSheet(true);
+  }
+  function phById(id) { return SHOP.PHRASES.filter(function (p) { return p.id === id; })[0]; }
+  var libFetched = false;
+  function libPrefetch() {   // 今日使いそうな声を 先に読んでおく(はじめて鳴らすときの 待ちをなくす)。ノブの声のときだけ・1回だけ
+    if (libFetched || !LIB.length || !AVATAR.voiceOf(ownerVoiceId(), true).rec) return; libFetched = true;
+    var ids = libNow().map(function (p) { return p.id; }); if (OWNER_MODE) ids = favs().concat(ids);
+    ids.filter(function (id, i, a) { return a.indexOf(id) === i && /^n_/.test(id); }).slice(0, 40).forEach(function (id, i) {
+      setTimeout(function () { try { fetch('voice/nobu/' + id + '.m4a').catch(function () {}); } catch (e) {} }, 1500 + i * 120);
+    });
+  }
   function myPhrases() { return (OWNER_MODE ? SHOP.OWNER_PHRASES : SHOP.GUEST_PHRASES).filter(inMode); }   // お祝いの日だけの言葉は その日だけ   // 大将とお客さんで まったく別
   var phraseAt = 0;
   function sayPhrase(id) {
@@ -1914,11 +1951,64 @@
       b.onclick = function () { sayPhrase(p.id); };
       box.appendChild(b);
     });
+    if (OWNER_MODE) {
+      var mainIds = myPhrases().filter(function (p) { return p.main; }).map(function (p) { return p.id; });
+      favs().filter(function (id) { return mainIds.indexOf(id) < 0; }).forEach(function (id) {   // ☆ お気に入り(設定の「💬 もっと」で選ぶ)
+        var p = phById(id); if (!p) return;
+        var b = document.createElement('button'); b.className = 'fav'; b.textContent = '★ ' + phraseLabel(p);
+        b.onclick = function () { sayPhrase(p.id); }; box.appendChild(b);
+      });
+      var nowL = libNow();
+      if (nowL.length) {   // その時期だけ出る言葉(季節・行事・曜日)
+        var nb = document.createElement('button'); nb.className = 'more now'; nb.textContent = seasonIcon() + ' いま ' + nowL.length;
+        nb.onclick = function () { openSheet('phrases'); setTimeout(function () { var t = document.getElementById('phNow'); if (t) t.scrollIntoView({ block: 'start' }); }, 60); };
+        box.appendChild(nb);
+      }
+    }
     var m = document.createElement('button'); m.className = 'more'; m.textContent = '💬 もっと';
     m.onclick = function () { openSheet('phrases'); };
     box.appendChild(m);
   }
+  function seasonIcon() {
+    var d = new Date(now()), md = (d.getMonth() + 1) * 100 + d.getDate();
+    if (md >= 1210 && md <= 1225) return '🎄'; if (md >= 1226 || md <= 115) return '🎍'; if (md >= 1020 && md <= 1031) return '🎃';
+    var m = d.getMonth() + 1; return m >= 3 && m <= 5 ? '🌸' : m >= 6 && m <= 8 ? '🎐' : m >= 9 && m <= 11 ? '🍁' : '⛄';
+  }
+  function phBtn(p) {
+    var f = favs().indexOf(p.id) >= 0;
+    return '<button data-ph="' + esc(p.id) + '" class="' + (f ? 'is-fav' : '') + '" data-s="' + esc((p.say + ' ' + (p.cat || '') + ' ' + (p.grp || '')).toLowerCase()) + '">' + (f ? '<i>★</i>' : '') + esc(phraseLabel(p)) + '</button>';
+  }
+  function ownerPhrasesHTML() {
+    var d = new Date(now()), WD = '日月火水木金土', h = '';
+    h += '<div class="ph-tools"><input id="phSearch" type="search" placeholder="🔎 言葉をさがす(例: 雨・ビール)" autocomplete="off"><button id="phFavMode" class="' + (phFavMode ? 'on' : '') + '">' + (phFavMode ? '✓ 選びおわる' : '☆ お気に入り') + '</button></div>';
+    if (phFavMode) h += '<p class="ph-favnote">☆ をつけたい言葉を押してください(' + FAV_MAX + 'こまで)。もう一度押すと外れます。☆ の言葉は 入力らんの上に いつも出ます。</p>';
+    var fv = favs().map(phById).filter(Boolean);
+    if (fv.length) h += '<div class="sh-sec">★ お気に入り</div><div class="ph-grid">' + fv.map(phBtn).join('') + '</div>';
+    var nowL = libNow();
+    h += '<div class="sh-sec" id="phNow">' + seasonIcon() + ' いまの時期<small>' + (d.getMonth() + 1) + '月' + d.getDate() + '日(' + WD[d.getDay()] + ')に合う言葉。日にちで自動で入れかわります</small></div>';
+    h += nowL.length ? '<div class="ph-grid">' + nowL.map(phBtn).join('') + '</div>' : '<p class="small-note">いまの時期の言葉はありません</p>';
+    var cat = '';
+    myPhrases().forEach(function (p) {
+      if (p.cat !== cat) { h += (cat ? '</div>' : '') + '<div class="sh-sec">' + esc(p.cat) + '</div><div class="ph-grid">'; cat = p.cat; }
+      h += phBtn(p);
+    });
+    if (cat) h += '</div>';
+    if (LIB.length) {
+      h += '<div class="sh-sec">🎙 ノブの声の言葉 ' + LIB.length + 'こ<small>押すと分類が開きます</small></div>';
+      var groups = []; LIB.forEach(function (p) { if (groups.indexOf(p.grp) < 0) groups.push(p.grp); });
+      var ic = window.OWNER_LIB_ICON || {};
+      groups.forEach(function (g) {
+        var L = LIB.filter(function (p) { return p.grp === g; }), c2 = '', inner = '';
+        L.forEach(function (p) { if (p.cat !== c2) { inner += (c2 ? '</div>' : '') + '<div class="ph-sub">' + esc(p.cat) + '</div><div class="ph-grid">'; c2 = p.cat; } inner += phBtn(p); });
+        h += '<details class="ph-lib"' + (phOpen[g] ? ' open' : '') + ' data-g="' + esc(g) + '"><summary>' + (ic[g] || '・') + ' ' + esc(g) + '<span>' + L.length + 'こ</span></summary>' + inner + '</div></details>';
+      });
+    }
+    if (!AVATAR.voiceOf(ownerVoiceId(), true).rec) h += '<p class="small-note">「ノブの声の言葉」は、大将の声が「ノブの声」のときだけ声が出ます。ほかの声のときは 吹き出しの文字だけ届きます。</p>';
+    return h + '<p class="ph-none small-note" hidden>その言葉は見つかりませんでした</p><p class="small-note">押すと、みんなに声と吹き出しで届きます。声は「アバター」の「体と声」で選べます。</p>';
+  }
+  var phOpen = {};
   function phrasesHTML() {
+    if (OWNER_MODE) return ownerPhrasesHTML();
     var h = '', cat = '';
     myPhrases().forEach(function (p) {
       if (p.cat !== cat) { h += (cat ? '</div>' : '') + '<div class="sh-sec">' + esc(p.cat) + '</div><div class="ph-grid">'; cat = p.cat; }
@@ -2377,7 +2467,7 @@
       title = 'おためし客';
       html = '<p class="small-note">ひとりでも試せるように、作りもののお客さんを呼べます(おためしモードだけ)。</p><div class="btn-row"><button id="botAdd">🙋 1人呼ぶ</button><button id="botAll">👥 満席にする</button><button id="botOut" class="red">👋 全員帰す</button></div>';
     }
-    var keepY = (sheetKind === 'aichan' || sheetKind === 'owner') && body._k === sheetKind ? body.scrollTop : 0;   // 押しても 上に戻らない
+    var keepY = (sheetKind === 'aichan' || sheetKind === 'owner' || sheetKind === 'phrases') && body._k === sheetKind ? body.scrollTop : 0;   // 押しても 上に戻らない
     var ae = document.activeElement, inBody = ae && body.contains(ae);
     if (!force && inBody && ae.type === 'range') return;   // つまみを動かしている途中は 描きなおさない
     var vals = {}; if (body._k === sheetKind) body.querySelectorAll('input[id]:not([type=range]):not([type=checkbox]), textarea[id]').forEach(function (el) { if (el.value) vals[el.id] = el.value; });   // 書いている途中の文字を残す(ほかの人のリクエストで 消えていた 11-24 点検)
@@ -2428,7 +2518,17 @@
     } else if (sheetKind === 'costume') {
       wireCostume(body);
     } else if (sheetKind === 'phrases') {
-      body.querySelectorAll('[data-ph]').forEach(function (b) { b.onclick = function () { if (sayPhrase(b.getAttribute('data-ph'))) closeSheet(); }; });
+      body.querySelectorAll('[data-ph]').forEach(function (b) { b.onclick = function () { var id = b.getAttribute('data-ph'); if (phFavMode) { favToggle(id); return; } if (sayPhrase(id)) closeSheet(); }; });
+      var fm = q('#phFavMode'); if (fm) fm.onclick = function () { phFavMode = !phFavMode; refreshSheet(true); };
+      body.querySelectorAll('details.ph-lib').forEach(function (dt) { dt.ontoggle = function () { phOpen[dt.getAttribute('data-g')] = dt.open; }; });
+      var se = q('#phSearch'); if (se) { var phFilter = function () {
+        var w = se.value.trim().toLowerCase(), any = false;
+        body.querySelectorAll('[data-ph]').forEach(function (b) { var hit = !w || (b.getAttribute('data-s') || '').indexOf(w) >= 0; b.hidden = !hit; if (hit && w) any = true; });
+        body.querySelectorAll('.ph-grid').forEach(function (g) { g.hidden = !!w && !g.querySelector('[data-ph]:not([hidden])'); });
+        body.querySelectorAll('.sh-sec, .ph-sub').forEach(function (x) { var g = x.nextElementSibling; x.hidden = !!w && !(g && g.classList.contains('ph-grid') && !g.hidden); });
+        body.querySelectorAll('details.ph-lib').forEach(function (dt) { var has = !!dt.querySelector('[data-ph]:not([hidden])'); dt.hidden = !!w && !has; if (w && has) dt.open = true; });
+        var none = body.querySelector('.ph-none'); if (none) none.hidden = !w || any;
+      }; se.oninput = phFilter; if (se.value) phFilter(); }
     } else if (sheetKind === 'orders') {
       body.querySelectorAll('[data-serve]').forEach(function (b) { b.onclick = function () { var k = b.getAttribute('data-serve'), o = (tree.orders || {})[k]; if (o) serve(o.seat, o.item, k); }; });
       body.querySelectorAll('[data-seatserve]').forEach(function (b) { b.onclick = function () { serveTo(+b.getAttribute('data-seatserve')); }; });
