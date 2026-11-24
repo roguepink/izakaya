@@ -114,9 +114,11 @@ var AVATAR = {
     { id: 'o_alnilam', name: 'どっしり', sex: 'm', tts: 'Alnilam', pitch: 0.8, rate: 1.0, style: '40代の男性。居酒屋の大将。どっしり落ち着いて、やさしい。小さな居酒屋で お客さんに声をかける。自然な日本語の話し言葉。' },
     { id: 'o_leda', name: 'いたずらっぽい', sex: 'f', tts: 'Leda', pitch: 1.4, rate: 1.1, style: '20代の女性。居酒屋の看板娘。明るく、テンポが速め。無邪気で、少しいたずらっぽい。標準語。小さな居酒屋で お客さんに声をかける。自然な日本語の話し言葉。', model: 'gemini-3.8-flash-lite-tts' },
     { id: 'o_gacrux', name: '貫禄の女将', sex: 'f', tts: 'Gacrux', pitch: 1.05, rate: 0.95, style: '50代の女性。貫禄のある女将。ゆったり、あたたかく、包みこむように。小さな居酒屋で お客さんに声をかける。自然な日本語の話し言葉。' },
-    { id: 'o_pulcherrima', name: '姉御肌', sex: 'f', tts: 'Pulcherrima', pitch: 1.2, rate: 1.06, style: '30代の女性。姉御肌の女将。きっぷがよく、はっきり、さばさば。小さな居酒屋で お客さんに声をかける。自然な日本語の話し言葉。' },
+    { id: 'o_achernar', name: 'かわいい看板娘', sex: 'f', tts: 'Achernar', pitch: 1.45, rate: 1.06, style: '20歳くらいの若い女の子。居酒屋の看板娘。かわいらしく、声は高めで、ふんわり、にこにこ。標準語。小さな居酒屋で お客さんに声をかける。自然な日本語の話し言葉。' },
+    { id: 'o_kore', name: 'しっかり者の女将', sex: 'f', tts: 'Kore', pitch: 1.2, rate: 1.0, style: '30代後半の女性。居酒屋の女将。はきはきして、頼れる感じ。明るく、女性らしい やわらかい声。標準語。小さな居酒屋で お客さんに声をかける。自然な日本語の話し言葉。' },
+    { id: 'o_sulafat', name: '頼れる女将', sex: 'f', tts: 'Sulafat', pitch: 1.15, rate: 1.0, style: '30代後半の女性。居酒屋の女将。しっかり者で、あたたかく、品がある。明るく、女性らしい やわらかい声。標準語。小さな居酒屋で お客さんに声をかける。自然な日本語の話し言葉。' },
   ],
-  VOICE_ALIAS: { m1: 'g_puck', m2: 'g_achird', m3: 'g_charon', f1: 'g_zephyr', f2: 'g_aoede', f3: 'g_sulafat', om1: 'o_fenrir', om2: 'o_alnilam', of1: 'o_leda', of2: 'o_gacrux' },   // 前の名前(保存してあるアバター用)
+  VOICE_ALIAS: { m1: 'g_puck', m2: 'g_achird', m3: 'g_charon', f1: 'g_zephyr', f2: 'g_aoede', f3: 'g_sulafat', om1: 'o_fenrir', om2: 'o_alnilam', of1: 'o_leda', of2: 'o_gacrux', o_pulcherrima: 'o_kore' },   // 前の名前(保存してあるアバター用)
   voiceList: function (owner) { return owner ? AVATAR.OWNER_VOICES : AVATAR.GUEST_VOICES; },
   voiceOf: function (id, owner) {
     var L = AVATAR.voiceList(owner);
