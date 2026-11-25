@@ -415,3 +415,6 @@
 - 声は ~/claude-work/izakaya-voice-raw/clone/out/<id>.mp3(まだ公開の置き場に入れていない)。一覧は docs/kotoba/final.json。
 - 聞き比べページ https://claude.ai/artifact/5aG4wBHhXdfDdL4kyMSBKy(db marks/<id> {v:'ok'|'ng', note})。ノブさんの○×待ち → ×を作り直し → アプリへ(季節・行事ごとに選べる仕組み)。
 - 人のペース: 11-24 ノブさん「公式 API・MCP は待たない」に見直し(hito-pace.py・CLAUDE.md)。
+
+## 2026-11-25 説明書に「おためし中」の一言
+- guide.html の「お店を開く」の上に「今は おためし中・ほかの人とは つながりません」(.trial)。**Firebase でつないで本番にしたら、この一言を消す。**
